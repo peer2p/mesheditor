@@ -1,0 +1,84 @@
+{
+  "name": "mesheditor",
+  "version": "1.0.0",
+  "description": "A modern 3D Mesh Editor and manipulation studio (Standalone, Web Component / NPM Library, and macOS/Windows/Linux Desktop App)",
+  "private": false,
+  "main": "dist-lib/index.umd.js",
+  "module": "dist-lib/esm/index.js",
+  "types": "dist-lib/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist-lib/esm/index.d.ts",
+      "import": "./dist-lib/esm/index.js",
+      "require": "./dist-lib/index.umd.js",
+      "default": "./dist-lib/esm/index.js"
+    },
+    "./standalone": "./dist-lib/standalone/mesheditor-element.bundle.js",
+    "./style.css": "./dist-lib/mesheditor.css",
+    "./mesheditor.css": "./dist-lib/mesheditor.css"
+  },
+  "files": [
+    "dist-lib",
+    "src/mesheditor.css",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "webpack serve --mode development",
+    "build": "webpack --mode production",
+    "build:dev": "webpack --mode development",
+    "prod": "webpack serve --mode production --port 8080",
+    "build:lib:styles": "node scripts/sync-styles.js",
+    "build:lib:esm": "tsc -p tsconfig.lib.json",
+    "build:lib:bundle": "webpack --config webpack.lib.config.js",
+    "build:lib": "npm run build:lib:styles && npm run build:lib:esm && npm run build:lib:bundle",
+    "desktop:dev": "electron electron/main.js --dev",
+    "desktop:start": "npm run build && electron electron/main.js",
+    "desktop:build:mac": "npm run build && electron-builder --mac --config electron-builder.yml",
+    "desktop:build:win": "npm run build && electron-builder --win --config electron-builder.yml",
+    "desktop:build:linux": "npm run build && electron-builder --linux --config electron-builder.yml",
+    "desktop:build:all": "npm run build && electron-builder -mwl --config electron-builder.yml",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist dist-lib release",
+    "prepublishOnly": "npm run build:lib"
+  },
+  "keywords": [
+    "babylonjs",
+    "mesh-editor",
+    "web-component",
+    "custom-element",
+    "3d",
+    "webgl",
+    "typescript",
+    "electron"
+  ],
+  "author": "daniel.peer@gmx.net",
+  "license": "ISC",
+  "peerDependencies": {
+    "@babylonjs/core": ">=7.0.0",
+    "@babylonjs/loaders": ">=7.0.0",
+    "@babylonjs/materials": ">=7.0.0",
+    "@babylonjs/serializers": ">=7.0.0"
+  },
+  "dependencies": {
+    "@babylonjs/core": ">=7.0.0",
+    "@babylonjs/loaders": ">=7.0.0",
+    "@babylonjs/materials": ">=7.0.0",
+    "@babylonjs/serializers": ">=7.0.0",
+    "dat.gui": "^0.7.9",
+    "earcut": "2.2.4",
+    "lucide": "^1.62.0"
+  },
+  "devDependencies": {
+    "@types/dat.gui": "^0.7.13",
+    "@types/node": "^26.2.0",
+    "copy-webpack-plugin": "^13.0.1",
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0",
+    "html-webpack-plugin": "^5.6.4",
+    "ts-loader": "^9.6.2",
+    "typescript": "^6.0.3",
+    "webpack": "^5.112.2",
+    "webpack-cli": "^7.2.2",
+    "webpack-dev-server": "^6.0.0"
+  }
+}

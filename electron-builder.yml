@@ -1,0 +1,51 @@
+appId: com.mesheditor.app
+productName: Mesh Editor
+copyright: Copyright © 2026 Daniel Peer
+
+extraMetadata:
+  main: electron/main.js
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - electron/**/*
+  - package.json
+  - "!node_modules/**/*"
+
+artifactName: "MeshEditor-${version}-${os}-${arch}.${ext}"
+
+mac:
+  category: public.app-category.graphics-design
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+    - target: zip
+      arch:
+        - arm64
+        - x64
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  artifactName: "MeshEditor-${version}-win-${arch}-${target}.${ext}"
+
+linux:
+  category: Graphics
+  maintainer: daniel.peer@gmx.net
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64

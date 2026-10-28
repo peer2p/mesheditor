@@ -1,0 +1,191 @@
+name: Release & Distribute All Targets
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a GitHub Release with all built artifacts'
+        required: false
+        default: false
+        type: boolean
+      tag_name:
+        description: 'Release tag name (used when triggered manually with create_release=true, e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # ============================================================================
+  # 1. BUILD STANDALONE WEB APP, WEB COMPONENT & NPM LIBRARY
+  # ============================================================================
+  build-web-and-lib:
+    name: Build Web App & NPM Library
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check source
+        run: npm run type-check
+
+      - name: Build Standalone Web App
+        run: npm run build
+
+      - name: Archive Standalone Web App (.zip)
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p artifacts
+          cd dist && zip -r "../artifacts/MeshEditor-${VERSION}-standalone-web.zip" . && cd ..
+
+      - name: Build NPM Library & <mesh-editor> Web Component
+        run: npm run build:lib
+
+      - name: Package NPM Library (.tgz) & Standalone Web Component (.zip)
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p artifacts
+          npm pack --pack-destination artifacts
+          cd dist-lib && zip -r "../artifacts/MeshEditor-${VERSION}-webcomponent-lib.zip" . && cd ..
+
+      - name: Upload Web & Library Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-web-and-lib
+          path: artifacts/*
+          if-no-files-found: error
+
+  # ============================================================================
+  # 2. BUILD NATIVE DESKTOP APPS (macOS, Windows, Linux)
+  # ============================================================================
+  build-desktop:
+    name: Build Desktop (${{ matrix.platform_name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform_name: macOS (arm64 & x64)
+            build_cmd: npx electron-builder --mac --publish never --config electron-builder.yml
+            artifact_name: release-desktop-macos
+          - os: windows-latest
+            platform_name: Windows (NSIS & Portable)
+            build_cmd: npx electron-builder --win --publish never --config electron-builder.yml
+            artifact_name: release-desktop-windows
+          - os: ubuntu-latest
+            platform_name: Linux (AppImage & deb)
+            build_cmd: npx electron-builder --linux --publish never --config electron-builder.yml
+            artifact_name: release-desktop-linux
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web bundle (dist/)
+        run: npm run build
+
+      - name: Package Electron Desktop App (${{ matrix.platform_name }})
+        env:
+          # Disable automatic code-signing discovery if no certificates are configured in secrets
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: ${{ matrix.build_cmd }}
+
+      - name: Upload Desktop Installers (${{ matrix.platform_name }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: error
+
+  # ============================================================================
+  # 3. CREATE GITHUB RELEASE & ATTACH ALL DISTRIBUTION ARTIFACTS
+  # ============================================================================
+  publish-release:
+    name: Publish GitHub Release
+    needs:
+      - build-web-and-lib
+      - build-desktop
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-artifacts
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS.txt
+        working-directory: dist-artifacts
+        run: |
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Determine Release Tag
+        id: release_meta
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: Mesh Editor ${{ steps.release_meta.outputs.tag }}
+          generate_release_notes: true
+          files: dist-artifacts/*
+          body: |
+            ## 📦 Mesh Editor ${{ steps.release_meta.outputs.tag }} — Distribution Downloads
+
+            ### 🖥️ Desktop Applications
+            - **macOS (Apple Silicon `arm64` & Intel `x64`)**: `MeshEditor-*-mac-*.dmg` / `.zip`
+            - **Windows (`x64` & `arm64`)**: `MeshEditor-*-win-*-nsis.exe` (Installer) / `MeshEditor-*-win-*-portable.exe` (Portable)
+            - **Linux (`x64`)**: `MeshEditor-*-linux-x64.AppImage` / `MeshEditor-*-linux-x64.deb`
+
+            ### 🌐 Web & NPM Library
+            - **Standalone Web Application**: `MeshEditor-*-standalone-web.zip` (Ready to host on any static web server)
+            - **Web Component & Library Bundle**: `MeshEditor-*-webcomponent-lib.zip` & `mesheditor-*.tgz` (`npm install ./mesheditor-*.tgz`)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
