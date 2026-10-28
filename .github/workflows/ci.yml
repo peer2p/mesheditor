@@ -39,6 +39,9 @@ jobs:
       - name: Run TypeScript type-check
         run: npm run type-check
 
+      - name: Run Integration Tests (Vitest + Babylon NullEngine)
+        run: npm run test:integration
+
       - name: Build Standalone Web Application (dist/)
         run: npm run build
 

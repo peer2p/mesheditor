@@ -260,6 +260,10 @@ bootstrap();
 | **Windows App (`.exe`)** | `npm run desktop:build:win` | Packages the Windows NSIS installer & portable `.exe` into `release/` |
 | **Linux App (`.AppImage` / `.deb`)** | `npm run desktop:build:linux` | Packages the Linux `AppImage` and Debian `.deb` package into `release/` |
 | **All Desktop Platforms** | `npm run desktop:build:all` | Packages macOS, Windows, and Linux builds in one run into `release/` |
+| **Integration Tests (Headless 3D)** | `npm test` / `npm run test:integration` | Runs fast Vitest + Babylon.js `NullEngine` integration tests (`tests/integration/`) |
+| **Integration Tests (Watch)** | `npm run test:watch` | Runs Vitest in interactive watch mode |
+| **End-to-End Tests (Browser)** | `npm run test:e2e` | Starts the dev server and runs Playwright Chromium E2E tests (`tests/e2e/`) |
+| **Full Test Suite** | `npm run test:all` | Runs all integration tests followed by all Playwright E2E tests |
 | **Clean Build Artifacts** | `npm run clean` | Removes `dist/`, `dist-lib/`, and `release/` |
 
 ---
@@ -377,13 +381,74 @@ npm run desktop:build:linux
 
 ---
 
+## Testing Architecture & Strategy
+
+Testing a 3D WebGL application requires balancing **execution speed & determinism** (scene graph math, vertex manipulation, undo/redo state) with **real browser verification** (WebGL canvas initialization, DOM menus, dat.GUI controls, and custom elements).
+
+The Mesh Editor uses a **two-tier testing architecture**:
+
+```
+tests/
+├── integration/
+│   ├── service.test.ts          # Stage 1: Core 3D service tests (Vitest + Babylon NullEngine)
+│   └── app-and-plugins.test.ts  # Stage 1: UI mounting, Outliner DOM sync, PluginManager & HostAppAdapter
+└── e2e/
+    └── editor.spec.ts           # Stage 2: Full browser E2E smoke & workflow tests (Playwright Chromium)
+```
+
+### Stage 1: Headless 3D Integration Tests (`Vitest` + Babylon.js `NullEngine` + `jsdom`)
+
+The core [`MeshEditorService`](src/MeshEditorService.ts) and [`MeshEditorApp`](src/MeshEditorApp.ts) accept an optional custom `Engine` instance (`customEngine?: Engine`), allowing tests to inject Babylon's headless **`NullEngine`**. This executes the real Babylon.js 3D scene graph, bounding box calculations, vertex buffer mutations, and hierarchy transformations directly in Node.js without requiring a physical GPU or browser window (~2.5 seconds for the entire suite):
+
+- **`tests/integration/service.test.ts`**:
+  - **Scene & Environment**: Camera, lights, ground grid visibility/sizing, and clear color updates.
+  - **Primitive Generation**: Spawning `Box`, `Sphere`, `Cylinder`, `Cone`, `Capsule`, `Torus`, `Plane`, `Ground`, and `Polyhedron` meshes with valid vertex data and `PBRMaterial`.
+  - **Selection & Multi-Selection Proxy**: Single selection, toggle selection, range selection, and temporary multi-selection transform proxy parenting.
+  - **Grouping & Hierarchy**: Grouping multiple meshes into `TransformNode` containers (`groupSelected`) and ungrouping (`ungroupSelected`) with full **Undo / Redo** verification.
+  - **Clipboard & Lifecycle**: Copy, paste, duplicate, and delete operations with Undo / Redo restoration.
+  - **Transform & Pivot Utilities**: Snap to ground ($Y \ge 0$), center to origin, degree-based rotation helpers, and baking transforms into vertex positions.
+  - **Facet & Vertex Editing**: Toggling the facet editor, extruding selected triangular facets, flipping face normals, and deleting individual facets.
+  - **Materials & UV Mapping**: Creating PBR materials and applying Triplanar and Planar (`top`, `front`, `side`) UV projections.
+- **`tests/integration/app-and-plugins.test.ts`**:
+  - **DOM & Outliner Synchronization**: Mounting `MeshEditorApp` into a custom container and verifying automatic `#statsMeshes` and `#outlinerTreeContainer` DOM updates when meshes are added.
+  - **Plugin Lifecycle**: Registering, executing toolbar/menu callbacks, and disposing custom plugins via [`PluginManager`](src/plugin.ts).
+  - **Host Application Adapter**: Verifying [`HostAppAdapter`](src/adapters/HostAppAdapter.ts) custom save toolbar buttons (`saveButtonLabel`) and `onModelLoaded` / `onModelExported` callbacks.
+
+### Stage 2: Real Browser End-to-End Tests (`Playwright` + Headless Chromium WebGL)
+
+While `NullEngine` verifies 3D logic at high speed, **Stage 2 (`tests/e2e/editor.spec.ts`)** launches the compiled application in a real Chromium browser with WebGL enabled (`playwright.config.ts`) to verify end-to-end user workflows:
+
+1. **Application Boot & Web Component Registration**: Verifies zero console/page errors on startup, active WebGL scene initialization, and `<mesh-editor>` Custom Element registration.
+2. **UI Primitive Creation Workflow**: Opens *Tools → Create Mesh*, triggers *Spawn at Origin* inside the `dat.GUI` panel, and verifies live updates in the Scene Objects outliner and polygon/mesh counters.
+3. **Interactive Delete & Undo/Redo**: Deletes a selected mesh through *Actions → Delete Selected* and restores/re-deletes it via the top toolbar *Undo* (`#btnUndo`) and *Redo* (`#btnRedo`) buttons.
+4. **Layout & Gizmo Switching**: Toggles between *Floating* and *Stackpanel* layout modes and switches active transformation gizmos (*Move*, *Rotate*, *Scale*).
+5. **Modal Dialogs**: Opens and closes the *Help & Keyboard Shortcuts* modal.
+
+### Running the Tests
+
+```bash
+# Run fast headless 3D integration tests (Vitest + NullEngine)
+npm test
+
+# Run integration tests in interactive watch mode during development
+npm run test:watch
+
+# Run browser E2E tests (automatically starts webpack-dev-server on port 8080)
+npm run test:e2e
+
+# Run the complete test suite (Integration + E2E)
+npm run test:all
+```
+
+---
+
 ## CI/CD & GitHub Releases (`.github/workflows/`)
 
 Three GitHub Actions workflows are included for automated building, testing, and multi-platform distribution:
 
 | Workflow | File | Trigger | Description |
 | :--- | :--- | :--- | :--- |
-| **CI — Build & Verify Targets** | [`.github/workflows/ci.yml`](file:///Users/dpeer/Sites/games/mesheditor/.github/workflows/ci.yml) | Push / PR on `main`, `master`, `develop` | Runs `type-check`, builds the Standalone Web App (`dist/`) and the NPM Library & `<mesh-editor>` Web Component (`dist-lib/` + `.tgz`), and uploads build artifacts. |
+| **CI — Build & Verify Targets** | [`.github/workflows/ci.yml`](file:///Users/dpeer/Sites/games/mesheditor/.github/workflows/ci.yml) | Push / PR on `main`, `master`, `develop` | Runs `type-check`, executes the `Vitest` integration test suite (`npm run test:integration`), builds the Standalone Web App (`dist/`) and the NPM Library & `<mesh-editor>` Web Component (`dist-lib/` + `.tgz`), and uploads build artifacts. |
 | **Release & Distribute All Targets** | [`.github/workflows/release.yml`](file:///Users/dpeer/Sites/games/mesheditor/.github/workflows/release.yml) | Tag `v*.*.*` (e.g. `v1.0.0`) or Manual Dispatch | Builds **macOS** (`.dmg` & `.zip` for `arm64`/`x64`), **Windows** (`.exe` NSIS & Portable), **Linux** (`.AppImage` & `.deb`), **Standalone Web** (`.zip`), and **NPM Library / Web Component** (`.tgz` & `.zip`), generates `SHA256SUMS.txt`, and publishes everything to **GitHub Releases**. |
 | **Deploy to GitHub Pages** | [`.github/workflows/pages.yml`](file:///Users/dpeer/Sites/games/mesheditor/.github/workflows/pages.yml) | Push on `main` / `master` or Manual Dispatch | Automatically deploys the Standalone Web App (`dist/`) to **GitHub Pages**. |
 

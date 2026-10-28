@@ -9,11 +9,11 @@
     "sourceMap": true,
     "strict": false,
     "skipLibCheck": true,
-    "outDir": "./dist",
-    "rootDir": "./src"
+    "outDir": "./dist"
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "tests/**/*"
   ],
   "exclude": [
     "node_modules",

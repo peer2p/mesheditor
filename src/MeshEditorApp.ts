@@ -1,4 +1,4 @@
-import { Color3, Mesh, PBRMaterial, StandardMaterial, Texture } from '@babylonjs/core';
+import { Color3, Engine, Mesh, PBRMaterial, StandardMaterial, Texture } from '@babylonjs/core';
 import * as dat from 'dat.gui';
 import { createDefaultPlatformAdapter, MeshEditorPlatformAdapter } from './adapters';
 import { MeshEditorService } from './MeshEditorService';
@@ -35,6 +35,11 @@ export interface MeshEditorAppOptions {
    * Optional additional service event callbacks (e.g. used by `<mesh-editor>` Web Component).
    */
   events?: MeshEditorServiceEvents;
+
+  /**
+   * Optional custom Babylon Engine instance (e.g. `NullEngine` for headless integration testing).
+   */
+  engine?: Engine;
 }
 
 // Single icons are imported here for tree shaking and smaller bundle size
@@ -484,7 +489,7 @@ export class MeshEditorApp {
         }
         return handled;
       },
-    });
+    }, options.engine);
 
     // Initialize Plugin Manager
     this.pluginManager = new PluginManager(this, this.service);

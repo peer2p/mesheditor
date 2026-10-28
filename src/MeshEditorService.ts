@@ -132,22 +132,24 @@ export class MeshEditorService {
   private resizeHandler: (() => void) | null = null;
   private resizeObserver: ResizeObserver | null = null;
 
-  constructor(canvas: HTMLCanvasElement, events: MeshEditorServiceEvents = {}) {
+  constructor(canvas: HTMLCanvasElement, events: MeshEditorServiceEvents = {}, customEngine?: Engine) {
     this.canvas = canvas;
     this.events = events;
-    this.initBabylon();
+    this.initBabylon(customEngine);
     this.initGizmosAndPicking();
   }
 
   /* =========================================================================
      1. BABYLON INITIALIZATION
      ========================================================================= */
-  private initBabylon(): void {
-    this.engine = new Engine(this.canvas, true, {
-      preserveDrawingBuffer: true,
-      stencil: true,
-      antialias: true,
-    });
+  private initBabylon(customEngine?: Engine): void {
+    this.engine =
+      customEngine ||
+      new Engine(this.canvas, true, {
+        preserveDrawingBuffer: true,
+        stencil: true,
+        antialias: true,
+      });
 
     this.scene = new Scene(this.engine);
     this.scene.clearColor = Color4.FromHexString(this.sceneParams.clearColor + 'ff');
@@ -740,11 +742,12 @@ export class MeshEditorService {
         }
         const idx = this.groups.indexOf(group);
         if (idx !== -1) this.groups.splice(idx, 1);
-        group.dispose();
+        group.setEnabled(false);
         this.selectNodes(validTargets);
       },
       redo: () => {
         this.clearSelectionProxy();
+        group.setEnabled(true);
         if (!this.groups.includes(group)) this.groups.push(group);
         for (const node of validTargets) {
           node.setParent(group);

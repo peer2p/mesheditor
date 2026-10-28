@@ -5,6 +5,8 @@ node_modules/
 dist/
 dist-lib/
 release/
+test-results/
+playwright-report/
 *.tsbuildinfo
 
 # OS metadata
