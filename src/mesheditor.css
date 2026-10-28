@@ -345,6 +345,11 @@ mesh-editor {
   z-index: 60;
 }
 
+.floating-dialog.has-open-color-picker,
+.floating-dialog:has(.cr.color:hover, .cr.color:focus-within, .cr.color.color-picker-open, .selector.drag) {
+  z-index: 500 !important;
+}
+
 .dialog-header {
   padding: 10px 14px;
   background: var(--bg-header);
@@ -466,7 +471,7 @@ body.layout-stackpanel .stackpanel-sidebar::-webkit-scrollbar-thumb,
 
 body.layout-stackpanel .stackpanel-sidebar .floating-dialog,
 #app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog {
-  position: static !important;
+  position: relative !important;
   width: 100% !important;
   left: auto !important;
   top: auto !important;
@@ -637,7 +642,7 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
   line-height: 32px !important;
 }
 
-.dialog-body .dg input[type='text'],
+.dialog-body .dg .cr:not(.color) input[type='text'],
 .dialog-body .dg select {
   background: rgba(0, 0, 0, 0.4) !important;
   border: 1px solid var(--border-color) !important;
@@ -648,10 +653,122 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
   height: 24px !important;
 }
 
+.dialog-body .dg .cr.color input[type='text'] {
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 4px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 2px 6px !important;
+  height: 24px !important;
+  margin-top: 4px !important;
+  cursor: pointer !important;
+}
+
 .dialog-body .dg input[type='text']:focus,
 .dialog-body .dg select:focus {
   border-color: var(--accent-color) !important;
   outline: none !important;
+}
+
+/* Dat.GUI Color Picker Palette (selector) z-index & overflow fixes */
+.dialog-body .dg .cr.color {
+  position: relative !important;
+  overflow: visible !important;
+  z-index: 20 !important;
+}
+
+.dialog-body .dg .cr.color:hover,
+.dialog-body .dg .cr.color:focus-within,
+.dialog-body .dg .cr.color.color-picker-open,
+.dialog-body .dg .cr.color:has(.selector.drag) {
+  z-index: 2000 !important;
+}
+
+.dialog-body .dg .cr.color > div,
+.dialog-body .dg .cr.color .c {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.dialog-body .dg .cr.color:hover .c,
+.dialog-body .dg .cr.color:focus-within .c,
+.dialog-body .dg .cr.color.color-picker-open .c,
+.dialog-body .dg .cr.color:has(.selector.drag) .c {
+  z-index: 2000 !important;
+}
+
+.dialog-body .dg .cr.color .selector {
+  position: absolute !important;
+  top: 28px !important;
+  left: 0 !important;
+  margin-left: 0 !important;
+  margin-top: 0 !important;
+  width: 122px !important;
+  height: 102px !important;
+  padding: 4px !important;
+  box-sizing: content-box !important;
+  line-height: normal !important;
+  background-color: #161b22 !important;
+  border: 1px solid rgba(88, 166, 255, 0.55) !important;
+  border-radius: 6px !important;
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(0, 0, 0, 0.6) !important;
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+}
+
+/* Invisible hover bridge so moving the cursor diagonally from the input to the palette never drops :hover */
+.dialog-body .dg .cr.color .selector::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -52px;
+  height: 10px;
+  background: transparent;
+}
+
+.dialog-body .dg .cr.color .c:hover .selector,
+.dialog-body .dg .cr.color:hover .selector,
+.dialog-body .dg .cr.color:focus-within .selector,
+.dialog-body .dg .cr.color.color-picker-open .selector,
+.dialog-body .dg .cr.color .selector.drag {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.dialog-body .dg .cr.color .selector * {
+  box-sizing: content-box !important;
+  line-height: normal !important;
+}
+
+.dialog-body .dg .cr.color .selector .saturation-field {
+  position: relative !important;
+  width: 100px !important;
+  height: 100px !important;
+  display: block !important;
+  float: left !important;
+  margin-right: 3px !important;
+  border: 1px solid #555 !important;
+  cursor: crosshair !important;
+}
+
+.dialog-body .dg .cr.color .selector .hue-field {
+  position: absolute !important;
+  top: 4px !important;
+  right: 4px !important;
+  width: 15px !important;
+  height: 100px !important;
+  border: 1px solid #555 !important;
+  cursor: ns-resize !important;
+}
+
+.dialog-body .dg .cr.color .selector .field-knob,
+.dialog-body .dg .cr.color .selector .hue-knob {
+  z-index: 2 !important;
+  pointer-events: none !important;
 }
 
 .dialog-body .dg .slider {
@@ -1273,4 +1390,692 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
 /* Hidden inputs */
 .hidden-input {
   display: none;
+}
+
+/* =========================================================================
+   FANCY 3D MESH LOADING ANIMATIONS (STARTUP & BABYLON SCENE INITIALIZATION)
+   ========================================================================= */
+
+@property --arc-start {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@property --arc-end {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 158deg;
+}
+
+/* Hide native indeterminate progress bars */
+progress.loading-spinner:indeterminate::-webkit-progress-bar {
+  display: none;
+  background: none;
+}
+progress.loading-spinner:indeterminate::-webkit-progress-value {
+  display: none;
+  background: none;
+}
+progress.loading-spinner:indeterminate::-moz-progress-bar {
+  display: none;
+  background: none;
+}
+progress.loading-spinner:indeterminate::slider-fill {
+  display: none;
+  background: none;
+}
+
+progress.loading-spinner:indeterminate {
+  --_from: calc(90deg + var(--arc-start, 0deg));
+  --_to: calc(90deg + var(--arc-end, 158deg));
+  --size: 20px;
+  --thickness: 2.5px;
+  --spinner-color: var(--accent-active);
+  --track-color: rgba(31, 111, 235, 0.22);
+  --spinner-duration: 1.4s;
+  --_used-spinner-duration: var(--spinner-duration);
+
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  appearance: none;
+  border: none;
+  flex-shrink: 0;
+  background:
+    conic-gradient(from var(--_from), var(--spinner-color) calc(var(--_to) - var(--_from)), transparent 0)
+    var(--track-color);
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--thickness) - 0.5px),
+    #000 calc(100% - var(--thickness))
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--thickness) - 0.5px),
+    #000 calc(100% - var(--thickness))
+  );
+  animation:
+    progress-spin var(--_used-spinner-duration) linear infinite,
+    progress-dash 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  progress.loading-spinner:indeterminate {
+    --_used-spinner-duration: 6s;
+  }
+}
+
+@keyframes progress-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+@keyframes progress-dash {
+  from {
+    --arc-start: 0deg;
+    --arc-end: 3deg;
+  }
+  50% {
+    --arc-start: 100deg;
+    --arc-end: 358deg;
+  }
+  to {
+    --arc-start: 360deg;
+    --arc-end: 363deg;
+  }
+}
+
+/* Base Overlay Container */
+.me-loader-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0.55s;
+}
+
+.me-loader-overlay.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(1.03);
+}
+
+/* 1. Program Startup Full-Screen 3D Mesh Loader */
+.me-startup-loader {
+  z-index: 3000;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(31, 111, 235, 0.24) 0%, rgba(15, 18, 24, 0.96) 62%),
+    var(--bg-primary);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.me-loader-ambient-glow {
+  position: absolute;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-active) 0%, rgba(31, 111, 235, 0) 70%);
+  opacity: 0.35;
+  filter: blur(42px);
+  animation: meAmbientPulse 3.2s ease-in-out infinite alternate;
+}
+
+.me-loader-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  z-index: 2;
+}
+
+/* 3D Mesh Stage with Gyro Rings & Holographic Grid */
+.me-mesh-stage {
+  position: relative;
+  width: 210px;
+  height: 210px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 900px;
+}
+
+.me-orbit-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(31, 111, 235, 0.35);
+  box-shadow:
+    0 0 18px rgba(31, 111, 235, 0.32),
+    inset 0 0 12px rgba(31, 111, 235, 0.18);
+  transform-style: preserve-3d;
+}
+
+.me-orbit-ring-1 {
+  width: 196px;
+  height: 196px;
+  border-top-color: var(--accent-active);
+  border-bottom-color: var(--accent-active);
+  animation: meOrbitSpin1 5.5s linear infinite;
+}
+
+.me-orbit-ring-2 {
+  width: 166px;
+  height: 166px;
+  border-left-color: var(--accent-active);
+  border-right-color: rgba(88, 166, 255, 0.75);
+  border-style: dashed;
+  animation: meOrbitSpin2 7s linear infinite reverse;
+}
+
+.me-orbit-ring-3 {
+  width: 138px;
+  height: 138px;
+  border: 1px solid rgba(31, 111, 235, 0.45);
+  border-top: 2.5px solid var(--accent-active);
+  animation: meOrbitSpin3 3.8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.me-3d-scene {
+  width: 84px;
+  height: 84px;
+  perspective: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.me-3d-mesh-assembly {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  transform-style: preserve-3d;
+  animation: meCubeRotate 6.5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .me-3d-mesh-assembly {
+    animation-duration: 24s;
+  }
+}
+
+/* Triangulated 3D Wireframe Cube Faces */
+.me-mesh-face {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--accent-active);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(31, 111, 235, 0.18) 0%,
+      rgba(31, 111, 235, 0.06) 48.5%,
+      var(--accent-active) 49.5%,
+      var(--accent-active) 50.5%,
+      rgba(31, 111, 235, 0.28) 51.5%,
+      rgba(31, 111, 235, 0.08) 100%
+    );
+  box-shadow:
+    0 0 16px rgba(31, 111, 235, 0.45),
+    inset 0 0 12px rgba(31, 111, 235, 0.28);
+  backface-visibility: visible;
+}
+
+/* Glowing 3D Vertex Corner Nodes */
+.me-mesh-face::before,
+.me-mesh-face::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid var(--accent-active);
+  box-shadow:
+    0 0 10px var(--accent-active),
+    0 0 4px #fff;
+}
+
+.me-mesh-face::before {
+  top: -4px;
+  left: -4px;
+}
+
+.me-mesh-face::after {
+  bottom: -4px;
+  right: -4px;
+}
+
+.me-mesh-face span {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed rgba(121, 192, 255, 0.35);
+}
+
+.me-face-front {
+  transform: rotateY(0deg) translateZ(36px);
+}
+.me-face-back {
+  transform: rotateY(180deg) translateZ(36px);
+}
+.me-face-right {
+  transform: rotateY(90deg) translateZ(36px);
+}
+.me-face-left {
+  transform: rotateY(-90deg) translateZ(36px);
+}
+.me-face-top {
+  transform: rotateX(90deg) translateZ(36px);
+}
+.me-face-bottom {
+  transform: rotateX(-90deg) translateZ(36px);
+}
+
+/* Inner Counter-Rotating 3D Octahedron Core Mesh */
+.me-inner-octahedron {
+  position: absolute;
+  inset: 14px;
+  transform-style: preserve-3d;
+  animation: meInnerOctaSpin 4s linear infinite reverse;
+}
+
+.me-octa-plane {
+  position: absolute;
+  inset: 0;
+  border: 1.8px solid #79c0ff;
+  background: radial-gradient(circle, var(--accent-active) 10%, rgba(31, 111, 235, 0.25) 75%);
+  box-shadow: 0 0 18px var(--accent-active);
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+.me-octa-1 {
+  transform: rotateX(0deg) rotateY(0deg);
+}
+.me-octa-2 {
+  transform: rotateY(90deg);
+}
+.me-octa-3 {
+  transform: rotateX(90deg);
+}
+
+/* Holographic Perspective Base Grid */
+.me-ground-holo-grid {
+  position: absolute;
+  bottom: -14px;
+  width: 180px;
+  height: 76px;
+  transform: rotateX(72deg);
+  border-radius: 50%;
+  background-image:
+    linear-gradient(to right, rgba(31, 111, 235, 0.45) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(31, 111, 235, 0.45) 1px, transparent 1px);
+  background-size: 16px 16px;
+  box-shadow:
+    0 0 28px rgba(31, 111, 235, 0.55),
+    inset 0 0 22px rgba(31, 111, 235, 0.45);
+  overflow: hidden;
+  border: 1.5px solid var(--accent-active);
+}
+
+.me-laser-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: linear-gradient(to bottom, transparent, var(--accent-active), #79c0ff, transparent);
+  box-shadow: 0 0 14px var(--accent-active);
+  animation: meLaserSweep 2.1s ease-in-out infinite alternate;
+}
+
+/* Startup Info & Progress Bar */
+.me-loader-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 280px;
+}
+
+.me-loader-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--text-primary);
+  text-shadow: 0 0 18px rgba(31, 111, 235, 0.6);
+}
+
+.me-loader-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-active);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(31, 111, 235, 0.75);
+}
+
+.me-loader-status {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.2px;
+}
+
+.me-loader-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.me-loader-bar-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(31, 111, 235, 0.18);
+  border: 1px solid rgba(31, 111, 235, 0.4);
+  overflow: hidden;
+  position: relative;
+}
+
+.me-loader-bar-fill {
+  width: 45%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-active), #58a6ff, var(--accent-active));
+  background-size: 200% 100%;
+  box-shadow: 0 0 12px var(--accent-active);
+  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: meBarShimmer 1.6s linear infinite;
+}
+
+/* 2. Babylon Scene Initialization & Model Loading Overlay */
+.me-scene-loader {
+  z-index: 45;
+  background: radial-gradient(circle at 50% 50%, rgba(15, 18, 24, 0.78) 0%, rgba(15, 18, 24, 0.42) 100%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.me-scene-loader-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 32px;
+  border-radius: var(--radius-lg);
+  background: rgba(16, 21, 30, 0.86);
+  border: 1px solid rgba(31, 111, 235, 0.55);
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.65),
+    0 0 32px rgba(31, 111, 235, 0.32),
+    inset 0 0 20px rgba(31, 111, 235, 0.14);
+}
+
+.me-icosahedron-stage {
+  position: relative;
+  width: 148px;
+  height: 148px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 700px;
+}
+
+.me-gizmo-arc {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  transform-style: preserve-3d;
+}
+
+.me-gizmo-arc-x {
+  border-top-color: var(--accent-active);
+  border-bottom-color: rgba(31, 111, 235, 0.35);
+  box-shadow: 0 0 14px rgba(31, 111, 235, 0.4);
+  animation: meOrbitSpin1 4.2s linear infinite;
+}
+
+.me-gizmo-arc-y {
+  inset: 14px;
+  border-left-color: #58a6ff;
+  border-right-color: var(--accent-active);
+  animation: meOrbitSpin2 5.4s linear infinite reverse;
+}
+
+.me-gizmo-arc-z {
+  inset: 24px;
+  border: 1px dashed rgba(31, 111, 235, 0.55);
+  animation: progress-spin 8s linear infinite;
+}
+
+.me-icosahedron-svg {
+  width: 124px;
+  height: 124px;
+  filter: drop-shadow(0 0 12px var(--accent-active));
+  animation: meFloatMesh 2.8s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .me-icosahedron-svg {
+    animation: none;
+  }
+}
+
+.me-mesh-core-pulse {
+  animation: meAmbientPulse 1.8s ease-in-out infinite alternate;
+}
+
+.me-mesh-back-edges polygon {
+  stroke: rgba(31, 111, 235, 0.32);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  fill: none;
+}
+
+.me-mesh-facets .me-facet {
+  fill: url(#meMeshFacetGrad);
+  stroke: rgba(31, 111, 235, 0.35);
+  stroke-width: 0.8;
+  opacity: 0.25;
+  animation: meFacetTessellate 2.4s ease-in-out infinite;
+}
+
+.me-facet-1 { animation-delay: 0s !important; }
+.me-facet-2 { animation-delay: 0.2s !important; }
+.me-facet-3 { animation-delay: 0.4s !important; }
+.me-facet-4 { animation-delay: 0.6s !important; }
+.me-facet-5 { animation-delay: 0.8s !important; }
+.me-facet-6 { animation-delay: 1.0s !important; }
+.me-facet-7 { animation-delay: 1.2s !important; }
+.me-facet-8 { animation-delay: 1.4s !important; }
+.me-facet-9 { animation-delay: 1.6s !important; }
+.me-facet-10 { animation-delay: 1.8s !important; }
+
+.me-mesh-wireframe polygon,
+.me-mesh-wireframe line {
+  stroke: var(--accent-active);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 260;
+  stroke-dashoffset: 0;
+  animation: meWireframeFlow 3.2s ease-in-out infinite alternate;
+}
+
+.me-mesh-vertices circle {
+  fill: #ffffff;
+  stroke: var(--accent-active);
+  stroke-width: 2.2;
+  animation: meVertexPulse 1.5s ease-in-out infinite alternate;
+}
+
+.me-scene-loader-hud {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.me-scene-loader-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.me-scene-loader-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.1px;
+}
+
+.me-scene-loader-sub {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+  color: var(--accent-color);
+  opacity: 0.85;
+}
+
+/* Keyframes for 3D Mesh Animations */
+@keyframes meCubeRotate {
+  0% {
+    transform: rotateX(-24deg) rotateY(0deg) rotateZ(6deg);
+  }
+  50% {
+    transform: rotateX(24deg) rotateY(180deg) rotateZ(-6deg);
+  }
+  100% {
+    transform: rotateX(-24deg) rotateY(360deg) rotateZ(6deg);
+  }
+}
+
+@keyframes meInnerOctaSpin {
+  0% {
+    transform: rotateX(0deg) rotateY(0deg) scale(0.92);
+  }
+  50% {
+    transform: rotateX(180deg) rotateY(180deg) scale(1.12);
+  }
+  100% {
+    transform: rotateX(360deg) rotateY(360deg) scale(0.92);
+  }
+}
+
+@keyframes meOrbitSpin1 {
+  0% {
+    transform: rotateX(64deg) rotateY(18deg) rotateZ(0deg);
+  }
+  100% {
+    transform: rotateX(64deg) rotateY(18deg) rotateZ(360deg);
+  }
+}
+
+@keyframes meOrbitSpin2 {
+  0% {
+    transform: rotateX(-52deg) rotateY(38deg) rotateZ(0deg);
+  }
+  100% {
+    transform: rotateX(-52deg) rotateY(38deg) rotateZ(360deg);
+  }
+}
+
+@keyframes meOrbitSpin3 {
+  0% {
+    transform: rotateX(25deg) rotateY(-65deg) rotateZ(0deg);
+  }
+  100% {
+    transform: rotateX(25deg) rotateY(-65deg) rotateZ(360deg);
+  }
+}
+
+@keyframes meLaserSweep {
+  0% {
+    transform: translateY(-8px);
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(72px);
+    opacity: 0.4;
+  }
+}
+
+@keyframes meAmbientPulse {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(1.08);
+    opacity: 0.65;
+  }
+}
+
+@keyframes meBarShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes meFloatMesh {
+  0% {
+    transform: translateY(-5px) rotate(-4deg) scale(0.97);
+  }
+  100% {
+    transform: translateY(5px) rotate(4deg) scale(1.03);
+  }
+}
+
+@keyframes meFacetTessellate {
+  0%,
+  100% {
+    opacity: 0.14;
+  }
+  50% {
+    opacity: 0.88;
+  }
+}
+
+@keyframes meWireframeFlow {
+  0% {
+    stroke-dashoffset: 110;
+    stroke: var(--accent-active);
+  }
+  100% {
+    stroke-dashoffset: 0;
+    stroke: #58a6ff;
+  }
+}
+
+@keyframes meVertexPulse {
+  0% {
+    stroke-width: 1.5px;
+    opacity: 0.72;
+  }
+  100% {
+    stroke-width: 4.2px;
+    opacity: 1;
+  }
 }

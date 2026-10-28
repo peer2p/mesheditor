@@ -107,23 +107,23 @@
           </button>
           <div class="dropdown-menu" id="menuTools">
             <div class="dropdown-header-label">Tools</div>
-            <button class="dropdown-item" id="btnCreatePrimitive" title="Create Mesh (Box, Sphere, Cylinder, Polyhedron...)">
+            <button class="dropdown-item active" id="btnCreatePrimitive" title="Create Mesh (Box, Sphere, Cylinder, Polyhedron...)">
               <span class="btn-icon"><i class="app-icon" data-lucide="plus-circle"></i></span>
               <span class="btn-label">Create Mesh</span>
             </button>
             <button
-              class="dropdown-item"
+              class="dropdown-item active"
               id="btnToggleCSG"
               title="Sculpting with Constructive Solid Geometry (Subtract / Cut, Union, Intersect)"
             >
               <span class="btn-icon"><i class="app-icon" data-lucide="shapes"></i></span>
               <span class="btn-label">Sculpting</span>
             </button>
-            <button class="dropdown-item" id="btnToggleFacetEditor" title="Facet & Vertex Editor">
+            <button class="dropdown-item active" id="btnToggleFacetEditor" title="Facet & Vertex Editor">
               <span class="btn-icon"><i class="app-icon" data-lucide="triangle"></i></span>
               <span class="btn-label">Facet & Vertex Editor</span>
             </button>
-            <button class="dropdown-item" id="btnToggleTexturePanel" title="WebP Texture Optimizer">
+            <button class="dropdown-item active" id="btnToggleTexturePanel" title="WebP Texture Optimizer">
               <span class="btn-icon"><i class="app-icon" data-lucide="zap"></i></span>
               <span class="btn-label">Texture Optimizer</span>
             </button>
@@ -133,19 +133,19 @@
               <span class="btn-icon"><i class="app-icon" data-lucide="list-tree"></i></span>
               <span class="btn-label">Scene Objects</span>
             </button>
-            <button class="dropdown-item" id="btnToggleMeshPanel" title="Mesh Properties">
+            <button class="dropdown-item active" id="btnToggleMeshPanel" title="Mesh Properties">
               <span class="btn-icon"><i class="app-icon" data-lucide="box"></i></span>
               <span class="btn-label">Mesh Properties</span>
             </button>
-            <button class="dropdown-item" id="btnToggleMaterialPanel" title="Material & UVs">
+            <button class="dropdown-item active" id="btnToggleMaterialPanel" title="Material & UVs">
               <span class="btn-icon"><i class="app-icon" data-lucide="palette"></i></span>
               <span class="btn-label">Material & UV Mapping</span>
             </button>
-            <button class="dropdown-item" id="btnToggleScenePanel" title="Scene & Environment">
+            <button class="dropdown-item active" id="btnToggleScenePanel" title="Scene & Environment">
               <span class="btn-icon"><i class="app-icon" data-lucide="sun-medium"></i></span>
               <span class="btn-label">Scene & Environment</span>
             </button>
-            <button class="dropdown-item" id="btnToggleAnimPanel" title="Animation Player">
+            <button class="dropdown-item active" id="btnToggleAnimPanel" title="Animation Player">
               <span class="btn-icon"><i class="app-icon" data-lucide="film"></i></span>
               <span class="btn-label">Animation Player</span>
             </button>
@@ -213,6 +213,124 @@
       <!-- 3D Babylon Canvas -->
       <canvas id="renderCanvas" tabindex="0"></canvas>
 
+      <!-- Program Startup 3D Mesh Loading Animation -->
+      <div id="appStartupLoader" class="me-loader-overlay me-startup-loader" role="status" aria-live="polite">
+        <div class="me-loader-ambient-glow"></div>
+        <div class="me-loader-content">
+          <div class="me-mesh-stage" aria-hidden="true">
+            <div class="me-orbit-ring me-orbit-ring-1"></div>
+            <div class="me-orbit-ring me-orbit-ring-2"></div>
+            <div class="me-orbit-ring me-orbit-ring-3"></div>
+            <div class="me-3d-scene">
+              <div class="me-3d-mesh-assembly">
+                <div class="me-mesh-face me-face-front"><span></span></div>
+                <div class="me-mesh-face me-face-back"><span></span></div>
+                <div class="me-mesh-face me-face-right"><span></span></div>
+                <div class="me-mesh-face me-face-left"><span></span></div>
+                <div class="me-mesh-face me-face-top"><span></span></div>
+                <div class="me-mesh-face me-face-bottom"><span></span></div>
+                <div class="me-inner-octahedron">
+                  <div class="me-octa-plane me-octa-1"></div>
+                  <div class="me-octa-plane me-octa-2"></div>
+                  <div class="me-octa-plane me-octa-3"></div>
+                </div>
+              </div>
+            </div>
+            <div class="me-ground-holo-grid">
+              <div class="me-laser-scan"></div>
+            </div>
+          </div>
+          <div class="me-loader-info">
+            <div class="me-loader-title">
+              <span class="me-loader-badge">3D STUDIO</span>
+              <span>Mesh Editor</span>
+            </div>
+            <div class="me-loader-status" id="startupLoaderText">Initializing 3D Workspace & Tools...</div>
+            <div class="me-loader-progress-row">
+              <progress aria-label="Application startup progress" class="loading-spinner me-startup-spinner"></progress>
+              <div class="me-loader-bar-track">
+                <div class="me-loader-bar-fill" id="startupLoaderBar"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Babylon Scene Initialization & Mesh Loading Overlay -->
+      <div id="sceneInitLoader" class="me-loader-overlay me-scene-loader" role="status" aria-live="polite">
+        <div class="me-scene-loader-card">
+          <div class="me-icosahedron-stage" aria-hidden="true">
+            <div class="me-gizmo-arc me-gizmo-arc-x"></div>
+            <div class="me-gizmo-arc me-gizmo-arc-y"></div>
+            <div class="me-gizmo-arc me-gizmo-arc-z"></div>
+            <svg class="me-icosahedron-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="meMeshFacetGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="var(--accent-active)" stop-opacity="0.58" />
+                  <stop offset="100%" stop-color="var(--accent-active)" stop-opacity="0.08" />
+                </linearGradient>
+                <radialGradient id="meMeshCoreGlow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="var(--accent-active)" stop-opacity="0.65" />
+                  <stop offset="100%" stop-color="var(--accent-active)" stop-opacity="0" />
+                </radialGradient>
+              </defs>
+              <circle cx="100" cy="100" r="72" fill="url(#meMeshCoreGlow)" class="me-mesh-core-pulse" />
+              <g class="me-mesh-back-edges">
+                <polygon points="100,24 166,62 100,68" />
+                <polygon points="100,24 34,62 100,68" />
+                <polygon points="34,62 34,138 100,132" />
+                <polygon points="166,62 166,138 100,132" />
+                <polygon points="34,138 100,176 100,132" />
+                <polygon points="166,138 100,176 100,132" />
+              </g>
+              <g class="me-mesh-facets">
+                <polygon class="me-facet me-facet-1" points="100,24 58,78 142,78" />
+                <polygon class="me-facet me-facet-2" points="100,24 34,62 58,78" />
+                <polygon class="me-facet me-facet-3" points="100,24 142,78 166,62" />
+                <polygon class="me-facet me-facet-4" points="34,62 34,138 58,78" />
+                <polygon class="me-facet me-facet-5" points="166,62 142,78 166,138" />
+                <polygon class="me-facet me-facet-6" points="58,78 142,78 100,134" />
+                <polygon class="me-facet me-facet-7" points="34,138 58,78 100,134" />
+                <polygon class="me-facet me-facet-8" points="166,138 100,134 142,78" />
+                <polygon class="me-facet me-facet-9" points="34,138 100,176 100,134" />
+                <polygon class="me-facet me-facet-10" points="166,138 100,134 100,176" />
+              </g>
+              <g class="me-mesh-wireframe">
+                <polygon points="100,24 166,62 166,138 100,176 34,138 34,62" />
+                <polygon points="58,78 142,78 100,134" />
+                <line x1="100" y1="24" x2="58" y2="78" />
+                <line x1="100" y1="24" x2="142" y2="78" />
+                <line x1="34" y1="62" x2="58" y2="78" />
+                <line x1="166" y1="62" x2="142" y2="78" />
+                <line x1="34" y1="138" x2="58" y2="78" />
+                <line x1="166" y1="138" x2="142" y2="78" />
+                <line x1="34" y1="138" x2="100" y2="134" />
+                <line x1="166" y1="138" x2="100" y2="134" />
+                <line x1="100" y1="176" x2="100" y2="134" />
+              </g>
+              <g class="me-mesh-vertices">
+                <circle cx="100" cy="24" r="4" />
+                <circle cx="166" cy="62" r="3.5" />
+                <circle cx="166" cy="138" r="3.5" />
+                <circle cx="100" cy="176" r="4" />
+                <circle cx="34" cy="138" r="3.5" />
+                <circle cx="34" cy="62" r="3.5" />
+                <circle cx="58" cy="78" r="4.5" />
+                <circle cx="142" cy="78" r="4.5" />
+                <circle cx="100" cy="134" r="4.5" />
+              </g>
+            </svg>
+          </div>
+          <div class="me-scene-loader-hud">
+            <div class="me-scene-loader-header">
+              <progress aria-label="Babylon scene initialization" class="loading-spinner me-scene-spinner"></progress>
+              <span class="me-scene-loader-title" id="sceneLoaderTitle">Initializing Babylon 3D Scene...</span>
+            </div>
+            <div class="me-scene-loader-sub" id="sceneLoaderSub">WEBGL2 ENGINE • SHADER PIPELINE • MESH GEOMETRY</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Drag & Drop Overlay -->
       <div id="dropOverlay">
         <div class="drop-icon"><i class="app-icon" data-lucide="upload-cloud" style="width: 48px; height: 48px"></i></div>
@@ -221,7 +339,7 @@
       </div>
 
       <!-- Outliner Floating Dialog (Hierarchy Tree of Meshes & Submeshes) -->
-      <div id="dialog-outliner" class="floating-dialog" style="top: 76px; left: 20px; width: 330px">
+      <div id="dialog-outliner" class="floating-dialog" style="top: 64px; left: 16px; width: 320px">
         <div class="dialog-header">
           <span class="dialog-title"><i class="app-icon" data-lucide="list-tree"></i> Scene Objects</span>
           <div class="dialog-actions">
@@ -239,7 +357,7 @@
 
       <!-- Floating HTML Dialog Containers for dat.GUI (wrapped for Stackpanel mode) -->
       <div id="stackpanelRightSidebar" class="stackpanel-sidebar">
-        <div id="dialog-create-primitive" class="floating-dialog" style="top: 76px; right: 360px; width: 330px; display: none">
+        <div id="dialog-create-primitive" class="floating-dialog" style="top: 64px; right: 338px; width: 320px; z-index: 55">
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="plus-circle"></i> Create Mesh</span>
             <div class="dialog-actions">
@@ -250,7 +368,7 @@
           <div class="dialog-body" id="gui-create-container"></div>
         </div>
 
-        <div id="dialog-csg" class="floating-dialog" style="top: 76px; right: 380px; width: 340px; display: none">
+        <div id="dialog-csg" class="floating-dialog" style="top: 530px; right: 338px; width: 320px">
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="shapes"></i> Sculpting</span>
             <div class="dialog-actions">
@@ -276,7 +394,7 @@
           <div class="dialog-body" id="gui-csg-container"></div>
         </div>
 
-        <div id="dialog-facet" class="floating-dialog" style="top: 76px; right: 20px; width: 330px; display: none">
+        <div id="dialog-facet" class="floating-dialog" style="top: 360px; right: 16px; width: 310px">
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="triangle"></i> Facet & Vertex Editor</span>
             <div class="dialog-actions">
@@ -302,7 +420,7 @@
           <div class="dialog-body" id="gui-facet-container"></div>
         </div>
 
-        <div id="dialog-scene" class="floating-dialog" style="top: 76px; right: 20px; display: none">
+        <div id="dialog-scene" class="floating-dialog" style="top: 64px; right: 16px; width: 310px">
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="sun-medium"></i> Scene & Environment</span>
             <div class="dialog-actions">
@@ -313,7 +431,7 @@
           <div class="dialog-body" id="gui-scene-container"></div>
         </div>
 
-        <div id="dialog-mesh" class="floating-dialog" style="top: 76px; left: 360px; display: none">
+        <div id="dialog-mesh" class="floating-dialog" style="top: 64px; left: 348px; width: 300px">
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="box"></i> Mesh Properties</span>
             <div class="dialog-actions">
@@ -324,7 +442,7 @@
           <div class="dialog-body" id="gui-mesh-container"></div>
         </div>
 
-        <div id="dialog-material" class="floating-dialog" style="top: 380px; left: 360px; display: none">
+        <div id="dialog-material" class="floating-dialog" style="top: 260px; left: 16px; width: 320px">
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="palette"></i> Material & UV Mapping</span>
             <div class="dialog-actions">
@@ -338,7 +456,7 @@
         <div
           id="dialog-anim"
           class="floating-dialog"
-          style="bottom: 48px; left: 50%; transform: translateX(-50%); width: 440px; display: none"
+          style="bottom: 46px; left: 50%; transform: translateX(-50%); width: 440px"
         >
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="film"></i> Animation Player</span>
@@ -350,7 +468,7 @@
           <div class="dialog-body" id="gui-anim-container"></div>
         </div>
 
-        <div id="dialog-textures" class="floating-dialog" style="top: 380px; right: 20px; width: 340px; display: none">
+        <div id="dialog-textures" class="floating-dialog" style="top: 560px; right: 16px; width: 310px">
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="zap"></i> Texture Optimizer</span>
             <div class="dialog-actions">

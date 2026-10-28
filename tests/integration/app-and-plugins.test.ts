@@ -10,6 +10,7 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
   let app: MeshEditorApp;
 
   beforeEach(() => {
+    localStorage.clear();
     container = document.createElement('div');
     container.id = 'test-host';
     document.body.appendChild(container);
@@ -18,9 +19,75 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
 
   afterEach(() => {
     if (app) {
-      app.service.dispose();
+      app.dispose();
     }
     container.remove();
+  });
+
+  it('activates all tools by default on first run and renders startup & scene 3D mesh loaders', () => {
+    app = new MeshEditorApp({
+      container,
+      engine,
+      layoutMode: 'floating',
+    });
+
+    const expectedDialogs = [
+      'dialog-outliner',
+      'dialog-create-primitive',
+      'dialog-csg',
+      'dialog-facet',
+      'dialog-scene',
+      'dialog-mesh',
+      'dialog-material',
+      'dialog-anim',
+      'dialog-textures',
+    ];
+
+    for (const id of expectedDialogs) {
+      const dlg = container.querySelector(`#${id}`) as HTMLElement | null;
+      expect(dlg).not.toBeNull();
+      expect(dlg?.style.display).toBe('flex');
+    }
+
+    const startupLoader = container.querySelector('#appStartupLoader');
+    const sceneLoader = container.querySelector('#sceneInitLoader');
+    expect(startupLoader).not.toBeNull();
+    expect(sceneLoader).not.toBeNull();
+
+    app.showSceneLoader('Custom Scene Load...');
+    expect(sceneLoader?.classList.contains('is-hidden')).toBe(false);
+    app.hideSceneLoader();
+    expect(sceneLoader?.classList.contains('is-hidden')).toBe(true);
+  });
+
+  it('keeps color picker palettes visible with elevated z-index across repeated interactions', () => {
+    app = new MeshEditorApp({
+      container,
+      engine,
+      layoutMode: 'floating',
+    });
+
+    const colorRows = Array.from(container.querySelectorAll('.dg .cr.color')) as HTMLElement[];
+    expect(colorRows.length).toBeGreaterThanOrEqual(3);
+
+    // Repeatedly interact with each color tool (Create Mesh, Scene, Material)
+    for (let round = 0; round < 3; round++) {
+      for (const row of colorRows) {
+        const dialog = row.closest('.floating-dialog') as HTMLElement;
+        const selector = row.querySelector('.selector') as HTMLElement;
+        const satField = row.querySelector('.saturation-field') as HTMLElement;
+
+        row.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+        selector.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+
+        expect(row.classList.contains('color-picker-open')).toBe(true);
+        expect(dialog.classList.contains('has-open-color-picker')).toBe(true);
+        expect(dialog.style.zIndex).toBe('60');
+        expect(satField.style.backgroundImage).toContain('linear-gradient');
+
+        window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      }
+    }
   });
 
   it('mounts MeshEditorApp into a custom container and updates DOM outliner when meshes are created', () => {

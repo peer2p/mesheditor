@@ -25,19 +25,27 @@ test.describe('Mesh Editor E2E Tests', () => {
     expect(pageErrors).toHaveLength(0);
   });
 
-  test('2. creates a 3D primitive via the Tools -> Create Mesh dialog and updates Outliner & Stats', async ({
+  test('2. activates all tools by default on first run and creates a 3D primitive via Create Mesh dialog', async ({
     page,
   }) => {
     await page.goto('/');
 
     await expect(page.locator('#statsMeshes')).toHaveText('0');
 
-    // Open Tools dropdown and click "Create Mesh"
-    await page.locator('#btnDropdownTools').click();
-    await page.locator('#btnCreatePrimitive').click();
-
+    // On first execution, all tool dialogs are activated by default
     const createDialog = page.locator('#dialog-create-primitive');
     await expect(createDialog).toBeVisible();
+    await expect(page.locator('#dialog-csg')).toBeVisible();
+    await expect(page.locator('#dialog-facet')).toBeVisible();
+    await expect(page.locator('#dialog-scene')).toBeVisible();
+    await expect(page.locator('#dialog-mesh')).toBeVisible();
+    await expect(page.locator('#dialog-material')).toBeVisible();
+    await expect(page.locator('#dialog-anim')).toBeVisible();
+    await expect(page.locator('#dialog-textures')).toBeVisible();
+
+    // Verify startup and Babylon scene 3D mesh loaders are present in DOM
+    await expect(page.locator('#appStartupLoader')).toBeAttached();
+    await expect(page.locator('#sceneInitLoader')).toBeAttached();
 
     // Click the dat.GUI "Spawn at Origin" button inside #gui-create-container
     await createDialog.locator('.cr.function', { hasText: 'Spawn at Origin' }).click();

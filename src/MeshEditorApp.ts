@@ -225,6 +225,16 @@ export class MeshEditorApp {
   // Layout Mode
   public layoutMode: 'floating' | 'stackpanel' = 'floating';
 
+  // Loading Animation Elements & Timers
+  private startupLoaderElement: HTMLElement | null = null;
+  private startupLoaderText: HTMLElement | null = null;
+  private startupLoaderBar: HTMLElement | null = null;
+  private sceneLoaderElement: HTMLElement | null = null;
+  private sceneLoaderTitle: HTMLElement | null = null;
+  private sceneLoaderSub: HTMLElement | null = null;
+  private startupTimerIds: Array<ReturnType<typeof setTimeout>> = [];
+  private sceneLoaderTimerId: ReturnType<typeof setTimeout> | null = null;
+
   // Dialog IDs
   private readonly dialogIds: string[] = [
     'dialog-outliner',
@@ -417,6 +427,16 @@ export class MeshEditorApp {
     this.importFileInput = this.getElement<HTMLInputElement>('importFileInput')!;
     this.textureFileInput = this.getElement<HTMLInputElement>('textureFileInput')!;
 
+    this.startupLoaderElement = this.getElement<HTMLElement>('appStartupLoader');
+    this.startupLoaderText = this.getElement<HTMLElement>('startupLoaderText');
+    this.startupLoaderBar = this.getElement<HTMLElement>('startupLoaderBar');
+    this.sceneLoaderElement = this.getElement<HTMLElement>('sceneInitLoader');
+    this.sceneLoaderTitle = this.getElement<HTMLElement>('sceneLoaderTitle');
+    this.sceneLoaderSub = this.getElement<HTMLElement>('sceneLoaderSub');
+
+    this.setStartupProgress(35, 'Initializing Babylon 3D Engine...');
+    this.showSceneLoader('Initializing Babylon 3D Scene...', 'WEBGL2 ENGINE • SHADER PIPELINE • MESH GEOMETRY');
+
     // Initialize Platform Adapter
     this.adapter = options.adapter || createDefaultPlatformAdapter();
 
@@ -515,6 +535,8 @@ export class MeshEditorApp {
     this.setLayoutMode(savedLayoutMode, false);
     this.refreshIcons();
 
+    this.runInitialLoadingSequence(options.autoLoadUrl);
+
     if (options.autoLoadUrl) {
       this.service.loadFromUrl(options.autoLoadUrl);
     }
@@ -562,6 +584,14 @@ export class MeshEditorApp {
   }
 
   public dispose(): void {
+    for (const timer of this.startupTimerIds) {
+      clearTimeout(timer);
+    }
+    this.startupTimerIds = [];
+    if (this.sceneLoaderTimerId) {
+      clearTimeout(this.sceneLoaderTimerId);
+      this.sceneLoaderTimerId = null;
+    }
     this.adapter.dispose?.();
     for (const plugin of this.pluginManager.getAllPlugins()) {
       this.pluginManager.unregister(plugin.id);
@@ -970,8 +1000,7 @@ export class MeshEditorApp {
 
     // Bring to front
     dialog.addEventListener('mousedown', () => {
-      document.querySelectorAll('.floating-dialog').forEach((d) => ((d as HTMLElement).style.zIndex = '50'));
-      dialog.style.zIndex = '60';
+      this.bringDialogToFront(dialog);
     });
 
     // Dragging
@@ -995,8 +1024,7 @@ export class MeshEditorApp {
         initialTop = rect.top;
 
         // Bring to front
-        document.querySelectorAll('.floating-dialog').forEach((d) => ((d as HTMLElement).style.zIndex = '50'));
-        dialog.style.zIndex = '60';
+        this.bringDialogToFront(dialog);
 
         const onMouseMove = (moveEvent: MouseEvent) => {
           if (!isDragging) return;
@@ -1053,7 +1081,7 @@ export class MeshEditorApp {
   private accordionMinimizeOthers(activeDialog: HTMLElement): void {
     const isSidebarPanel = activeDialog.closest('.stackpanel-sidebar') !== null;
     for (const id of this.dialogIds) {
-      const other = document.getElementById(id);
+      const other = this.getElement(id);
       if (!other || other === activeDialog || other.style.display === 'none') continue;
 
       if (isSidebarPanel && other.closest('.stackpanel-sidebar') !== null) {
@@ -1072,7 +1100,7 @@ export class MeshEditorApp {
   }
 
   public toggleDialog(id: string, forceOpen?: boolean): void {
-    const dialog = document.getElementById(id);
+    const dialog = this.getElement(id);
     if (!dialog) return;
 
     const isCurrentlyOpen =
@@ -1081,6 +1109,7 @@ export class MeshEditorApp {
     dialog.style.display = willOpen ? 'flex' : 'none';
 
     if (willOpen) {
+      this.bringDialogToFront(dialog);
       dialog.classList.remove('minimized');
       const btnMin = dialog.querySelector('.btn-min') as HTMLElement | null;
       if (btnMin) {
@@ -1101,7 +1130,7 @@ export class MeshEditorApp {
     try {
       const layout: Record<string, { left: string; top: string; display: string; open: boolean; minimized: boolean }> = {};
       for (const id of this.dialogIds) {
-        const dialog = document.getElementById(id);
+        const dialog = this.getElement(id);
         if (dialog) {
           const isOpen =
             dialog.style.display !== 'none' && (dialog.style.display !== '' || window.getComputedStyle(dialog).display !== 'none');
@@ -1124,16 +1153,23 @@ export class MeshEditorApp {
     try {
       const saved = localStorage.getItem('mesheditor_window_layout');
       if (!saved) {
-        const outliner = document.getElementById('dialog-outliner');
-        if (outliner) outliner.style.display = 'flex';
+        // First time execution: activate all tools & panels by default
+        for (const id of this.dialogIds) {
+          const dialog = this.getElement(id);
+          if (dialog) {
+            dialog.style.display = 'flex';
+            dialog.classList.remove('minimized');
+          }
+        }
         this.updatePanelButtonStates();
+        this.saveDialogLayout();
         return;
       }
 
       const layout = JSON.parse(saved);
 
       for (const id of this.dialogIds) {
-        const dialog = document.getElementById(id);
+        const dialog = this.getElement(id);
         const state = layout[id];
         if (!dialog || !state) continue;
 
@@ -1153,13 +1189,11 @@ export class MeshEditorApp {
         }
 
         // Restore visibility (support old display: string and new open: boolean)
-        let isOpen = false;
+        let isOpen = true;
         if (state.display !== undefined) {
           isOpen = state.display !== 'none';
         } else if (state.open !== undefined) {
           isOpen = !!state.open;
-        } else if (id === 'dialog-outliner') {
-          isOpen = true;
         }
 
         dialog.style.display = isOpen ? 'flex' : 'none';
@@ -1174,14 +1208,16 @@ export class MeshEditorApp {
         }
       }
 
-      // Safeguard: If every dialog is closed (e.g. from previous bug), ensure at least Outliner is open
+      // Safeguard: If every dialog is closed, activate all tools by default
       const anyOpen = this.dialogIds.some((id) => {
-        const d = document.getElementById(id);
+        const d = this.getElement(id);
         return d && d.style.display !== 'none';
       });
       if (!anyOpen) {
-        const outliner = document.getElementById('dialog-outliner');
-        if (outliner) outliner.style.display = 'flex';
+        for (const id of this.dialogIds) {
+          const d = this.getElement(id);
+          if (d) d.style.display = 'flex';
+        }
       }
 
       this.updatePanelButtonStates();
@@ -1205,8 +1241,8 @@ export class MeshEditorApp {
     };
 
     for (const [dialogId, btnId] of Object.entries(mapping)) {
-      const dialog = document.getElementById(dialogId);
-      const btn = document.getElementById(btnId);
+      const dialog = this.getElement(dialogId);
+      const btn = this.getElement(btnId);
       if (dialog && btn) {
         const isOpen =
           dialog.style.display !== 'none' && (dialog.style.display !== '' || window.getComputedStyle(dialog).display !== 'none');
@@ -1215,7 +1251,7 @@ export class MeshEditorApp {
     }
 
     // Also update Ground Grid button state
-    const btnGrid = document.getElementById('btnToggleGrid');
+    const btnGrid = this.getElement('btnToggleGrid');
     if (btnGrid) {
       btnGrid.classList.toggle('active', !!this.service.sceneParams?.grid);
     }
@@ -1585,6 +1621,194 @@ export class MeshEditorApp {
       .onChange((f: number) => {
         this.service.setAnimFrame(f);
       });
+
+    this.setupColorPickerEnhancements();
+  }
+
+  public bringDialogToFront(activeDialog: HTMLElement): void {
+    const scope = this.rootContainer || document;
+    const allDialogs = Array.from(scope.querySelectorAll('.floating-dialog')) as HTMLElement[];
+    // Sort other dialogs by their current z-index so relative stacking order is preserved
+    const others = allDialogs
+      .filter((d) => d !== activeDialog)
+      .sort((a, b) => (parseInt(a.style.zIndex || '50', 10) || 50) - (parseInt(b.style.zIndex || '50', 10) || 50));
+
+    others.forEach((d, idx) => {
+      d.style.zIndex = String(50 + idx);
+      d.classList.remove('active-focus');
+    });
+
+    activeDialog.style.zIndex = '60';
+    activeDialog.classList.add('active-focus');
+  }
+
+  private setupColorPickerEnhancements(): void {
+    const scope = this.rootContainer || document;
+    const colorRows = Array.from(scope.querySelectorAll('.dg .cr.color')) as HTMLElement[];
+
+    const closeAllColorPickers = (exceptRow?: HTMLElement) => {
+      for (const row of colorRows) {
+        if (row === exceptRow) continue;
+        row.classList.remove('color-picker-open');
+        const sel = row.querySelector('.selector') as HTMLElement | null;
+        if (sel) {
+          sel.classList.remove('drag');
+          sel.style.display = '';
+        }
+        const input = row.querySelector('input[type="text"]') as HTMLInputElement | null;
+        if (input && document.activeElement === input) {
+          input.blur();
+        }
+      }
+      const allDialogs = Array.from(scope.querySelectorAll('.floating-dialog')) as HTMLElement[];
+      for (const dlg of allDialogs) {
+        if (exceptRow && dlg.contains(exceptRow)) continue;
+        dlg.classList.remove('has-open-color-picker');
+      }
+    };
+
+    // Enhance each dat.GUI ColorController instance
+    const allGuis = [this.guiScene, this.guiMaterial, this.guiCreate].filter(Boolean);
+    const collectColorControllers = (gui: dat.GUI): any[] => {
+      const result: any[] = [];
+      const controllers = (gui as any).__controllers || [];
+      for (const ctrl of controllers) {
+        if (ctrl && ctrl.__selector && ctrl.__saturation_field && ctrl.__hue_field) {
+          result.push(ctrl);
+        }
+      }
+      const folders = (gui as any).__folders || {};
+      for (const folderName of Object.keys(folders)) {
+        result.push(...collectColorControllers(folders[folderName]));
+      }
+      return result;
+    };
+
+    for (const gui of allGuis) {
+      for (const ctrl of collectColorControllers(gui)) {
+        let lastValidHue =
+          typeof ctrl.__color?.__state?.h === 'number' && !Number.isNaN(ctrl.__color.__state.h) ? ctrl.__color.__state.h : 0;
+        const origUpdateDisplay = ctrl.updateDisplay;
+
+        ctrl.updateDisplay = function () {
+          if (typeof this.__color?.__state?.h === 'number' && !Number.isNaN(this.__color.__state.h)) {
+            lastValidHue = this.__color.__state.h;
+          }
+          const res = origUpdateDisplay.apply(this, arguments);
+          try {
+            if (this.__color?.__state) {
+              if (Number.isNaN(this.__color.__state.h) || this.__color.__state.h === undefined) {
+                this.__color.__state.h = lastValidHue;
+              } else {
+                lastValidHue = this.__color.__state.h;
+              }
+            }
+
+            // Compute pure hue RGB for saturation gradient using standard CSS linear-gradient syntax
+            const hNorm = (((lastValidHue % 360) + 360) % 360) / 60;
+            const hi = Math.floor(hNorm) % 6;
+            const f = hNorm - Math.floor(hNorm);
+            const q = 1 - f;
+            const t = f;
+            const rgbArr = [
+              [1, t, 0],
+              [q, 1, 0],
+              [0, 1, t],
+              [0, q, 1],
+              [t, 0, 1],
+              [1, 0, q],
+            ][hi] || [1, 0, 0];
+            const hr = Math.round(rgbArr[0] * 255);
+            const hg = Math.round(rgbArr[1] * 255);
+            const hb = Math.round(rgbArr[2] * 255);
+            const pureHueCss = `rgb(${hr}, ${hg}, ${hb})`;
+
+            if (this.__saturation_field) {
+              this.__saturation_field.style.backgroundImage = `linear-gradient(to right, #ffffff 0%, ${pureHueCss} 100%)`;
+              const valField = this.__saturation_field.firstElementChild as HTMLElement | null;
+              if (valField) {
+                valField.style.backgroundImage = 'linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, #000000 100%)';
+              }
+            }
+            if (this.__hue_field) {
+              this.__hue_field.style.backgroundImage =
+                'linear-gradient(to bottom, #ff0000 0%, #ff00ff 17%, #0000ff 34%, #00ffff 50%, #00ff00 67%, #ffff00 84%, #ff0000 100%)';
+            }
+          } catch {
+            // Ignore style sync errors
+          }
+          return res;
+        };
+
+        ctrl.updateDisplay();
+      }
+    }
+
+    // Attach robust open/close & z-index management to each .cr.color row
+    for (const row of colorRows) {
+      const dialog = row.closest('.floating-dialog') as HTMLElement | null;
+      const selector = row.querySelector('.selector') as HTMLElement | null;
+      const input = row.querySelector('input[type="text"]') as HTMLInputElement | null;
+      let isDraggingPalette = false;
+
+      const openPicker = () => {
+        closeAllColorPickers(row);
+        row.classList.add('color-picker-open');
+        if (dialog) {
+          this.bringDialogToFront(dialog);
+          dialog.classList.add('has-open-color-picker');
+        }
+      };
+
+      row.addEventListener('mouseenter', () => {
+        openPicker();
+      });
+
+      row.addEventListener('mousedown', () => {
+        openPicker();
+      });
+
+      input?.addEventListener('focus', () => {
+        openPicker();
+      });
+
+      selector?.addEventListener('mousedown', () => {
+        isDraggingPalette = true;
+        openPicker();
+        const onWindowMouseUp = () => {
+          isDraggingPalette = false;
+          selector.classList.remove('drag');
+          if (!row.matches(':hover') && document.activeElement !== input) {
+            row.classList.remove('color-picker-open');
+            dialog?.classList.remove('has-open-color-picker');
+          }
+        };
+        window.addEventListener('mouseup', onWindowMouseUp, { once: true });
+      });
+
+      row.addEventListener('mouseleave', () => {
+        if (!isDraggingPalette && document.activeElement !== input) {
+          row.classList.remove('color-picker-open');
+          dialog?.classList.remove('has-open-color-picker');
+        }
+      });
+    }
+
+    const rootTarget = this.rootContainer || document;
+    rootTarget.addEventListener('mousedown', (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const activeColorRow = target.closest('.cr.color') as HTMLElement | null;
+      if (!activeColorRow) {
+        closeAllColorPickers();
+      }
+    });
+
+    window.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        closeAllColorPickers();
+      }
+    });
   }
 
   private updateMeshGUI(): void {
@@ -2153,6 +2377,80 @@ export class MeshEditorApp {
   public setStatus(text: string, isBusy: boolean = false): void {
     if (this.statusText) this.statusText.textContent = text;
     if (this.statusIndicator) this.statusIndicator.classList.toggle('busy', isBusy);
+    if (isBusy) {
+      this.showSceneLoader(text, 'BABYLON.JS 3D SCENE • PROCESSING MESH PIPELINE');
+    } else {
+      this.hideSceneLoader();
+    }
+  }
+
+  private runInitialLoadingSequence(autoLoadUrl?: string): void {
+    this.setStartupProgress(78, 'Activating 3D Tools & Panels...');
+
+    const t1 = setTimeout(() => {
+      this.setStartupProgress(100, 'Launching 3D Studio...');
+    }, 260);
+
+    const t2 = setTimeout(() => {
+      this.hideStartupLoader();
+    }, 560);
+
+    this.startupTimerIds.push(t1, t2);
+
+    const scene = this.service.getScene();
+    const finalizeSceneInit = () => {
+      if (autoLoadUrl) return;
+      if (this.sceneLoaderTimerId) clearTimeout(this.sceneLoaderTimerId);
+      this.sceneLoaderTimerId = setTimeout(() => {
+        this.hideSceneLoader();
+      }, 1050);
+    };
+
+    if (scene) {
+      scene.executeWhenReady(() => {
+        finalizeSceneInit();
+      });
+    } else {
+      finalizeSceneInit();
+    }
+  }
+
+  public setStartupProgress(percent: number, statusText?: string): void {
+    if (this.startupLoaderBar) {
+      this.startupLoaderBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+    }
+    if (statusText && this.startupLoaderText) {
+      this.startupLoaderText.textContent = statusText;
+    }
+  }
+
+  public showStartupLoader(statusText?: string): void {
+    if (statusText && this.startupLoaderText) {
+      this.startupLoaderText.textContent = statusText;
+    }
+    this.startupLoaderElement?.classList.remove('is-hidden');
+  }
+
+  public hideStartupLoader(): void {
+    this.startupLoaderElement?.classList.add('is-hidden');
+  }
+
+  public showSceneLoader(title?: string, subtitle?: string): void {
+    if (this.sceneLoaderTimerId) {
+      clearTimeout(this.sceneLoaderTimerId);
+      this.sceneLoaderTimerId = null;
+    }
+    if (title && this.sceneLoaderTitle) {
+      this.sceneLoaderTitle.textContent = title;
+    }
+    if (subtitle && this.sceneLoaderSub) {
+      this.sceneLoaderSub.textContent = subtitle;
+    }
+    this.sceneLoaderElement?.classList.remove('is-hidden');
+  }
+
+  public hideSceneLoader(): void {
+    this.sceneLoaderElement?.classList.add('is-hidden');
   }
 
   /* =========================================================================

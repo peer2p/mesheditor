@@ -151,6 +151,21 @@ export class MeshEditorService {
         antialias: true,
       });
 
+    // Custom Babylon.js Loading Screen Hook
+    this.engine.loadingScreen = {
+      displayLoadingUI: () => {
+        this.events.onStatusChanged?.(
+          this.engine.loadingScreen.loadingUIText || 'Initializing Babylon 3D Scene...',
+          true
+        );
+      },
+      hideLoadingUI: () => {
+        this.events.onStatusChanged?.('Ready', false);
+      },
+      loadingUIBackgroundColor: '#0f1218',
+      loadingUIText: 'Initializing Babylon 3D Scene...',
+    };
+
     this.scene = new Scene(this.engine);
     this.scene.clearColor = Color4.FromHexString(this.sceneParams.clearColor + 'ff');
 
