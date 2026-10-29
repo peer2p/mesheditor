@@ -1,6 +1,6 @@
 import { NullEngine } from '@babylonjs/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BUILT_IN_AGENT_SKILLS } from '../../src/AIAgentService';
+import { BUILT_IN_AGENT_SKILLS, discoverSkills, parseSkillMarkdown } from '../../src/builtInSkills';
 import { MeshEditorApp } from '../../src/MeshEditorApp';
 import { MeshEditorService } from '../../src/MeshEditorService';
 
@@ -111,6 +111,46 @@ describe('AI Mesh Agent (Text-to-Mesh, Image-to-Mesh & Mesh Update) Integration 
       service.aiAgent.setSkillEnabled('voxel-painter', false);
       const updatedPrompt = service.aiAgent.buildSystemPrompt();
       expect(updatedPrompt).not.toContain('Voxel & Block Modeler');
+    });
+
+    it('discovers skills from /skills directory and parses markdown with YAML frontmatter', () => {
+      const skills = discoverSkills();
+      expect(skills.length).toBeGreaterThanOrEqual(4);
+      expect(skills.some((s) => s.id === 'procedural-modeler')).toBe(true);
+
+      // Test parsing frontmatter
+      const sampleMd = `---
+id: custom-terrain
+name: Procedural Terrain Modeler
+description: Generates heightmap terrains and noise landscapes.
+enabled: false
+---
+# Terrain Generation
+Use simplex noise to deform planes.`;
+
+      const parsed = parseSkillMarkdown(sampleMd, 'fallback-id');
+      expect(parsed.id).toBe('custom-terrain');
+      expect(parsed.name).toBe('Procedural Terrain Modeler');
+      expect(parsed.description).toBe('Generates heightmap terrains and noise landscapes.');
+      expect(parsed.enabled).toBe(false);
+      expect(parsed.instructions).toContain('Use simplex noise to deform planes.');
+
+      // Test parsing pure markdown without frontmatter
+      const pureMd = `# Low Poly Trees
+Build low-poly trees using cylinder trunks and icosphere foliage.`;
+      const parsedPure = parseSkillMarkdown(pureMd, 'low-poly-tree');
+      expect(parsedPure.id).toBe('low-poly-tree');
+      expect(parsedPure.name).toBe('Low Poly Trees');
+      expect(parsedPure.description).toContain('Build low-poly trees');
+      expect(parsedPure.enabled).toBe(true);
+
+      // Register skill into agent service
+      service.aiAgent.registerSkill(parsed);
+      expect(service.aiAgent.getSkills().some((s) => s.id === 'custom-terrain')).toBe(true);
+
+      // Register skill from markdown directly
+      service.aiAgent.registerSkillFromMarkdown(pureMd, 'low-poly-tree');
+      expect(service.aiAgent.getSkills().some((s) => s.id === 'low-poly-tree')).toBe(true);
     });
   });
 

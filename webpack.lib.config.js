@@ -1,6 +1,7 @@
 const path = require('path');
 const webpack = require('webpack');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+require('./scripts/sync-skills');
 
 /**
  * Dual Webpack configuration for building the NPM Library (`dist-lib/`):
@@ -47,6 +48,10 @@ module.exports = [
             },
           ],
           exclude: /node_modules/,
+        },
+        {
+          test: /\.md$/,
+          type: 'asset/source',
         },
       ],
     },
@@ -102,6 +107,10 @@ module.exports = [
             },
           ],
           exclude: /node_modules/,
+        },
+        {
+          test: /\.md$/,
+          type: 'asset/source',
         },
       ],
     },

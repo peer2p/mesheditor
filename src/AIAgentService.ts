@@ -106,114 +106,10 @@ export const AI_ENDPOINT_PRESETS: EndpointPreset[] = [
 ];
 
 /* =========================================================================
-   BUILT-IN BABYLON.JS MODELING SKILLS (Adapted from platformia3d/.agents/skills)
+   BUILT-IN BABYLON.JS MODELING SKILLS (Loaded from /skills directory)
    ========================================================================= */
-export const BUILT_IN_AGENT_SKILLS: AIAgentSkillDefinition[] = [
-  {
-    id: 'procedural-modeler',
-    name: 'Procedural Modeler (MeshBuilder, CSG2, Extrude, Lathe)',
-    description:
-      'Guidance for building 3D meshes procedurally using Babylon.js primitives, CSG boolean operations, polygon/path extrusions, lathes, PBR materials, and triplanar UV mapping.',
-    enabled: true,
-    instructions: `
-# Procedural Modeler Skill (Babylon.js Live Scene)
-
-Use this skill whenever requested to create or extend 3D models, assets, or geometries (such as pipes, columns, gears, furniture, swords, vehicles, buildings, or organic/mechanical objects).
-
-## Core Workflow Rules
-1. **Think procedurally**: Decompose complex objects into geometric primitives (boxes, cylinders, spheres, cones, capsules, tori, polygons, lathes, tubes).
-2. **Coordinate system**: Babylon.js uses a left-handed coordinate system:
-   - **Y is up** (height), **X is right** (width), **Z is forward** (depth).
-   - Align the base of standing objects to **Y = 0** (Bottom-Aligned: A box with \`height: 2\` stands on ground \`Y = 0\` when \`position.y = 1\`).
-3. **Step-by-step workflow**:
-   - Inspect scene if updating existing meshes (\`modeler_get_scene_info\`).
-   - Create base meshes (\`modeler_create_primitive\`, \`modeler_extrude_polygon\`, \`modeler_extrude_shape\`, \`modeler_create_lathe\`, \`modeler_create_tube\`).
-   - Apply materials before or after CSG operations (\`modeler_create_material\`, \`modeler_apply_material\`).
-   - Combine or carve shapes using CSG (\`modeler_boolean_operation\`: \`union\`, \`subtract\`, \`intersect\`).
-   - Apply \`modeler_auto_uv_mapping\` to CSG or extruded meshes so textures project cleanly.
-
-## Best Practices & Guidelines
-1. **Clean up intermediate meshes**:
-   - In \`modeler_boolean_operation\`, input meshes are removed by default (\`keepToolMesh: false\`), leaving only the clean CSG result.
-   - When using \`modeler_execute_babylon_code\` for complex parametric loops, always dispose temporary intermediate tool meshes.
-2. **Multi-materials in CSG & Merge**:
-   - If an object needs multiple materials (e.g. wooden walls with a brick roof), apply materials **before** boolean operations or before \`modeler_merge_meshes\`.
-   - Do not overwrite a merged multi-material mesh with a single material afterwards.
-3. **Extrusions (\`modeler_extrude_polygon\` & \`modeler_extrude_shape\`)**:
-   - \`modeler_extrude_polygon\` expects 2D points in the **XZ plane** (\`y: 0\`) clockwise without self-intersection and extrudes along Y. To stand a profile upright, rotate by \`rotationDegrees: { x: -90, y: 0, z: 0 }\`.
-   - \`modeler_extrude_shape\` extrudes a 2D profile along a 3D path.
-4. **Rotational Bodies (\`modeler_create_lathe\`)**:
-   - Ideal for vases, chalices, pillar bases, bottles, chess pieces, domes, or lamp shades. Define profile in the XY plane (\`x >= 0\` radius, \`y\` height).
-5. **Metallic & filigree structures**:
-   - Use thin cylinders or \`modeler_create_tube\` for railings, frames, pipes, and cables. For realistic metal use \`metallic: 0.8\`, \`roughness: 0.25\`.
-`.trim(),
-  },
-  {
-    id: 'voxel-painter',
-    name: 'Voxel & Block Modeler (3D Voxel Grids & 2D-to-3D Extrusion)',
-    description:
-      'Guidance for generating 3D voxel models, blocky characters, pixel-art extrusions, and modular terrain blocks using palette-based voxel runs or box regions.',
-    enabled: true,
-    instructions: `
-# Voxel & Block Modeler Skill
-
-Use this skill when generating voxel models, blocky characters, retro 3D sprites, or converting 2D pixel art into 3D voxel meshes.
-
-## Workflow with \`modeler_build_voxel_mesh\`
-1. **Define Palette**:
-   - Define named palette entries with hex color, roughness, and metallic (e.g. \`stone: { color: "#7d8491", roughness: 0.85 }\`, \`gold: { color: "#f5c542", metallic: 0.85, roughness: 0.2 }\`, \`wood: { color: "#8b5a2b", roughness: 0.7 }\`).
-2. **Efficient Box Regions (\`boxes\`) & Voxel Lists (\`voxels\`)**:
-   - Use the \`boxes\` array for solid cuboids/walls/platforms: \`{ minX, minY, minZ, maxX, maxY, maxZ, paletteKey }\`.
-   - Add fine details with the \`voxels\` array: \`{ x, y, z, paletteKey }\`.
-   - Interior hidden voxels are culled automatically, and solid voxels of the same palette key are merged into optimized multi-material meshes.
-3. **2D Image to 3D Voxel Conversion**:
-   - Map X (width) and Y (height) of the image, extruding depth along the Z axis (typically 3 to 8 voxels deep).
-`.trim(),
-  },
-  {
-    id: 'mesh-updater',
-    name: 'Mesh Updater & Scene Sculptor (Text/Image to Mesh Update)',
-    description:
-      'Guidance for inspecting, modifying, transforming, carving, extending, recoloring, or restructuring existing meshes in the active 3D scene.',
-    enabled: true,
-    instructions: `
-# Mesh Updater & Scene Sculptor Skill
-
-Use this skill when meshes already exist in the scene and the user wants to adapt, extend, repair, recolor, hollow out, or rebuild an existing model ("Text to Mesh Update" / "Image to Mesh Update").
-
-## Rules for Updating Existing Meshes
-1. **Check Scene & Selection**:
-   - Inspect active meshes via context or \`modeler_get_scene_info\` for exact bounding boxes (\`min\`, \`max\`, \`center\`, \`size\`).
-2. **Accurate Placement relative to existing meshes**:
-   - Use the bounding box of existing meshes to accurately position additions (e.g. roof on a house, handle on a cup, wheels on a vehicle, battlements on a tower).
-3. **Modifying Existing Meshes**:
-   - **Transform**: Use \`modeler_transform_mesh\` to move, rotate, scale, rename, snap to ground (\`snapToGround: true\`), or center pivot (\`centerPivot: true\`).
-   - **Carve / Bore Holes / Fuse**: Create a cutter tool mesh and call \`modeler_boolean_operation\` (\`subtract\`, \`union\`, \`intersect\`) with the target mesh as \`baseMeshName\`.
-   - **Change Material & Texture**: Use \`modeler_create_material\` (including procedural textures: \`wood\`, \`stone\`, \`brick\`, \`marble\`, \`metal\`, etc.) and \`modeler_apply_material\`.
-   - **Patterns & Repetition**: Use \`modeler_clone_array\` (\`linear\` or \`radial\`) to repeat parts along an axis or in a circle (pillars, gear teeth, fence posts, stairs).
-   - **Separate / Merge**: Use \`modeler_separate_mesh\` to break loose parts into separate meshes or \`modeler_merge_meshes\` to fuse parts.
-`.trim(),
-  },
-  {
-    id: 'image-to-mesh',
-    name: 'Image to 3D Mesh Vision Analyzer',
-    description:
-      'Guidance for reconstructing 3D meshes or updating existing 3D models from user-provided reference images or viewport screenshots.',
-    enabled: true,
-    instructions: `
-# Image to 3D Mesh Vision Skill
-
-When a user provides a reference image (concept art, photo, icon, screenshot, or 2D sprite):
-1. **Proportional Decomposition**:
-   - Analyze main dimensions (width X, height Y, estimated depth Z).
-   - Deconstruct visible object into primary shapes, secondary features, and detail trims.
-2. **Symmetry & Repetition**:
-   - Detect rotational symmetry (use \`modeler_create_lathe\`), mirror symmetry, and radial/linear repetition (\`modeler_clone_array\`).
-3. **Colors & Materials**:
-   - Extract hex colors and surface properties (\`roughness\`, \`metallic\`, procedural textures) and apply them to parts.
-`.trim(),
-  },
-];
+export { BUILT_IN_AGENT_SKILLS, discoverSkills, parseSkillMarkdown } from './builtInSkills';
+import { BUILT_IN_AGENT_SKILLS, discoverSkills, parseSkillMarkdown } from './builtInSkills';
 
 /* =========================================================================
    PROCEDURAL IN-MEMORY TEXTURE GENERATOR
@@ -408,7 +304,7 @@ export class AIAgentService {
   ) {
     this.service = service;
     this.customFetch = customFetch || null;
-    this.skills = BUILT_IN_AGENT_SKILLS.map((s) => ({ ...s }));
+    this.skills = discoverSkills();
     this.config = {
       ...DEFAULT_AI_AGENT_CONFIG,
       ...this.loadSavedConfig(),
@@ -510,6 +406,68 @@ export class AIAgentService {
     if (skill) {
       skill.enabled = enabled;
     }
+  }
+
+  /**
+   * Registers or updates an AI agent skill definition.
+   */
+  public registerSkill(skill: AIAgentSkillDefinition): void {
+    const existingIndex = this.skills.findIndex((s) => s.id === skill.id);
+    if (existingIndex >= 0) {
+      this.skills[existingIndex] = { ...skill };
+    } else {
+      this.skills.push({ ...skill });
+    }
+  }
+
+  /**
+   * Parses and registers a skill directly from raw Markdown content (with optional YAML frontmatter).
+   */
+  public registerSkillFromMarkdown(content: string, fallbackId: string = 'custom-skill'): AIAgentSkillDefinition {
+    const skill = parseSkillMarkdown(content, fallbackId);
+    this.registerSkill(skill);
+    return skill;
+  }
+
+  /**
+   * Reloads skills discovered from the /skills directory, preserving user checkbox states.
+   */
+  public reloadSkills(): AIAgentSkillDefinition[] {
+    const existingStates = new Map<string, boolean>();
+    for (const s of this.skills) {
+      existingStates.set(s.id, s.enabled);
+    }
+    const freshSkills = discoverSkills();
+    for (const fresh of freshSkills) {
+      if (existingStates.has(fresh.id)) {
+        fresh.enabled = existingStates.get(fresh.id)!;
+      }
+    }
+    this.skills = freshSkills;
+    return this.skills;
+  }
+
+  /**
+   * Optionally fetches dynamically discovered skills from the local dev server or bridge API (/api/skills).
+   */
+  public async fetchSkillsFromApi(apiUrl: string = '/api/skills'): Promise<AIAgentSkillDefinition[]> {
+    try {
+      const fetchFn = this.customFetch || (typeof fetch !== 'undefined' ? fetch : null);
+      if (!fetchFn) return this.skills;
+      const res = await fetchFn(apiUrl);
+      if (!res.ok) return this.skills;
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        for (const item of data) {
+          if (item && item.id && item.instructions) {
+            this.registerSkill(item);
+          }
+        }
+      }
+    } catch {
+      // Ignore network errors and keep currently loaded skills
+    }
+    return this.skills;
   }
 
   public clearChatHistory(): void {

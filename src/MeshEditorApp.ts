@@ -3048,11 +3048,22 @@ export class MeshEditorApp {
     updateEndpointBadge();
     renderSkills();
 
+    // Refresh dynamic skills from local dev server/bridge if available
+    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+      this.service.aiAgent.fetchSkillsFromApi().then(() => {
+        renderSkills();
+      });
+    }
+
     // Toggle settings panel
     const toggleSettings = (forceOpen?: boolean) => {
       if (!settingsPanel) return;
       const isHidden = settingsPanel.style.display === 'none' || settingsPanel.style.display === '';
       const willOpen = forceOpen !== undefined ? forceOpen : isHidden;
+      if (willOpen) {
+        this.service.aiAgent.reloadSkills();
+        renderSkills();
+      }
       settingsPanel.style.display = willOpen ? 'block' : 'none';
     };
 

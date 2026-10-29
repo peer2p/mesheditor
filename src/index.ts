@@ -6,6 +6,7 @@ export * from './plugin';
 export * from './adapters';
 export * from './styles';
 export * from './template';
+export * from './builtInSkills';
 export * from './AIAgentService';
 export * from './MeshEditorService';
 export * from './MeshEditorApp';

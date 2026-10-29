@@ -443,6 +443,22 @@ function setupAntigravityBridgeRoutes(app) {
     }
   });
 
+  const handleSkillsRequest = (_req, res) => {
+    try {
+      const { getDiscoveredSkills } = require('./sync-skills');
+      const skills = getDiscoveredSkills();
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(skills));
+    } catch (err) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: { message: err.message || String(err) } }));
+    }
+  };
+
+  app.get('/api/skills', handleSkillsRequest);
+  app.get('/api/antigravity/v1/skills', handleSkillsRequest);
+
   app.post('/api/antigravity/v1/chat/completions', (req, res) => {
     let rawBody = '';
     req.on('data', (chunk) => {
@@ -497,6 +513,22 @@ function startStandaloneBridgeServer(port = Number(process.env.AGY_BRIDGE_PORT) 
             data: models.map((id) => ({ id, object: 'model', owned_by: 'antigravity' })),
           })
         );
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { message: err.message || String(err) } }));
+      }
+      return;
+    }
+
+    if (
+      req.method === 'GET' &&
+      (urlPath === '/v1/skills' || urlPath === '/api/antigravity/v1/skills' || urlPath === '/api/skills' || urlPath === '/skills')
+    ) {
+      try {
+        const { getDiscoveredSkills } = require('./sync-skills');
+        const skills = getDiscoveredSkills();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(skills));
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: { message: err.message || String(err) } }));

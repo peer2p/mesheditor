@@ -2,6 +2,7 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const { setupAntigravityBridgeRoutes } = require('./scripts/antigravity-bridge');
+require('./scripts/sync-skills');
 
 module.exports = (env, argv) => {
   const isProduction = (argv && argv.mode === 'production') || process.env.NODE_ENV === 'production';
@@ -53,6 +54,10 @@ module.exports = (env, argv) => {
           ],
           exclude: /node_modules/,
         },
+        {
+          test: /\.md$/,
+          type: 'asset/source',
+        },
       ],
     },
     plugins: [
@@ -65,6 +70,7 @@ module.exports = (env, argv) => {
       new CopyWebpackPlugin({
         patterns: [
           { from: 'src/mesheditor.css', to: 'mesheditor.css' },
+          { from: 'skills', to: 'skills' },
         ],
       }),
     ],
