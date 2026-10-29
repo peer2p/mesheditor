@@ -6,7 +6,7 @@ import { MeshEditorService } from './MeshEditorService';
 import { MenuItemDefinition, MeshEditorPlugin, PluginManager, ToolbarButtonDefinition } from './plugin';
 import { ensureMeshEditorStyles } from './styles';
 import { getMeshEditorTemplate } from './template';
-import { AIAgentToolExecutionStep, MeshEditorServiceEvents, PrimitiveShape } from './types';
+import { AIAgentToolExecutionStep, ExportOptions, MeshEditorServiceEvents, PrimitiveShape } from './types';
 
 export interface MeshEditorAppOptions {
   /**
@@ -788,8 +788,7 @@ export class MeshEditorApp {
     });
     this.getElement('btnExportMenu')?.addEventListener('click', () => {
       this.closeAllDropdowns();
-      this.toggleDialog('dialog-scene', true);
-      this.showToast('Configure your export in the Scene & Environment panel.', 'info');
+      this.openExportDialog();
     });
 
     // Actions Menu
@@ -918,6 +917,7 @@ export class MeshEditorApp {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         this.closeAllDropdowns();
+        this.closeExportDialog();
       }
     });
 
@@ -942,6 +942,9 @@ export class MeshEditorApp {
     helpModal?.addEventListener('click', (e) => {
       if (e.target === helpModal) helpModal.classList.remove('active');
     });
+
+    // Export Modal Dialog
+    this.initExportDialog();
 
     // Search filter in Outliner
     this.outlinerSearchInput?.addEventListener('input', (e) => {
@@ -1159,6 +1162,160 @@ export class MeshEditorApp {
     this.saveDialogLayout();
   }
 
+  /* =========================================================================
+     EXPORT MODAL DIALOG
+     ========================================================================= */
+  private initExportDialog(): void {
+    const modal = this.getElement('exportModal');
+    if (!modal) return;
+
+    const btnClose = this.getElement('btnCloseExport');
+    const btnCancel = this.getElement('btnCancelExport');
+    const btnConfirm = this.getElement('btnConfirmExport');
+    const filenameInput = this.getElement<HTMLInputElement>('exportFilenameInput');
+    const selectedOnlyCheckbox = this.getElement<HTMLInputElement>('exportSelectedOnlyCheckbox');
+    const formatCards = modal.querySelectorAll<HTMLElement>('.export-format-option');
+
+    btnClose?.addEventListener('click', () => this.closeExportDialog());
+    btnCancel?.addEventListener('click', () => this.closeExportDialog());
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        this.closeExportDialog();
+      }
+    });
+
+    formatCards.forEach((card) => {
+      card.addEventListener('click', () => {
+        const format = card.getAttribute('data-format') as ExportOptions['format'] | null;
+        if (!format) return;
+
+        formatCards.forEach((c) => c.classList.remove('active'));
+        card.classList.add('active');
+
+        const radio = card.querySelector<HTMLInputElement>('input[type="radio"]');
+        if (radio) radio.checked = true;
+
+        this.service.exportParams.format = format;
+        const badge = this.getElement('exportExtensionBadge');
+        if (badge) badge.textContent = '.' + format;
+      });
+    });
+
+    selectedOnlyCheckbox?.addEventListener('change', () => {
+      this.service.exportParams.selectedOnly = selectedOnlyCheckbox.checked;
+      this.updateExportScopeDetails();
+    });
+
+    btnConfirm?.addEventListener('click', () => {
+      this.confirmExport();
+    });
+
+    filenameInput?.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.confirmExport();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeExportDialog();
+      }
+    });
+  }
+
+  public openExportDialog(): void {
+    const modal = this.getElement('exportModal');
+    if (!modal) return;
+
+    const filenameInput = this.getElement<HTMLInputElement>('exportFilenameInput');
+    if (filenameInput) {
+      filenameInput.value = (this.service.exportParams.filename || 'model_edited').trim();
+    }
+
+    const currentFormat = (this.service.exportParams.format || 'glb').toLowerCase();
+    const formatCards = modal.querySelectorAll<HTMLElement>('.export-format-option');
+    formatCards.forEach((card) => {
+      const format = card.getAttribute('data-format');
+      const isSelected = format === currentFormat;
+      card.classList.toggle('active', isSelected);
+      const radio = card.querySelector<HTMLInputElement>('input[type="radio"]');
+      if (radio) radio.checked = isSelected;
+    });
+
+    const badge = this.getElement('exportExtensionBadge');
+    if (badge) {
+      badge.textContent = '.' + currentFormat;
+    }
+
+    const selectedOnlyCheckbox = this.getElement<HTMLInputElement>('exportSelectedOnlyCheckbox');
+    if (selectedOnlyCheckbox) {
+      selectedOnlyCheckbox.checked = !!this.service.exportParams.selectedOnly;
+    }
+
+    this.updateExportScopeDetails();
+
+    modal.classList.add('active');
+    this.refreshIcons();
+
+    setTimeout(() => {
+      if (filenameInput) {
+        filenameInput.focus();
+        filenameInput.select();
+      }
+    }, 50);
+  }
+
+  public closeExportDialog(): void {
+    const modal = this.getElement('exportModal');
+    modal?.classList.remove('active');
+  }
+
+  public updateExportScopeDetails(): void {
+    const selectedOnlyCheckbox = this.getElement<HTMLInputElement>('exportSelectedOnlyCheckbox');
+    const details = this.getElement('exportSelectionDetails');
+    if (!details) return;
+
+    const selectedCount = this.service.selectedNodes.length;
+    const totalMeshes = this.service.importedMeshes.length;
+
+    if (selectedOnlyCheckbox?.checked) {
+      if (selectedCount > 0) {
+        details.textContent = `${selectedCount} selected mesh${selectedCount === 1 ? '' : 'es'} will be exported.`;
+        details.className = 'export-selection-details';
+      } else {
+        details.textContent = 'Warning: No meshes are currently selected.';
+        details.className = 'export-selection-details warning';
+      }
+    } else {
+      details.textContent = `All scene meshes will be exported (${totalMeshes} mesh${totalMeshes === 1 ? '' : 'es'} in scene).`;
+      details.className = 'export-selection-details';
+    }
+  }
+
+  public async confirmExport(): Promise<void> {
+    const filenameInput = this.getElement<HTMLInputElement>('exportFilenameInput');
+    const rawFilename = (filenameInput?.value || '').trim();
+    const filename = rawFilename || this.service.exportParams.filename || 'model_edited';
+
+    const modal = this.getElement('exportModal');
+    const activeCard = modal?.querySelector<HTMLElement>('.export-format-option.active');
+    const format = (activeCard?.getAttribute('data-format') || this.service.exportParams.format || 'glb') as ExportOptions['format'];
+
+    const selectedOnlyCheckbox = this.getElement<HTMLInputElement>('exportSelectedOnlyCheckbox');
+    const selectedOnly = !!selectedOnlyCheckbox?.checked;
+
+    if (selectedOnly && this.service.selectedNodes.length === 0) {
+      this.showToast('Please select at least one mesh or uncheck "Export selected objects only".', 'warning');
+      return;
+    }
+
+    this.service.exportParams.filename = filename;
+    this.service.exportParams.format = format;
+    this.service.exportParams.selectedOnly = selectedOnly;
+
+    this.closeExportDialog();
+    await this.service.exportCurrentModel({ filename, format, selectedOnly });
+  }
+
   private saveDialogLayout(): void {
     try {
       const layout: Record<string, { left: string; top: string; display: string; open: boolean; minimized: boolean }> = {};
@@ -1338,13 +1495,6 @@ export class MeshEditorApp {
       .add(this.service.sceneParams, 'cameraSpeed', 0.1, 2.0, 0.05)
       .name('Camera Speed')
       .onChange((v) => this.service.setCameraSpeed(v));
-
-    const fExport = this.guiScene.addFolder('Export Model');
-    fExport.add(this.service.exportParams, 'format', ['glb', 'gltf', 'obj', 'stl']).name('Format');
-    fExport.add(this.service.exportParams, 'filename').name('Filename');
-    fExport.add(this.service.exportParams, 'selectedOnly').name('Selected Only');
-    fExport.add({ exportNow: () => this.service.exportCurrentModel() }, 'exportNow').name('Export File');
-    fExport.open();
 
     // 2. Mesh Properties GUI
     const containerMesh = document.getElementById('gui-mesh-container') || document.getElementById('gui-container-mesh');
@@ -2368,6 +2518,9 @@ export class MeshEditorApp {
       } else if ((e.metaKey || e.ctrlKey) && key === 'd') {
         e.preventDefault();
         this.service.duplicateSelectedMesh();
+      } else if ((e.metaKey || e.ctrlKey) && key === 'e') {
+        e.preventDefault();
+        this.openExportDialog();
       } else if (key === 'm') {
         document.getElementById('btnGizmoTranslate')?.click();
       } else if (key === 'e') {
@@ -2381,6 +2534,7 @@ export class MeshEditorApp {
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         this.service.deleteSelected();
       } else if (e.key === 'Escape') {
+        this.closeExportDialog();
         if (this.service.isPlaceModeActive) {
           this.service.cancelPlacementMode();
         }

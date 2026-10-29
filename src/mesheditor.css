@@ -1058,19 +1058,22 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
   color: var(--text-primary);
 }
 
-/* Help Modal */
-#helpModal {
+/* Help & Export Modals */
+#helpModal,
+#exportModal {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: none;
   align-items: center;
   justify-content: center;
   z-index: 2000;
 }
 
-#helpModal.active {
+#helpModal.active,
+#exportModal.active {
   display: flex;
 }
 
@@ -1153,6 +1156,192 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
   border-top: 1px solid var(--border-color);
   display: flex;
   justify-content: flex-end;
+}
+
+/* Export Modal Dialog Styles */
+.export-modal-content {
+  width: 530px;
+  max-width: 92vw;
+}
+
+.export-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.export-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.export-form-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.export-input-wrap {
+  display: flex;
+  align-items: center;
+  position: relative;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.export-input-wrap:focus-within {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
+}
+
+.export-text-input {
+  flex: 1;
+  height: 34px;
+  padding: 0 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  user-select: text;
+}
+
+.export-ext-badge {
+  padding: 3px 8px;
+  margin-right: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-color);
+}
+
+.export-format-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.export-format-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.export-format-option:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.export-format-option.active {
+  background: rgba(31, 111, 235, 0.15);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 1px var(--accent-color);
+}
+
+.export-radio-hidden {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+.format-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.format-option-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.format-option-tag {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+}
+
+.format-option-tag.recommended {
+  background: rgba(35, 134, 54, 0.25);
+  color: #56d364;
+  border: 1px solid rgba(86, 211, 100, 0.3);
+}
+
+.format-option-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.export-scope-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.export-checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.export-checkbox {
+  cursor: pointer;
+  accent-color: var(--accent-active);
+  width: 15px;
+  height: 15px;
+}
+
+.export-checkbox-title {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.export-selection-details {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding-left: 23px;
+}
+
+.export-selection-details.warning {
+  color: var(--warning-color);
+}
+
+.export-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* Notification Toast */

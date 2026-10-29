@@ -31,8 +31,8 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
       label: 'Save Model As...',
       icon: 'save',
       shortcut: this.bridge.platform === 'darwin' ? '⌘S' : 'Ctrl+S',
-      onClick: async () => {
-        await app.service.exportCurrentModel();
+      onClick: () => {
+        app.openExportDialog();
       },
     });
 
@@ -47,7 +47,7 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
           break;
         case 'file:save':
         case 'file:export':
-          await app.service.exportCurrentModel();
+          app.openExportDialog();
           break;
         case 'edit:undo':
           app.service.undo();

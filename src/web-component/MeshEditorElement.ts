@@ -215,6 +215,13 @@ export class MeshEditorElement extends HTMLElement {
   }
 
   /**
+   * Opens the model export dialog.
+   */
+  public openExportDialog(): void {
+    this.app?.openExportDialog();
+  }
+
+  /**
    * Clears all meshes and resets the scene.
    */
   public clearScene(): void {

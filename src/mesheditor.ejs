@@ -757,6 +757,10 @@
                   <td>Duplicate selected mesh</td>
                 </tr>
                 <tr>
+                  <td><span class="shortcut-tag">Cmd+E / Ctrl+E</span></td>
+                  <td>Open Export 3D Model dialog</td>
+                </tr>
+                <tr>
                   <td><span class="shortcut-tag">Del / Backspace</span></td>
                   <td>Delete selected mesh or facet</td>
                 </tr>
@@ -778,6 +782,86 @@
           </div>
           <div class="modal-footer">
             <button class="tool-btn btn-primary" id="btnHelpDone">Got it!</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Export Modal Dialog -->
+      <div id="exportModal">
+        <div class="modal-content export-modal-content">
+          <div class="modal-header">
+            <h3><i class="app-icon" data-lucide="download"></i> Export 3D Model</h3>
+            <button class="dialog-btn btn-close" id="btnCloseExport" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+          </div>
+          <div class="modal-body export-modal-body">
+            <div class="export-form-group">
+              <label for="exportFilenameInput" class="export-form-label">Filename</label>
+              <div class="export-input-wrap">
+                <input type="text" id="exportFilenameInput" class="export-text-input" placeholder="model_name" spellcheck="false" autocomplete="off" />
+                <span id="exportExtensionBadge" class="export-ext-badge">.glb</span>
+              </div>
+            </div>
+
+            <div class="export-form-group">
+              <label class="export-form-label">Format</label>
+              <div class="export-format-options" id="exportFormatOptions">
+                <label class="export-format-option active" data-format="glb">
+                  <input type="radio" name="exportModalFormat" value="glb" checked class="export-radio-hidden" />
+                  <div class="format-option-header">
+                    <span class="format-option-name">GLB</span>
+                    <span class="format-option-tag recommended">Recommended</span>
+                  </div>
+                  <div class="format-option-desc">Binary glTF 2.0 with embedded geometry, materials &amp; textures</div>
+                </label>
+
+                <label class="export-format-option" data-format="gltf">
+                  <input type="radio" name="exportModalFormat" value="gltf" class="export-radio-hidden" />
+                  <div class="format-option-header">
+                    <span class="format-option-name">glTF</span>
+                    <span class="format-option-tag">JSON + Bin</span>
+                  </div>
+                  <div class="format-option-desc">Standard glTF JSON scene description with external or embedded buffers</div>
+                </label>
+
+                <label class="export-format-option" data-format="obj">
+                  <input type="radio" name="exportModalFormat" value="obj" class="export-radio-hidden" />
+                  <div class="format-option-header">
+                    <span class="format-option-name">OBJ</span>
+                    <span class="format-option-tag">Wavefront</span>
+                  </div>
+                  <div class="format-option-desc">Universal polygon geometry format for 3D modeling &amp; DCC suites</div>
+                </label>
+
+                <label class="export-format-option" data-format="stl">
+                  <input type="radio" name="exportModalFormat" value="stl" class="export-radio-hidden" />
+                  <div class="format-option-header">
+                    <span class="format-option-name">STL</span>
+                    <span class="format-option-tag">3D Print</span>
+                  </div>
+                  <div class="format-option-desc">Stereolithography triangulated surface mesh for slicing &amp; 3D printing</div>
+                </label>
+              </div>
+            </div>
+
+            <div class="export-form-group">
+              <label class="export-form-label">Scope</label>
+              <div class="export-scope-box">
+                <label class="export-checkbox-container">
+                  <input type="checkbox" id="exportSelectedOnlyCheckbox" class="export-checkbox" />
+                  <span class="export-checkbox-title">Export selected objects only</span>
+                </label>
+                <div id="exportSelectionDetails" class="export-selection-details">
+                  All visible meshes will be exported
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer export-modal-footer">
+            <button class="tool-btn" id="btnCancelExport">Cancel</button>
+            <button class="tool-btn btn-export" id="btnConfirmExport">
+              <span class="btn-icon"><i class="app-icon" data-lucide="download"></i></span>
+              <span class="btn-label">Export</span>
+            </button>
           </div>
         </div>
       </div>

@@ -206,4 +206,65 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
     expect(handled).toBe(true);
     expect(onModelExported).toHaveBeenCalledWith(dummyBlob, 'spaceship.glb', 'glb');
   });
+
+  it('opens, updates, and confirms model export via dedicated export modal dialog', async () => {
+    app = new MeshEditorApp({
+      container,
+      engine,
+    });
+
+    const exportModal = container.querySelector('#exportModal') as HTMLElement;
+    expect(exportModal).not.toBeNull();
+    expect(exportModal.classList.contains('active')).toBe(false);
+
+    // Open export dialog via File menu button
+    const btnExportMenu = container.querySelector('#btnExportMenu') as HTMLButtonElement;
+    expect(btnExportMenu).not.toBeNull();
+    btnExportMenu.click();
+
+    expect(exportModal.classList.contains('active')).toBe(true);
+
+    const filenameInput = container.querySelector('#exportFilenameInput') as HTMLInputElement;
+    const badge = container.querySelector('#exportExtensionBadge') as HTMLElement;
+    expect(filenameInput).not.toBeNull();
+    expect(badge.textContent).toBe('.glb');
+
+    // Select OBJ format
+    const objCard = exportModal.querySelector('.export-format-option[data-format="obj"]') as HTMLElement;
+    expect(objCard).not.toBeNull();
+    objCard.click();
+
+    expect(objCard.classList.contains('active')).toBe(true);
+    expect(badge.textContent).toBe('.obj');
+
+    // Change filename
+    filenameInput.value = 'hero_ship';
+
+    // Mock service.exportCurrentModel
+    const exportSpy = vi.spyOn(app.service, 'exportCurrentModel').mockResolvedValue(undefined as any);
+
+    // Confirm export
+    const btnConfirm = container.querySelector('#btnConfirmExport') as HTMLButtonElement;
+    btnConfirm.click();
+
+    expect(exportModal.classList.contains('active')).toBe(false);
+    expect(exportSpy).toHaveBeenCalledWith({
+      filename: 'hero_ship',
+      format: 'obj',
+      selectedOnly: false,
+    });
+
+    // Test closing via cancel button
+    app.openExportDialog();
+    expect(exportModal.classList.contains('active')).toBe(true);
+    const btnCancel = container.querySelector('#btnCancelExport') as HTMLButtonElement;
+    btnCancel.click();
+    expect(exportModal.classList.contains('active')).toBe(false);
+
+    // Test closing via Escape key
+    app.openExportDialog();
+    expect(exportModal.classList.contains('active')).toBe(true);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(exportModal.classList.contains('active')).toBe(false);
+  });
 });
