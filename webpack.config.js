@@ -1,6 +1,7 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const { setupAntigravityBridgeRoutes } = require('./scripts/antigravity-bridge');
 
 module.exports = (env, argv) => {
   const isProduction = (argv && argv.mode === 'production') || process.env.NODE_ENV === 'production';
@@ -30,6 +31,12 @@ module.exports = (env, argv) => {
           errors: true,
           warnings: false,
         },
+      },
+      setupMiddlewares: (middlewares, devServer) => {
+        if (devServer && devServer.app) {
+          setupAntigravityBridgeRoutes(devServer.app);
+        }
+        return middlewares;
       },
     },
     module: {

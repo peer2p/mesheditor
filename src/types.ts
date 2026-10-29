@@ -71,3 +71,48 @@ export interface MeshEditorServiceEvents {
   onAnimProgress?: (currentFrame: number) => void;
   onExportModel?: (blob: Blob, filename: string, format: ExportOptions['format']) => Promise<boolean> | boolean;
 }
+
+export interface AIAgentEndpointConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  temperature?: number;
+  maxIterations?: number;
+}
+
+export interface AIAgentSkillDefinition {
+  id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  enabled: boolean;
+}
+
+export interface AIAgentToolExecutionStep {
+  id: string;
+  toolName: string;
+  args: Record<string, any>;
+  result: string;
+  isError?: boolean;
+  durationMs?: number;
+}
+
+export interface AIAgentChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  images?: string[];
+  toolSteps?: AIAgentToolExecutionStep[];
+  timestamp: number;
+}
+
+export interface AIAgentRequestOptions {
+  prompt: string;
+  images?: string[];
+  mode?: 'create_or_update' | 'replace_scene';
+  includeViewportSnapshot?: boolean;
+  signal?: AbortSignal;
+  onStep?: (step: AIAgentToolExecutionStep) => void;
+  onStatus?: (statusText: string) => void;
+}
+

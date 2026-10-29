@@ -1,11 +1,12 @@
 import { Color3, Engine, Mesh, PBRMaterial, StandardMaterial, Texture } from '@babylonjs/core';
 import * as dat from 'dat.gui';
 import { createDefaultPlatformAdapter, MeshEditorPlatformAdapter } from './adapters';
+import { AI_ENDPOINT_PRESETS } from './AIAgentService';
 import { MeshEditorService } from './MeshEditorService';
 import { MenuItemDefinition, MeshEditorPlugin, PluginManager, ToolbarButtonDefinition } from './plugin';
 import { ensureMeshEditorStyles } from './styles';
 import { getMeshEditorTemplate } from './template';
-import { MeshEditorServiceEvents, PrimitiveShape } from './types';
+import { AIAgentToolExecutionStep, MeshEditorServiceEvents, PrimitiveShape } from './types';
 
 export interface MeshEditorAppOptions {
   /**
@@ -49,11 +50,14 @@ import {
   AlertCircle,
   AlertTriangle,
   AppWindow,
+  Bot,
   Box,
   BoxSelect,
+  Camera,
   Check,
   CheckCircle2,
   ChevronDown,
+  Code,
   createIcons,
   Crosshair,
   Download,
@@ -68,6 +72,7 @@ import {
   FolderPlus,
   Grid3x3,
   HelpCircle,
+  Image,
   Info,
   Keyboard,
   Library,
@@ -83,12 +88,16 @@ import {
   Plus,
   PlusCircle,
   Redo2,
+  RefreshCw,
   RotateCw,
   Save,
   Scissors,
   Search,
+  Send,
+  Settings,
   Shapes,
   Sparkles,
+  Square,
   Sun,
   SunMedium,
   Target,
@@ -108,11 +117,14 @@ export const editorIcons = {
   AlertCircle,
   AlertTriangle,
   AppWindow,
+  Bot,
   Box,
   BoxSelect,
+  Camera,
   Check,
   CheckCircle2,
   ChevronDown,
+  Code,
   Crosshair,
   Download,
   Eye,
@@ -126,6 +138,7 @@ export const editorIcons = {
   FolderPlus,
   Grid3x3,
   HelpCircle,
+  Image,
   Info,
   Keyboard,
   Library,
@@ -141,12 +154,16 @@ export const editorIcons = {
   Plus,
   PlusCircle,
   Redo2,
+  RefreshCw,
   RotateCw,
   Save,
   Scissors,
   Search,
+  Send,
+  Settings,
   Shapes,
   Sparkles,
+  Square,
   Sun,
   SunMedium,
   Target,
@@ -241,12 +258,17 @@ export class MeshEditorApp {
     'dialog-create-primitive',
     'dialog-csg',
     'dialog-facet',
+    'dialog-ai-agent',
     'dialog-scene',
     'dialog-mesh',
     'dialog-material',
     'dialog-anim',
     'dialog-textures',
   ];
+
+  // AI Agent UI State
+  private aiPendingImages: string[] = [];
+  private aiAbortController: AbortController | null = null;
 
   // GUI parameter proxy objects
   private meshParams = {
@@ -810,6 +832,14 @@ export class MeshEditorApp {
       this.closeAllDropdowns();
       this.toggleDialog('dialog-facet');
     });
+    this.getElement('btnToggleAIAgent')?.addEventListener('click', () => {
+      this.closeAllDropdowns();
+      this.toggleDialog('dialog-ai-agent');
+    });
+    this.getElement('btnToolbarAIAgent')?.addEventListener('click', () => {
+      this.closeAllDropdowns();
+      this.toggleDialog('dialog-ai-agent');
+    });
     document.getElementById('btnToggleTexturePanel')?.addEventListener('click', () => {
       this.closeAllDropdowns();
       this.toggleDialog('dialog-textures');
@@ -893,9 +923,12 @@ export class MeshEditorApp {
 
     // Setup Floating Dialogs & Dragging
     for (const id of this.dialogIds) {
-      const dialog = document.getElementById(id);
+      const dialog = this.getElement(id);
       if (dialog) this.setupFloatingDialog(dialog);
     }
+
+    // Initialize AI Agent Panel UI
+    this.initAIAgentUI();
 
     // Restore saved window layout and active tools from localStorage
     this.restoreDialogLayout();
@@ -1153,12 +1186,16 @@ export class MeshEditorApp {
     try {
       const saved = localStorage.getItem('mesheditor_window_layout');
       if (!saved) {
-        // First time execution: activate all tools & panels by default
+        // First time execution: activate default tools & panels (keep AI Agent dialog closed until toggled)
         for (const id of this.dialogIds) {
           const dialog = this.getElement(id);
           if (dialog) {
-            dialog.style.display = 'flex';
-            dialog.classList.remove('minimized');
+            if (id === 'dialog-ai-agent') {
+              dialog.style.display = 'none';
+            } else {
+              dialog.style.display = 'flex';
+              dialog.classList.remove('minimized');
+            }
           }
         }
         this.updatePanelButtonStates();
@@ -1233,6 +1270,7 @@ export class MeshEditorApp {
       'dialog-create-primitive': 'btnCreatePrimitive',
       'dialog-csg': 'btnToggleCSG',
       'dialog-facet': 'btnToggleFacetEditor',
+      'dialog-ai-agent': 'btnToggleAIAgent',
       'dialog-mesh': 'btnToggleMeshPanel',
       'dialog-material': 'btnToggleMaterialPanel',
       'dialog-scene': 'btnToggleScenePanel',
@@ -1248,6 +1286,16 @@ export class MeshEditorApp {
           dialog.style.display !== 'none' && (dialog.style.display !== '' || window.getComputedStyle(dialog).display !== 'none');
         btn.classList.toggle('active', isOpen);
       }
+    }
+
+    // Also update AI Agent top toolbar button state
+    const aiDialog = this.getElement('dialog-ai-agent');
+    const btnToolbarAI = this.getElement('btnToolbarAIAgent');
+    if (aiDialog && btnToolbarAI) {
+      const isAIOpen =
+        aiDialog.style.display !== 'none' &&
+        (aiDialog.style.display !== '' || window.getComputedStyle(aiDialog).display !== 'none');
+      btnToolbarAI.classList.toggle('active', isAIOpen);
     }
 
     // Also update Ground Grid button state
@@ -2768,6 +2816,462 @@ export class MeshEditorApp {
       } else {
         select.value = options[0] || 'None';
       }
+    }
+  }
+
+  /* =========================================================================
+     AI MESH AGENT UI (TEXT/IMAGE TO MESH & MESH UPDATE)
+     ========================================================================= */
+  private initAIAgentUI(): void {
+    const endpointInput = this.getElement<HTMLInputElement>('aiEndpointUrlInput');
+    const apiKeyInput = this.getElement<HTMLInputElement>('aiApiKeyInput');
+    const modelInput = this.getElement<HTMLInputElement>('aiModelInput');
+    const modelDatalist = this.getElement<HTMLDataListElement>('aiModelDatalist');
+    const settingsPanel = this.getElement<HTMLElement>('aiSettingsPanel');
+    const skillsList = this.getElement<HTMLElement>('aiSkillsList');
+    const endpointBadge =
+      this.getElement<HTMLElement>('aiEndpointSummaryText') || this.getElement<HTMLElement>('aiEndpointBadge');
+    const endpointDot = this.getElement<HTMLElement>('aiEndpointStatusDot');
+    const settingsStatus = this.getElement<HTMLElement>('aiSettingsStatus');
+    const promptInput = this.getElement<HTMLTextAreaElement>('aiPromptInput');
+    const imageFileInput = this.getElement<HTMLInputElement>('aiImageFileInput');
+
+    const updateEndpointBadge = () => {
+      const cfg = this.service.aiAgent.getConfig();
+      const isAgy =
+        cfg.baseUrl.includes('/api/antigravity') ||
+        cfg.baseUrl.includes('localhost:8787') ||
+        cfg.baseUrl.includes('127.0.0.1:8787');
+      let host = isAgy ? 'Antigravity' : cfg.baseUrl;
+      if (!isAgy) {
+        try {
+          const u = new URL(cfg.baseUrl);
+          host = u.host;
+        } catch {
+          // Keep raw string if not a valid URL
+        }
+      }
+      const isLocal = isAgy || host.includes('localhost') || host.includes('127.0.0.1');
+      const hasKey = !!cfg.apiKey || isLocal;
+      const keyStatus = isAgy ? 'Account ✓' : cfg.apiKey ? 'Key ✓' : isLocal ? 'Local' : 'No Key';
+      if (endpointBadge) {
+        endpointBadge.textContent = `${cfg.model} • ${host} (${keyStatus})`;
+      }
+      if (endpointDot) {
+        endpointDot.classList.toggle('is-ready', hasKey);
+      }
+    };
+
+    const renderSkills = () => {
+      if (!skillsList) return;
+      const skills = this.service.aiAgent.getSkills();
+      skillsList.innerHTML = '';
+      for (const skill of skills) {
+        const checked = skill.enabled;
+        const label = document.createElement('label');
+        label.className = 'ai-skill-item';
+        label.title = skill.description;
+        label.innerHTML = `
+          <input type="checkbox" data-skill-id="${skill.id}" ${checked ? 'checked' : ''} />
+          <span class="ai-skill-info">
+            <span class="ai-skill-name">${skill.name}</span>
+            <span class="ai-skill-desc">${skill.description}</span>
+          </span>
+        `;
+        const checkbox = label.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+        checkbox?.addEventListener('change', () => {
+          this.service.aiAgent.setSkillEnabled(skill.id, !!checkbox.checked);
+        });
+        skillsList.appendChild(label);
+      }
+    };
+
+    // Populate initial values from saved config
+    const initialConfig = this.service.aiAgent.getConfig();
+    if (endpointInput) endpointInput.value = initialConfig.baseUrl;
+    if (apiKeyInput) apiKeyInput.value = initialConfig.apiKey;
+    if (modelInput) modelInput.value = initialConfig.model;
+    updateEndpointBadge();
+    renderSkills();
+
+    // Toggle settings panel
+    const toggleSettings = (forceOpen?: boolean) => {
+      if (!settingsPanel) return;
+      const isHidden = settingsPanel.style.display === 'none' || settingsPanel.style.display === '';
+      const willOpen = forceOpen !== undefined ? forceOpen : isHidden;
+      settingsPanel.style.display = willOpen ? 'block' : 'none';
+    };
+
+    this.getElement('btnAISettingsToggle')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSettings();
+    });
+    this.getElement('btnOpenAISettingsInline')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSettings();
+    });
+
+    // Endpoint presets
+    const presetContainer = this.getElement('aiPresetChips');
+    presetContainer?.querySelectorAll('[data-preset]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const presetId = (btn as HTMLElement).getAttribute('data-preset');
+        const preset = AI_ENDPOINT_PRESETS.find((p) => p.id === presetId);
+        if (preset) {
+          if (endpointInput) endpointInput.value = preset.baseUrl;
+          if (modelInput) modelInput.value = preset.defaultModel;
+          this.service.aiAgent.saveConfig({
+            baseUrl: preset.baseUrl,
+            model: preset.defaultModel,
+          });
+          updateEndpointBadge();
+          if (settingsStatus) settingsStatus.textContent = `Preset: ${preset.label}`;
+          this.showToast(`Switched to ${preset.label} (${preset.defaultModel})`, 'info');
+        }
+      });
+    });
+
+    // Toggle API key visibility
+    this.getElement('btnToggleApiKeyVis')?.addEventListener('click', () => {
+      if (!apiKeyInput) return;
+      apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
+    });
+
+    // Fetch available models from OpenAI-compatible /models endpoint
+    this.getElement('btnFetchAIModels')?.addEventListener('click', async () => {
+      try {
+        if (settingsStatus) settingsStatus.textContent = 'Fetching models...';
+        const models = await this.service.aiAgent.fetchAvailableModels({
+          baseUrl: endpointInput?.value.trim(),
+          apiKey: apiKeyInput?.value.trim(),
+        });
+        if (modelDatalist) {
+          modelDatalist.innerHTML = models.map((m) => `<option value="${m}"></option>`).join('');
+        }
+        if (models.length > 0 && modelInput && !modelInput.value.trim()) {
+          modelInput.value = models[0];
+        }
+        if (settingsStatus) settingsStatus.textContent = `${models.length} models loaded`;
+        this.showToast(`Loaded ${models.length} models from endpoint.`, 'success');
+      } catch (err: any) {
+        if (settingsStatus) settingsStatus.textContent = 'Model fetch failed';
+        this.showToast(err?.message || 'Failed to fetch models from endpoint.', 'warning');
+      }
+    });
+
+    // Save settings button
+    this.getElement('btnSaveAISettings')?.addEventListener('click', () => {
+      this.service.aiAgent.saveConfig({
+        baseUrl: endpointInput?.value.trim() || 'https://api.openai.com/v1',
+        apiKey: apiKeyInput?.value.trim() || '',
+        model: modelInput?.value.trim() || 'gpt-4o',
+      });
+      updateEndpointBadge();
+      if (settingsStatus) settingsStatus.textContent = 'Saved ✓';
+      toggleSettings(false);
+      this.showToast('AI Agent endpoint configuration saved.', 'success');
+    });
+
+    // Quick prompt chips
+    this.getElement('aiQuickPrompts')?.querySelectorAll('[data-prompt]').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const text = (chip as HTMLElement).getAttribute('data-prompt') || '';
+        if (promptInput) {
+          promptInput.value = text;
+          promptInput.focus();
+        }
+      });
+    });
+
+    // Image attachments (Upload File, Capture 3D Viewport, Paste)
+    this.getElement('btnAIAttachImage')?.addEventListener('click', () => {
+      imageFileInput?.click();
+    });
+
+    imageFileInput?.addEventListener('change', (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (!files || files.length === 0) return;
+      Array.from(files).forEach((file) => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            this.aiPendingImages.push(reader.result);
+            this.renderAIAttachments();
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+      imageFileInput.value = '';
+    });
+
+    this.getElement('btnAICaptureView')?.addEventListener('click', () => {
+      const dataUrl = this.service.aiAgent.captureViewportDataUrl();
+      if (dataUrl) {
+        this.aiPendingImages.push(dataUrl);
+        this.renderAIAttachments();
+        this.showToast('Captured 3D viewport snapshot for AI Agent.', 'info');
+      } else {
+        this.showToast('Could not capture viewport image.', 'warning');
+      }
+    });
+
+    promptInput?.addEventListener('paste', (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              if (typeof reader.result === 'string') {
+                this.aiPendingImages.push(reader.result);
+                this.renderAIAttachments();
+              }
+            };
+            reader.readAsDataURL(file);
+          }
+        }
+      }
+    });
+
+    // Clear chat history
+    this.getElement('btnAIClearChat')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.service.aiAgent.clearChatHistory();
+      const chatLog = this.getElement('aiChatLog');
+      if (chatLog) {
+        chatLog.innerHTML = `
+          <div class="ai-chat-welcome">
+            <div class="ai-welcome-title">Babylon.js 3D AI Modeler</div>
+            <div class="ai-welcome-sub">
+              Create new 3D assets from text or reference images, or update selected meshes in the scene using built-in Procedural Modeler, CSG2, and Voxel Painter skills.
+            </div>
+          </div>
+        `;
+      }
+      this.showToast('AI Agent chat history cleared.', 'info');
+    });
+
+    // Generate & Stop buttons
+    this.getElement('btnAIGenerate')?.addEventListener('click', () => {
+      this.runAIAgentPrompt();
+    });
+
+    this.getElement('btnAIStop')?.addEventListener('click', () => {
+      if (this.aiAbortController) {
+        this.aiAbortController.abort();
+        this.aiAbortController = null;
+      }
+    });
+
+    promptInput?.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        this.runAIAgentPrompt();
+      }
+    });
+  }
+
+  private renderAIAttachments(): void {
+    const bar = this.getElement('aiImageAttachmentsBar');
+    if (!bar) return;
+
+    if (this.aiPendingImages.length === 0) {
+      bar.style.display = 'none';
+      bar.innerHTML = '';
+      return;
+    }
+
+    bar.style.display = 'flex';
+    bar.innerHTML = '';
+    this.aiPendingImages.forEach((dataUrl, idx) => {
+      const thumb = document.createElement('div');
+      thumb.className = 'ai-attachment-thumb';
+      thumb.innerHTML = `
+        <img src="${dataUrl}" alt="Reference ${idx + 1}" />
+        <button type="button" class="ai-attachment-remove" title="Remove image">&times;</button>
+      `;
+      thumb.querySelector('.ai-attachment-remove')?.addEventListener('click', () => {
+        this.aiPendingImages.splice(idx, 1);
+        this.renderAIAttachments();
+      });
+      bar.appendChild(thumb);
+    });
+  }
+
+  private escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  public async runAIAgentPrompt(promptOverride?: string): Promise<void> {
+    const promptInput = this.getElement<HTMLTextAreaElement>('aiPromptInput');
+    const endpointInput = this.getElement<HTMLInputElement>('aiEndpointUrlInput');
+    const apiKeyInput = this.getElement<HTMLInputElement>('aiApiKeyInput');
+    const modelInput = this.getElement<HTMLInputElement>('aiModelInput');
+    const chatLog = this.getElement<HTMLElement>('aiChatLog');
+    const btnGenerate = this.getElement<HTMLButtonElement>('btnAIGenerate');
+    const btnStop = this.getElement<HTMLButtonElement>('btnAIStop');
+    const endpointBadge =
+      this.getElement<HTMLElement>('aiEndpointSummaryText') || this.getElement<HTMLElement>('aiEndpointBadge');
+    const actionModeSelect = this.getElement<HTMLSelectElement>('aiActionModeSelect');
+    const includeViewportCheck = this.getElement<HTMLInputElement>('aiIncludeViewportCheck');
+
+    const promptText = (promptOverride !== undefined ? promptOverride : promptInput?.value || '').trim();
+    const images = [...this.aiPendingImages];
+
+    if (!promptText && images.length === 0) {
+      this.showToast('Please enter a prompt or attach a reference image.', 'warning');
+      return;
+    }
+
+    // Sync any edits in the settings inputs before calling the endpoint
+    if (endpointInput?.value.trim() || modelInput?.value.trim() || apiKeyInput?.value !== undefined) {
+      const updatedCfg = this.service.aiAgent.saveConfig({
+        baseUrl: endpointInput?.value.trim() || this.service.aiAgent.getConfig().baseUrl,
+        apiKey: apiKeyInput ? apiKeyInput.value.trim() : this.service.aiAgent.getConfig().apiKey,
+        model: modelInput?.value.trim() || this.service.aiAgent.getConfig().model,
+      });
+      if (endpointInput) endpointInput.value = updatedCfg.baseUrl;
+      if (modelInput) modelInput.value = updatedCfg.model;
+      if (endpointBadge) {
+        const isAgy =
+          updatedCfg.baseUrl.includes('/api/antigravity') ||
+          updatedCfg.baseUrl.includes('localhost:8787') ||
+          updatedCfg.baseUrl.includes('127.0.0.1:8787');
+        let host = isAgy ? 'Antigravity' : updatedCfg.baseUrl;
+        if (!isAgy) {
+          try {
+            host = new URL(updatedCfg.baseUrl).host;
+          } catch {
+            // ignore
+          }
+        }
+        const keyStatus = isAgy
+          ? 'Account ✓'
+          : updatedCfg.apiKey
+            ? 'Key ✓'
+            : host.includes('localhost') || host.includes('127.0.0.1')
+              ? 'Local'
+              : 'No Key';
+        endpointBadge.textContent = `${updatedCfg.model} • ${host} (${keyStatus})`;
+      }
+    }
+
+    if (promptInput && promptOverride === undefined) {
+      promptInput.value = '';
+    }
+    this.aiPendingImages = [];
+    this.renderAIAttachments();
+
+    // Remove welcome banner if present
+    chatLog?.querySelector('.ai-chat-welcome')?.remove();
+
+    // Append user bubble
+    if (chatLog) {
+      const userEl = document.createElement('div');
+      userEl.className = 'ai-msg ai-msg-user';
+      const imgsHtml =
+        images.length > 0
+          ? `<div class="ai-msg-images">${images.map((u) => `<img src="${u}" alt="Ref" />`).join('')}</div>`
+          : '';
+      userEl.innerHTML = `${imgsHtml}<div class="ai-msg-text">${this.escapeHtml(promptText || '(Image-to-Mesh Reference)')}</div>`;
+      chatLog.appendChild(userEl);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    // Create assistant progress bubble
+    const assistantEl = document.createElement('div');
+    assistantEl.className = 'ai-msg ai-msg-assistant';
+    const stepsContainer = document.createElement('div');
+    stepsContainer.className = 'ai-msg-steps';
+    const textContainer = document.createElement('div');
+    textContainer.className = 'ai-msg-text';
+    textContainer.textContent = 'Thinking & planning 3D operations...';
+    assistantEl.appendChild(stepsContainer);
+    assistantEl.appendChild(textContainer);
+    chatLog?.appendChild(assistantEl);
+    if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
+
+    const stepElements = new Map<string, HTMLElement>();
+
+    if (btnGenerate) btnGenerate.disabled = true;
+    if (btnStop) btnStop.style.display = 'inline-flex';
+    this.aiAbortController = new AbortController();
+
+    try {
+      const modeVal =
+        actionModeSelect?.value === 'replace_scene' ? 'replace_scene' : 'create_or_update';
+      const result = await this.service.aiAgent.runPrompt({
+        prompt: promptText || 'Build a 3D mesh matching the attached reference image.',
+        images,
+        mode: modeVal,
+        includeViewportSnapshot: !!includeViewportCheck?.checked,
+        signal: this.aiAbortController.signal,
+        onStep: (step: AIAgentToolExecutionStep) => {
+          const isErr = !!step.isError;
+          const statusClass = isErr ? 'error' : 'success';
+          let stepEl = stepElements.get(step.id);
+          if (!stepEl) {
+            stepEl = document.createElement('div');
+            stepEl.className = `ai-tool-step is-${statusClass}`;
+            stepElements.set(step.id, stepEl);
+            stepsContainer.appendChild(stepEl);
+          } else {
+            stepEl.className = `ai-tool-step is-${statusClass}`;
+          }
+
+          const iconSymbol = isErr ? '⚠' : '✓';
+          const argSummary =
+            step.args?.name ||
+            step.args?.meshName ||
+            step.args?.targetMeshName ||
+            step.args?.materialName ||
+            step.args?.shape ||
+            '';
+          stepEl.innerHTML = `
+            <span class="ai-step-icon">${iconSymbol}</span>
+            <span class="ai-step-name">${this.escapeHtml(step.toolName.replace(/^modeler_/, ''))}</span>
+            <span class="ai-step-summary">${this.escapeHtml(String(argSummary))}</span>
+          `;
+          if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
+        },
+        onStatus: (statusText: string) => {
+          textContainer.textContent = statusText;
+          if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
+        },
+      });
+
+      textContainer.textContent = result.content || 'Completed 3D mesh operations.';
+      if (modelInput) {
+        modelInput.value = this.service.aiAgent.getConfig().model;
+      }
+      this.updateOutliner();
+      this.updateMeshGUI();
+      this.updateMaterialGUI();
+      this.updateCSGGUI();
+    } catch (err: any) {
+      assistantEl.classList.add('ai-msg-error');
+      const errMsg = err?.message || String(err);
+      textContainer.textContent = `Error: ${errMsg}`;
+      this.showToast(errMsg, 'error');
+
+      // Automatically open endpoint settings if API key or connection failed
+      if (errMsg.includes('401') || errMsg.includes('API key') || errMsg.includes('Endpoint')) {
+        const settingsPanel = this.getElement<HTMLElement>('aiSettingsPanel');
+        if (settingsPanel) settingsPanel.style.display = 'block';
+      }
+    } finally {
+      this.aiAbortController = null;
+      if (btnGenerate) btnGenerate.disabled = false;
+      if (btnStop) btnStop.style.display = 'none';
+      if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
     }
   }
 }

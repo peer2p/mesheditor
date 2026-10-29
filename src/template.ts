@@ -9,6 +9,7 @@ export function getMeshEditorTemplate(): string {
       <input type="file" id="modelFileInput" class="hidden-input" accept=".glb,.gltf,.obj,.stl,.ply,.babylon,.bin,.png,.jpg,.jpeg,.webp" multiple />
       <input type="file" id="importFileInput" class="hidden-input" accept=".glb,.gltf,.obj,.stl,.ply,.babylon,.bin,.png,.jpg,.jpeg,.webp" multiple />
       <input type="file" id="textureFileInput" class="hidden-input" accept="image/*" />
+      <input type="file" id="aiImageFileInput" class="hidden-input" accept="image/*" multiple />
 
       <!-- Top Toolbar -->
       <header id="top-toolbar">
@@ -103,6 +104,10 @@ export function getMeshEditorTemplate(): string {
           </button>
           <div class="dropdown-menu" id="menuTools">
             <div class="dropdown-header-label">Tools</div>
+            <button class="dropdown-item active" id="btnToggleAIAgent" title="AI Mesh Agent (Text/Image to Mesh & Mesh Update)">
+              <span class="btn-icon"><i class="app-icon" data-lucide="bot"></i></span>
+              <span class="btn-label">AI Mesh Agent</span>
+            </button>
             <button class="dropdown-item active" id="btnCreatePrimitive" title="Create Mesh (Box, Sphere, Cylinder, Polyhedron...)">
               <span class="btn-icon"><i class="app-icon" data-lucide="plus-circle"></i></span>
               <span class="btn-label">Create Mesh</span>
@@ -182,6 +187,16 @@ export function getMeshEditorTemplate(): string {
           </button>
           <button class="tool-btn gizmo-btn" id="btnGizmoBounds" title="Bounds (Key: B)">
             <span class="btn-icon"><i class="app-icon" data-lucide="box-select"></i></span><span class="btn-badge">B</span>
+          </button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <!-- Quick AI Agent Toggle -->
+        <div class="btn-group ai-toolbar-group">
+          <button class="tool-btn ai-toolbar-btn active" id="btnToolbarAIAgent" title="Toggle AI Mesh Agent (Text/Image to Mesh & Mesh Update)">
+            <span class="btn-icon"><i class="app-icon" data-lucide="bot"></i></span>
+            <span class="btn-label">AI Agent</span>
           </button>
         </div>
 
@@ -353,6 +368,177 @@ export function getMeshEditorTemplate(): string {
 
       <!-- Floating HTML Dialog Containers for dat.GUI (wrapped for Stackpanel mode) -->
       <div id="stackpanelRightSidebar" class="stackpanel-sidebar">
+        <div id="dialog-ai-agent" class="floating-dialog" style="top: 64px; left: 660px; width: 350px; z-index: 58">
+          <div class="dialog-header">
+            <span class="dialog-title"><i class="app-icon" data-lucide="bot"></i> AI Mesh Agent</span>
+            <div class="dialog-actions">
+              <button class="dialog-btn" id="btnAISettingsToggle" title="Configure OpenAI-Compatible Endpoint & Skills">
+                <i class="app-icon" data-lucide="settings"></i>
+              </button>
+              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+            </div>
+          </div>
+
+          <!-- Endpoint & Skills Configuration Drawer -->
+          <div id="aiSettingsPanel" class="ai-settings-panel" style="display: none">
+            <div class="ai-settings-title-row">
+              <span class="ai-settings-title">OpenAI-Compatible Endpoint</span>
+              <div class="ai-preset-chips" id="aiPresetChips">
+                <button type="button" class="ai-chip-btn" data-preset="antigravity">Antigravity</button>
+                <button type="button" class="ai-chip-btn" data-preset="gemini">Gemini Flash</button>
+                <button type="button" class="ai-chip-btn" data-preset="gemini-pro">Gemini Pro</button>
+                <button type="button" class="ai-chip-btn" data-preset="openai">OpenAI</button>
+                <button type="button" class="ai-chip-btn" data-preset="openrouter">OpenRouter</button>
+                <button type="button" class="ai-chip-btn" data-preset="ollama">Ollama</button>
+                <button type="button" class="ai-chip-btn" data-preset="lmstudio">LM Studio</button>
+              </div>
+            </div>
+
+            <div class="ai-form-group">
+              <label for="aiEndpointUrlInput">Base URL</label>
+              <input
+                type="text"
+                id="aiEndpointUrlInput"
+                class="ai-input"
+                placeholder="https://api.openai.com/v1"
+                autocomplete="off"
+              />
+            </div>
+
+            <div class="ai-form-group">
+              <label for="aiApiKeyInput">API Key</label>
+              <div class="ai-input-row">
+                <input
+                  type="password"
+                  id="aiApiKeyInput"
+                  class="ai-input"
+                  placeholder="sk-... (optional for local Ollama / LM Studio)"
+                  autocomplete="off"
+                />
+                <button type="button" class="ai-icon-btn" id="btnToggleApiKeyVis" title="Show/Hide API Key">
+                  <i class="app-icon" data-lucide="eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="ai-form-group">
+              <label for="aiModelInput">Model</label>
+              <div class="ai-input-row">
+                <input
+                  type="text"
+                  id="aiModelInput"
+                  class="ai-input"
+                  list="aiModelDatalist"
+                  placeholder="gpt-4o"
+                  autocomplete="off"
+                />
+                <datalist id="aiModelDatalist">
+                  <option value="gemini-3.8-flash-medium"></option>
+                  <option value="gemini-3.8-flash-high"></option>
+                  <option value="gemini-3.8-flash-low"></option>
+                  <option value="gemini-4-argon-medium"></option>
+                  <option value="claude-sonnet-5-5-medium"></option>
+                  <option value="gemini-3-flash-preview"></option>
+                  <option value="gemini-3.1-pro-preview"></option>
+                  <option value="gpt-4o"></option>
+                  <option value="qwen2.5-coder:14b"></option>
+                </datalist>
+                <button type="button" class="ai-icon-btn" id="btnFetchAIModels" title="Load available models from endpoint (/models)">
+                  <i class="app-icon" data-lucide="refresh-cw"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="ai-form-group">
+              <label>Built-in Babylon.js Agent Skills</label>
+              <div id="aiSkillsList" class="ai-skills-list"></div>
+            </div>
+
+            <div class="ai-settings-actions">
+              <button type="button" class="tool-btn btn-primary" id="btnSaveAISettings" style="width: 100%">
+                <span class="btn-icon"><i class="app-icon" data-lucide="check"></i></span>
+                <span class="btn-label">Save Endpoint Config</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="dialog-body ai-agent-body">
+            <!-- Status & Mode Bar -->
+            <div class="ai-mode-bar">
+              <select id="aiActionModeSelect" class="ai-select" title="Choose how generated meshes interact with current scene">
+                <option value="create_or_update">Create / Update in Scene</option>
+                <option value="replace_scene">Replace Scene (Clear First)</option>
+              </select>
+              <label class="ai-checkbox-label" title="Send a screenshot of the current 3D viewport to the vision model">
+                <input type="checkbox" id="aiIncludeViewportCheck" />
+                <span>+ 3D View</span>
+              </label>
+            </div>
+
+            <div class="ai-endpoint-summary" id="aiEndpointSummaryBar">
+              <span class="ai-endpoint-dot" id="aiEndpointStatusDot"></span>
+              <span id="aiEndpointSummaryText">Model: gpt-4o</span>
+              <button type="button" class="ai-link-btn" id="btnOpenAISettingsInline">Configure</button>
+            </div>
+
+            <!-- Quick Example Prompts -->
+            <div class="ai-quick-prompts" id="aiQuickPrompts">
+              <button type="button" class="ai-prompt-chip" data-prompt="Build an ancient fluted stone pillar with a stepped base and capital.">Stone Pillar</button>
+              <button type="button" class="ai-prompt-chip" data-prompt="Create a metallic gear wheel with 12 teeth and a center bore.">Gear Wheel</button>
+              <button type="button" class="ai-prompt-chip" data-prompt="Build a medieval wooden treasure chest with golden trim.">Treasure Chest</button>
+              <button type="button" class="ai-prompt-chip" data-prompt="Build a detailed voxel knight helmet with visor.">Voxel Helmet</button>
+              <button type="button" class="ai-prompt-chip" data-prompt="Update the currently selected mesh: hollow it out with CSG and apply a polished marble material.">Mesh Update</button>
+            </div>
+
+            <!-- Chat & Tool Execution Log -->
+            <div id="aiChatLog" class="ai-chat-log">
+              <div class="ai-chat-empty">
+                <strong>Text / Image to 3D Mesh & Update</strong><br />
+                Describe a 3D object, attach a reference image, or select a mesh in the scene to modify it with AI.
+              </div>
+            </div>
+
+            <!-- Attached Images Preview Bar -->
+            <div id="aiImageAttachmentsBar" class="ai-image-attachments" style="display: none"></div>
+
+            <!-- Prompt Input & Controls -->
+            <div class="ai-input-area">
+              <textarea
+                id="aiPromptInput"
+                class="ai-prompt-textarea"
+                rows="3"
+                placeholder="Enter a prompt (e.g. 'Build a stone archway' or 'Add a roof to selected mesh')... Attach images via button, Drag & Drop or Cmd+V."
+              ></textarea>
+              <div class="ai-controls-row">
+                <div class="ai-controls-left">
+                  <button type="button" class="tool-btn" id="btnAIAttachImage" title="Attach reference image for Image-to-Mesh">
+                    <span class="btn-icon"><i class="app-icon" data-lucide="image"></i></span>
+                    <span class="btn-label">Image</span>
+                  </button>
+                  <button type="button" class="tool-btn" id="btnAICaptureView" title="Attach screenshot of current 3D viewport">
+                    <span class="btn-icon"><i class="app-icon" data-lucide="camera"></i></span>
+                    <span class="btn-label">View</span>
+                  </button>
+                  <button type="button" class="tool-btn" id="btnAIClearChat" title="Clear AI conversation history">
+                    <span class="btn-icon"><i class="app-icon" data-lucide="trash-2"></i></span>
+                  </button>
+                </div>
+                <div class="ai-controls-right">
+                  <button type="button" class="tool-btn btn-danger" id="btnAIStop" style="display: none" title="Cancel running AI generation">
+                    <span class="btn-icon"><i class="app-icon" data-lucide="square"></i></span>
+                    <span class="btn-label">Stop</span>
+                  </button>
+                  <button type="button" class="tool-btn btn-primary" id="btnAIGenerate" title="Run AI Mesh Agent (Enter / Cmd+Enter)">
+                    <span class="btn-icon"><i class="app-icon" data-lucide="send"></i></span>
+                    <span class="btn-label">Generate</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div id="dialog-create-primitive" class="floating-dialog" style="top: 64px; right: 338px; width: 320px; z-index: 55">
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="plus-circle"></i> Create Mesh</span>

@@ -24,6 +24,7 @@
   ],
   "scripts": {
     "dev": "webpack serve --mode development",
+    "ai:bridge": "node scripts/antigravity-bridge.js",
     "build": "webpack --mode production",
     "build:dev": "webpack --mode development",
     "prod": "webpack serve --mode production --port 8080",

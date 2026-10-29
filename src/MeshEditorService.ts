@@ -38,6 +38,7 @@ import {
 import '@babylonjs/loaders';
 import { GridMaterial } from '@babylonjs/materials';
 import { GLTF2Export, OBJExport, RegisterEXT_texture_webp, STLExport } from '@babylonjs/serializers';
+import { AIAgentService } from './AIAgentService';
 import {
   ActionRecord,
   CSGOperationType,
@@ -63,6 +64,7 @@ export class MeshEditorService {
   public gridMaterial: GridMaterial;
   public highlightLayer: HighlightLayer;
   public gizmoManager: GizmoManager;
+  public aiAgent: AIAgentService;
 
   // Model & Selection state
   public currentModelRoot: TransformNode | null = null;
@@ -137,6 +139,7 @@ export class MeshEditorService {
     this.events = events;
     this.initBabylon(customEngine);
     this.initGizmosAndPicking();
+    this.aiAgent = new AIAgentService(this);
   }
 
   /* =========================================================================
