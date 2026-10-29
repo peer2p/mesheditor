@@ -148,6 +148,11 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
           label: 'Custom Mesh Tool',
           onClick: actionClickSpy,
         });
+        ctx.registerViewMenuItem({
+          id: 'menuViewCustom',
+          label: 'Custom View Action',
+          onClick: actionClickSpy,
+        });
       },
       dispose: disposeSpy,
     };
@@ -167,6 +172,11 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
     expect(menuBtn).not.toBeNull();
     menuBtn?.click();
     expect(actionClickSpy).toHaveBeenCalledTimes(2);
+
+    const viewMenuBtn = container.querySelector('#menuViewCustom') as HTMLButtonElement | null;
+    expect(viewMenuBtn).not.toBeNull();
+    viewMenuBtn?.click();
+    expect(actionClickSpy).toHaveBeenCalledTimes(3);
 
     app.pluginManager.unregister('test-plugin');
     expect(disposeSpy).toHaveBeenCalledOnce();

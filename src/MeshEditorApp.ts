@@ -5,7 +5,7 @@ import { AI_ENDPOINT_PRESETS } from './AIAgentService';
 import { MeshEditorService } from './MeshEditorService';
 import { MenuItemDefinition, MeshEditorPlugin, PluginManager, ToolbarButtonDefinition } from './plugin';
 import { ensureMeshEditorStyles } from './styles';
-import { getMeshEditorTemplate } from './template';
+import { AI_CHAT_EMPTY_HTML, getMeshEditorTemplate } from './template';
 import { AIAgentToolExecutionStep, ExportOptions, MeshEditorServiceEvents, PrimitiveShape } from './types';
 
 export interface MeshEditorAppOptions {
@@ -269,6 +269,7 @@ export class MeshEditorApp {
   // AI Agent UI State
   private aiPendingImages: string[] = [];
   private aiAbortController: AbortController | null = null;
+  private initialChatEmptyHtml: string = '';
 
   // GUI parameter proxy objects
   private meshParams = {
@@ -719,6 +720,36 @@ export class MeshEditorApp {
     this.refreshIcons();
   }
 
+  public registerViewMenuItem(item: MenuItemDefinition): void {
+    const container = document.getElementById('menuViewPlugins');
+    const divider = document.getElementById('menuViewPluginsDivider');
+    if (!container) return;
+
+    if (divider) divider.style.display = 'block';
+
+    const btn = document.createElement('button');
+    btn.className = `dropdown-item ${item.danger ? 'btn-danger' : ''}`;
+    btn.id = item.id;
+
+    const iconHtml = item.icon ? `<span class="btn-icon"><i class="app-icon" data-lucide="${item.icon}"></i></span>` : '';
+    const shortcutHtml = item.shortcut ? `<span class="shortcut-tag">${item.shortcut}</span>` : '';
+
+    btn.innerHTML = `
+      ${iconHtml}
+      <span class="btn-label">${item.label}</span>
+      ${shortcutHtml}
+    `;
+
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      this.closeAllDropdowns();
+      await item.onClick();
+    });
+
+    container.appendChild(btn);
+    this.refreshIcons();
+  }
+
   public registerToolbarButton(button: ToolbarButtonDefinition): void {
     const toolbar = document.getElementById('top-toolbar');
     if (!toolbar) return;
@@ -736,10 +767,10 @@ export class MeshEditorApp {
       await button.onClick();
     });
 
-    // Insert before layout buttons
-    const layoutGroup = toolbar.querySelector('.layout-group');
-    if (layoutGroup) {
-      toolbar.insertBefore(btn, layoutGroup);
+    // Insert before help or layout buttons
+    const targetAnchor = toolbar.querySelector('.panel-group') || toolbar.querySelector('.layout-group');
+    if (targetAnchor) {
+      toolbar.insertBefore(btn, targetAnchor);
     } else {
       toolbar.appendChild(btn);
     }
@@ -872,8 +903,14 @@ export class MeshEditorApp {
     });
 
     // Layout Mode (Floating vs Stack)
-    document.getElementById('btnLayoutFloating')?.addEventListener('click', () => this.setLayoutMode('floating'));
-    document.getElementById('btnLayoutStack')?.addEventListener('click', () => this.setLayoutMode('stackpanel'));
+    this.getElement('btnLayoutFloating')?.addEventListener('click', () => {
+      this.closeAllDropdowns();
+      this.setLayoutMode('floating');
+    });
+    this.getElement('btnLayoutStack')?.addEventListener('click', () => {
+      this.closeAllDropdowns();
+      this.setLayoutMode('stackpanel');
+    });
 
     // Dropdown Toggles Setup
     const setupDropdown = (wrapperId: string, buttonId: string, menuId: string) => {
@@ -904,6 +941,7 @@ export class MeshEditorApp {
     setupDropdown('dropdownFile', 'btnDropdownFile', 'menuFile');
     setupDropdown('dropdownActions', 'btnDropdownActions', 'menuActions');
     setupDropdown('dropdownTools', 'btnDropdownTools', 'menuTools');
+    setupDropdown('dropdownView', 'btnDropdownView', 'menuView');
 
     // Close on outside click
     document.addEventListener('click', (e) => {
@@ -2989,6 +3027,14 @@ export class MeshEditorApp {
     const settingsStatus = this.getElement<HTMLElement>('aiSettingsStatus');
     const promptInput = this.getElement<HTMLTextAreaElement>('aiPromptInput');
     const imageFileInput = this.getElement<HTMLInputElement>('aiImageFileInput');
+    const chatLog = this.getElement<HTMLElement>('aiChatLog');
+
+    if (chatLog) {
+      if (!chatLog.innerHTML.trim()) {
+        chatLog.innerHTML = AI_CHAT_EMPTY_HTML;
+      }
+      this.initialChatEmptyHtml = chatLog.innerHTML;
+    }
 
     const updateEndpointBadge = () => {
       const cfg = this.service.aiAgent.getConfig();
@@ -3208,14 +3254,7 @@ export class MeshEditorApp {
       this.service.aiAgent.clearChatHistory();
       const chatLog = this.getElement('aiChatLog');
       if (chatLog) {
-        chatLog.innerHTML = `
-          <div class="ai-chat-welcome">
-            <div class="ai-welcome-title">Babylon.js 3D AI Modeler</div>
-            <div class="ai-welcome-sub">
-              Create new 3D assets from text or reference images, or update selected meshes in the scene using built-in Procedural Modeler, CSG2, and Voxel Painter skills.
-            </div>
-          </div>
-        `;
+        chatLog.innerHTML = this.initialChatEmptyHtml || AI_CHAT_EMPTY_HTML;
       }
       this.showToast('AI Agent chat history cleared.', 'info');
     });
@@ -3335,8 +3374,8 @@ export class MeshEditorApp {
     this.aiPendingImages = [];
     this.renderAIAttachments();
 
-    // Remove welcome banner if present
-    chatLog?.querySelector('.ai-chat-welcome')?.remove();
+    // Remove empty state or welcome banner if present
+    chatLog?.querySelector('.ai-chat-empty, .ai-chat-welcome')?.remove();
 
     // Append user bubble
     if (chatLog) {

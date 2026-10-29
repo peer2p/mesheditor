@@ -1,4 +1,15 @@
 /**
+ * Initial empty state markup for the AI Chat log.
+ * Single source of truth for both the initial UI rendering and chat resets.
+ */
+export const AI_CHAT_EMPTY_HTML: string = `
+              <div class="ai-chat-empty">
+                <strong>Text / Image to 3D Mesh & Update</strong><br />
+                Describe a 3D object, attach a reference image, or select a mesh in the scene to modify it with AI.
+              </div>
+`.trim();
+
+/**
  * Generates the inner HTML structure for the Mesh Editor UI.
  * Used when mounting the editor programmatically into a container element
  * or inside the <mesh-editor> Web Component.
@@ -160,6 +171,28 @@ export function getMeshEditorTemplate(): string {
           </div>
         </div>
 
+        <!-- View Menu -->
+        <div class="dropdown-wrapper" id="dropdownView">
+          <button class="tool-btn dropdown-toggle" id="btnDropdownView" title="View Menu">
+            <span class="btn-icon"><i class="app-icon" data-lucide="eye"></i></span>
+            <span class="btn-label">View</span>
+            <span class="dropdown-arrow"><i class="app-icon arrow-icon" data-lucide="chevron-down"></i></span>
+          </button>
+          <div class="dropdown-menu" id="menuView">
+            <div class="dropdown-header-label">Layout Mode</div>
+            <button class="dropdown-item active" id="btnLayoutFloating" title="Floating layout: freely movable windows">
+              <span class="btn-icon"><i class="app-icon" data-lucide="app-window"></i></span>
+              <span class="btn-label">Float</span>
+            </button>
+            <button class="dropdown-item" id="btnLayoutStack" title="Stackpanel layout: neatly docked vertical sidebar">
+              <span class="btn-icon"><i class="app-icon" data-lucide="panel-right"></i></span>
+              <span class="btn-label">Stack</span>
+            </button>
+            <div class="dropdown-divider" id="menuViewPluginsDivider" style="display: none"></div>
+            <div id="menuViewPlugins"></div>
+          </div>
+        </div>
+
         <div class="toolbar-divider"></div>
 
         <!-- History: Undo & Redo -->
@@ -200,17 +233,6 @@ export function getMeshEditorTemplate(): string {
           </button>
         </div>
 
-        <div class="toolbar-divider"></div>
-
-        <!-- Layout Mode Switcher: Floating vs Stackpanel -->
-        <div class="btn-group layout-group">
-          <button class="tool-btn layout-btn active" id="btnLayoutFloating" title="Floating layout: freely movable windows">
-            <span class="btn-icon"><i class="app-icon" data-lucide="app-window"></i></span><span class="btn-label">Float</span>
-          </button>
-          <button class="tool-btn layout-btn" id="btnLayoutStack" title="Stackpanel layout: neatly docked vertical sidebar">
-            <span class="btn-icon"><i class="app-icon" data-lucide="panel-right"></i></span><span class="btn-label">Stack</span>
-          </button>
-        </div>
 
         <div class="toolbar-divider"></div>
 
@@ -451,7 +473,7 @@ export function getMeshEditorTemplate(): string {
             </div>
 
             <div class="ai-form-group">
-              <label>Built-in Babylon.js Agent Skills</label>
+              <label>Built-in Agent Skills</label>
               <div id="aiSkillsList" class="ai-skills-list"></div>
             </div>
 
@@ -493,10 +515,7 @@ export function getMeshEditorTemplate(): string {
 
             <!-- Chat & Tool Execution Log -->
             <div id="aiChatLog" class="ai-chat-log">
-              <div class="ai-chat-empty">
-                <strong>Text / Image to 3D Mesh & Update</strong><br />
-                Describe a 3D object, attach a reference image, or select a mesh in the scene to modify it with AI.
-              </div>
+              ${AI_CHAT_EMPTY_HTML}
             </div>
 
             <!-- Attached Images Preview Bar -->

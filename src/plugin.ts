@@ -127,6 +127,13 @@ export interface MeshEditorPluginContext {
   registerToolMenuItem(item: MenuItemDefinition): void;
 
   /**
+   * Registers an item into the View dropdown menu under the plugin section.
+   *
+   * @param item - The menu item definition with id, label, icon, shortcut, and onClick.
+   */
+  registerViewMenuItem(item: MenuItemDefinition): void;
+
+  /**
    * Registers a direct quick-access button into the top toolbar.
    *
    * @param button - The toolbar button definition with id, label, icon, and onClick.
@@ -328,6 +335,9 @@ export class PluginManager {
       },
       registerToolMenuItem: (item: MenuItemDefinition) => {
         this.app.registerToolMenuItem(item);
+      },
+      registerViewMenuItem: (item: MenuItemDefinition) => {
+        this.app.registerViewMenuItem(item);
       },
       registerToolbarButton: (button: ToolbarButtonDefinition) => {
         this.app.registerToolbarButton(button);

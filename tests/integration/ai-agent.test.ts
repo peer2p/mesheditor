@@ -448,6 +448,22 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       expect(userMessage.content[1].type).toBe('image_url');
       expect(userMessage.content[1].image_url.url).toBe(sampleDataUrl);
 
+      // Verify AI chat log empty state & reset behavior
+      const chatLog = container.querySelector('#aiChatLog') as HTMLElement | null;
+      const btnClearChat = container.querySelector('#btnAIClearChat') as HTMLButtonElement | null;
+      expect(chatLog).not.toBeNull();
+      expect(btnClearChat).not.toBeNull();
+
+      // Initially, chat log should contain the initial empty-state text
+      expect(chatLog?.querySelector('.ai-chat-empty')).not.toBeNull();
+      expect(chatLog?.textContent).toContain('Text / Image to 3D Mesh & Update');
+
+      // Click clear chat to verify the exact initial text is restored
+      btnClearChat?.click();
+      expect(chatLog?.querySelector('.ai-chat-empty')).not.toBeNull();
+      expect(chatLog?.textContent).toContain('Text / Image to 3D Mesh & Update');
+      expect(chatLog?.querySelector('.ai-chat-welcome')).toBeNull();
+
       app.dispose();
       container.remove();
     });

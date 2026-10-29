@@ -101,11 +101,13 @@ test.describe('Mesh Editor E2E Tests', () => {
   test('4. switches layout modes (Floating vs Stackpanel) and Gizmo modes', async ({ page }) => {
     await page.goto('/');
 
-    // Switch to Stackpanel mode
+    // Switch to Stackpanel mode via View menu
+    await page.locator('#btnDropdownView').click();
     await page.locator('#btnLayoutStack').click();
     await expect(page.locator('#btnLayoutStack')).toHaveClass(/active/);
 
-    // Switch back to Floating mode
+    // Switch back to Floating mode via View menu
+    await page.locator('#btnDropdownView').click();
     await page.locator('#btnLayoutFloating').click();
     await expect(page.locator('#btnLayoutFloating')).toHaveClass(/active/);
 

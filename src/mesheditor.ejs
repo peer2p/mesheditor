@@ -164,6 +164,28 @@
           </div>
         </div>
 
+        <!-- View Menu -->
+        <div class="dropdown-wrapper" id="dropdownView">
+          <button class="tool-btn dropdown-toggle" id="btnDropdownView" title="View Menu">
+            <span class="btn-icon"><i class="app-icon" data-lucide="eye"></i></span>
+            <span class="btn-label">View</span>
+            <span class="dropdown-arrow"><i class="app-icon arrow-icon" data-lucide="chevron-down"></i></span>
+          </button>
+          <div class="dropdown-menu" id="menuView">
+            <div class="dropdown-header-label">Layout Mode</div>
+            <button class="dropdown-item active" id="btnLayoutFloating" title="Floating layout: freely movable windows">
+              <span class="btn-icon"><i class="app-icon" data-lucide="app-window"></i></span>
+              <span class="btn-label">Float</span>
+            </button>
+            <button class="dropdown-item" id="btnLayoutStack" title="Stackpanel layout: neatly docked vertical sidebar">
+              <span class="btn-icon"><i class="app-icon" data-lucide="panel-right"></i></span>
+              <span class="btn-label">Stack</span>
+            </button>
+            <div class="dropdown-divider" id="menuViewPluginsDivider" style="display: none"></div>
+            <div id="menuViewPlugins"></div>
+          </div>
+        </div>
+
         <div class="toolbar-divider"></div>
 
         <!-- History: Undo & Redo -->
@@ -204,17 +226,6 @@
           </button>
         </div>
 
-        <div class="toolbar-divider"></div>
-
-        <!-- Layout Mode Switcher: Floating vs Stackpanel -->
-        <div class="btn-group layout-group">
-          <button class="tool-btn layout-btn active" id="btnLayoutFloating" title="Floating layout: freely movable windows">
-            <span class="btn-icon"><i class="app-icon" data-lucide="app-window"></i></span><span class="btn-label">Float</span>
-          </button>
-          <button class="tool-btn layout-btn" id="btnLayoutStack" title="Stackpanel layout: neatly docked vertical sidebar">
-            <span class="btn-icon"><i class="app-icon" data-lucide="panel-right"></i></span><span class="btn-label">Stack</span>
-          </button>
-        </div>
 
         <div class="toolbar-divider"></div>
 
@@ -455,7 +466,7 @@
             </div>
 
             <div class="ai-form-group">
-              <label>Built-in Babylon.js Agent Skills</label>
+              <label>Built-in Agent Skills</label>
               <div id="aiSkillsList" class="ai-skills-list"></div>
             </div>
 
@@ -496,12 +507,7 @@
             </div>
 
             <!-- Chat & Tool Execution Log -->
-            <div id="aiChatLog" class="ai-chat-log">
-              <div class="ai-chat-empty">
-                <strong>Text / Image to 3D Mesh & Update</strong><br />
-                Describe a 3D object, attach a reference image, or select a mesh in the scene to modify it with AI.
-              </div>
-            </div>
+            <div id="aiChatLog" class="ai-chat-log"></div>
 
             <!-- Attached Images Preview Bar -->
             <div id="aiImageAttachmentsBar" class="ai-image-attachments" style="display: none"></div>
