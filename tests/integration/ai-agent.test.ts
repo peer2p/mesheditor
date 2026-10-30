@@ -484,7 +484,7 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
 
       const btnRecordSpeech = container.querySelector('#btnAIRecordSpeech') as HTMLButtonElement | null;
       expect(btnRecordSpeech).not.toBeNull();
-      expect(btnRecordSpeech?.textContent).toContain('Voice');
+      expect(btnRecordSpeech?.title).toContain('Voice');
 
       // 1. Mock OpenAI endpoint that returns rich markdown response
       const markdownReply = '### Pillar Created\n\n- Height: **4.0**\n- Radius: `0.8`\n\n```ts\nmesh.position.y = 2;\n```';
@@ -580,7 +580,7 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       await new Promise((r) => setTimeout(r, 10));
 
       expect(btnRecordSpeech?.classList.contains('btn-recording')).toBe(true);
-      expect(btnRecordSpeech?.textContent).toContain('Listening...');
+      expect(btnRecordSpeech?.title).toContain('Listening...');
 
       // Simulate incoming speech transcript
       activeMockRecognition?.simulateTranscript('Create a crystal dragon', true);
@@ -591,7 +591,7 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       await new Promise((r) => setTimeout(r, 10));
 
       expect(btnRecordSpeech?.classList.contains('btn-recording')).toBe(false);
-      expect(btnRecordSpeech?.textContent).toContain('Voice');
+      expect(btnRecordSpeech?.title).toContain('Voice');
 
       // Cleanup
       delete (window as any).SpeechRecognition;

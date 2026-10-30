@@ -3365,6 +3365,7 @@ export class MeshEditorApp {
         this.isRecordingSpeech = true;
         if (btnRecord) {
           btnRecord.classList.add('btn-recording');
+          btnRecord.title = 'Listening... Speak into your microphone (click to stop)';
           const label = btnRecord.querySelector('.btn-label');
           if (label) label.textContent = 'Listening...';
         }
@@ -3437,6 +3438,7 @@ export class MeshEditorApp {
     const btnRecord = this.getElement<HTMLButtonElement>('btnAIRecordSpeech');
     if (btnRecord) {
       btnRecord.classList.remove('btn-recording');
+      btnRecord.title = 'Voice: Record prompt using Speech-to-Text';
       const label = btnRecord.querySelector('.btn-label');
       if (label) label.textContent = 'Voice';
     }
