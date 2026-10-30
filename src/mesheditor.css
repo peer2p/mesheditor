@@ -2413,7 +2413,7 @@ progress.loading-spinner:indeterminate {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 520px;
+  max-height: calc(100vh - 110px);
 }
 
 .ai-mode-bar {
@@ -2506,8 +2506,8 @@ progress.loading-spinner:indeterminate {
 }
 
 .ai-chat-log {
-  min-height: 140px;
-  max-height: 220px;
+  min-height: 280px;
+  max-height: 480px;
   overflow-y: auto;
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.35);
@@ -2682,4 +2682,112 @@ progress.loading-spinner:indeterminate {
   align-items: center;
   gap: 4px;
 }
+
+/* AI Message Text & Markdown Styling */
+.ai-msg-text {
+  user-select: text;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.ai-msg-text p {
+  margin: 0 0 6px 0;
+}
+
+.ai-msg-text p:last-child {
+  margin-bottom: 0;
+}
+
+.ai-msg-text h1,
+.ai-msg-text h2,
+.ai-msg-text h3,
+.ai-msg-text h4 {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 8px 0 4px 0;
+  color: #fff;
+}
+
+.ai-msg-text h1:first-child,
+.ai-msg-text h2:first-child,
+.ai-msg-text h3:first-child {
+  margin-top: 0;
+}
+
+.ai-msg-text ul,
+.ai-msg-text ol {
+  margin: 4px 0 6px 16px;
+  padding: 0;
+}
+
+.ai-msg-text li {
+  margin-bottom: 3px;
+}
+
+.ai-msg-text code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 10.5px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 2px 4px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #79c0ff;
+}
+
+.ai-msg-text pre {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 6px 0;
+  overflow-x: auto;
+}
+
+.ai-msg-text pre code {
+  background: transparent;
+  padding: 0;
+  border: none;
+  font-size: 10.5px;
+  color: #e6edf3;
+  display: block;
+}
+
+.ai-msg-text blockquote {
+  border-left: 3px solid var(--accent-color);
+  padding-left: 8px;
+  margin: 6px 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.ai-msg-text a {
+  color: var(--accent-color);
+  text-decoration: underline;
+}
+
+.ai-msg-text strong {
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Voice Recording Active State */
+.tool-btn.btn-recording {
+  background: rgba(248, 81, 73, 0.25) !important;
+  border-color: rgba(248, 81, 73, 0.6) !important;
+  color: #ff7b72 !important;
+  animation: pulse-recording 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse-recording {
+  0% {
+    box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 5px rgba(248, 81, 73, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(248, 81, 73, 0);
+  }
+}
+
 

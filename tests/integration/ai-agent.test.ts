@@ -467,6 +467,137 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       app.dispose();
       container.remove();
     });
+
+    it('renders ai-msg-text in Markdown using marked and records prompt via Speech-to-Text', async () => {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+
+      const nullEngine = new NullEngine();
+      const app = new MeshEditorApp({
+        container,
+        engine: nullEngine,
+      });
+
+      const aiDialog = container.querySelector('#dialog-ai-agent') as HTMLElement | null;
+      expect(aiDialog).not.toBeNull();
+      expect(aiDialog?.style.width).toBe('380px');
+
+      const btnRecordSpeech = container.querySelector('#btnAIRecordSpeech') as HTMLButtonElement | null;
+      expect(btnRecordSpeech).not.toBeNull();
+      expect(btnRecordSpeech?.textContent).toContain('Voice');
+
+      // 1. Mock OpenAI endpoint that returns rich markdown response
+      const markdownReply = '### Pillar Created\n\n- Height: **4.0**\n- Radius: `0.8`\n\n```ts\nmesh.position.y = 2;\n```';
+      (globalThis as any).fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: 'chatcmpl-test-md',
+          choices: [
+            {
+              message: {
+                role: 'assistant',
+                content: markdownReply,
+                tool_calls: [],
+              },
+            },
+          ],
+        }),
+      });
+
+      const promptInput = container.querySelector('#aiPromptInput') as HTMLTextAreaElement | null;
+      const btnGenerate = container.querySelector('#btnAIGenerate') as HTMLButtonElement | null;
+      const chatLog = container.querySelector('#aiChatLog') as HTMLElement | null;
+      expect(promptInput).not.toBeNull();
+      expect(btnGenerate).not.toBeNull();
+      expect(chatLog).not.toBeNull();
+
+      if (promptInput) {
+        promptInput.value = '**Make a Roman Pillar** with _fluting_';
+      }
+
+      await app.runAIAgentPrompt();
+
+      // Verify user message is rendered in markdown
+      const userMsgText = chatLog?.querySelector('.ai-msg-user .ai-msg-text') as HTMLElement | null;
+      expect(userMsgText).not.toBeNull();
+      expect(userMsgText?.innerHTML).toContain('<strong>Make a Roman Pillar</strong>');
+      expect(userMsgText?.innerHTML).toContain('<em>fluting</em>');
+
+      // Verify assistant message is rendered in markdown
+      const assistantMsgText = chatLog?.querySelector('.ai-msg-assistant .ai-msg-text') as HTMLElement | null;
+      expect(assistantMsgText).not.toBeNull();
+      expect(assistantMsgText?.innerHTML).toContain('<h3>Pillar Created</h3>');
+      expect(assistantMsgText?.innerHTML).toContain('<li>Height: <strong>4.0</strong></li>');
+      expect(assistantMsgText?.innerHTML).toContain('<code>0.8</code>');
+      expect(assistantMsgText?.innerHTML).toContain('mesh.position.y = 2;');
+
+      // 2. Test Speech-to-Text Recording
+      class MockSpeechRecognition {
+        public continuous = false;
+        public interimResults = false;
+        public lang = 'en-US';
+        public onstart: (() => void) | null = null;
+        public onresult: ((e: any) => void) | null = null;
+        public onerror: ((e: any) => void) | null = null;
+        public onend: (() => void) | null = null;
+
+        public start(): void {
+          setTimeout(() => this.onstart?.(), 0);
+        }
+
+        public stop(): void {
+          setTimeout(() => this.onend?.(), 0);
+        }
+
+        public simulateTranscript(text: string, isFinal: boolean = true): void {
+          this.onresult?.({
+            results: [
+              [
+                { transcript: text },
+              ],
+            ],
+          });
+          if (this.onresult) {
+            (this.onresult as any)({
+              results: {
+                length: 1,
+                0: Object.assign([{ transcript: text }], { isFinal }),
+              },
+            });
+          }
+        }
+      }
+
+      let activeMockRecognition: MockSpeechRecognition | null = null;
+      (window as any).SpeechRecognition = function () {
+        activeMockRecognition = new MockSpeechRecognition();
+        return activeMockRecognition;
+      };
+
+      // Click record button to start voice recording
+      btnRecordSpeech?.click();
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(btnRecordSpeech?.classList.contains('btn-recording')).toBe(true);
+      expect(btnRecordSpeech?.textContent).toContain('Listening...');
+
+      // Simulate incoming speech transcript
+      activeMockRecognition?.simulateTranscript('Create a crystal dragon', true);
+      expect(promptInput?.value).toBe('Create a crystal dragon');
+
+      // Click again to stop
+      btnRecordSpeech?.click();
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(btnRecordSpeech?.classList.contains('btn-recording')).toBe(false);
+      expect(btnRecordSpeech?.textContent).toContain('Voice');
+
+      // Cleanup
+      delete (window as any).SpeechRecognition;
+      app.dispose();
+      container.remove();
+    });
   });
 });
 

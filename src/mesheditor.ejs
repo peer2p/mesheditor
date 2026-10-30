@@ -383,7 +383,7 @@
 
       <!-- Floating HTML Dialog Containers for dat.GUI (wrapped for Stackpanel mode) -->
       <div id="stackpanelRightSidebar" class="stackpanel-sidebar">
-        <div id="dialog-ai-agent" class="floating-dialog" style="top: 64px; left: 660px; width: 350px; z-index: 58">
+        <div id="dialog-ai-agent" class="floating-dialog" style="top: 64px; left: 660px; width: 380px; z-index: 58">
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="bot"></i> AI Mesh Agent</span>
             <div class="dialog-actions">
@@ -522,6 +522,10 @@
               ></textarea>
               <div class="ai-controls-row">
                 <div class="ai-controls-left">
+                  <button type="button" class="tool-btn" id="btnAIRecordSpeech" title="Record prompt using Speech-to-Text">
+                    <span class="btn-icon"><i class="app-icon" data-lucide="mic"></i></span>
+                    <span class="btn-label">Voice</span>
+                  </button>
                   <button type="button" class="tool-btn" id="btnAIAttachImage" title="Attach reference image for Image-to-Mesh">
                     <span class="btn-icon"><i class="app-icon" data-lucide="image"></i></span>
                     <span class="btn-label">Image</span>

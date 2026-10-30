@@ -1,5 +1,6 @@
 import { Color3, Engine, Mesh, PBRMaterial, StandardMaterial, Texture } from '@babylonjs/core';
 import * as dat from 'dat.gui';
+import { marked } from 'marked';
 import { createDefaultPlatformAdapter, MeshEditorPlatformAdapter } from './adapters';
 import { AI_ENDPOINT_PRESETS } from './AIAgentService';
 import { MeshEditorService } from './MeshEditorService';
@@ -80,6 +81,8 @@ import {
   ListTree,
   Loader2,
   Maximize2,
+  Mic,
+  MicOff,
   Minus,
   Mouse,
   Move,
@@ -146,6 +149,8 @@ export const editorIcons = {
   ListTree,
   Loader2,
   Maximize2,
+  Mic,
+  MicOff,
   Minus,
   Mouse,
   Move,
@@ -270,6 +275,9 @@ export class MeshEditorApp {
   private aiPendingImages: string[] = [];
   private aiAbortController: AbortController | null = null;
   private initialChatEmptyHtml: string = '';
+  private speechRecognition: any = null;
+  private isRecordingSpeech: boolean = false;
+  private speechInitialPrompt: string = '';
 
   // GUI parameter proxy objects
   private meshParams = {
@@ -577,6 +585,7 @@ export class MeshEditorApp {
   }
 
   public setAdapter(adapter: MeshEditorPlatformAdapter): void {
+    this.stopSpeechRecognition();
     this.adapter.dispose?.();
     this.adapter = adapter;
     this.adapter.initialize?.(this);
@@ -615,6 +624,7 @@ export class MeshEditorApp {
       clearTimeout(this.sceneLoaderTimerId);
       this.sceneLoaderTimerId = null;
     }
+    this.stopSpeechRecognition();
     this.adapter.dispose?.();
     for (const plugin of this.pluginManager.getAllPlugins()) {
       this.pluginManager.unregister(plugin.id);
@@ -3248,6 +3258,12 @@ export class MeshEditorApp {
       }
     });
 
+    // Speech-to-Text Voice Recording
+    this.getElement('btnAIRecordSpeech')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleSpeechRecognition();
+    });
+
     // Clear chat history
     this.getElement('btnAIClearChat')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -3314,7 +3330,122 @@ export class MeshEditorApp {
       .replace(/"/g, '&quot;');
   }
 
+  private toggleSpeechRecognition(): void {
+    if (this.isRecordingSpeech) {
+      this.stopSpeechRecognition();
+      return;
+    }
+    this.startSpeechRecognition();
+  }
+
+  private startSpeechRecognition(): void {
+    const SpeechRecognitionClass =
+      typeof window !== 'undefined'
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
+
+    if (!SpeechRecognitionClass) {
+      this.showToast('Speech recognition is not supported in this browser.', 'warning');
+      return;
+    }
+
+    const promptInput = this.getElement<HTMLTextAreaElement>('aiPromptInput');
+    const btnRecord = this.getElement<HTMLButtonElement>('btnAIRecordSpeech');
+
+    try {
+      const recognition = new SpeechRecognitionClass();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang =
+        typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'en-US';
+
+      this.speechInitialPrompt = promptInput?.value || '';
+
+      recognition.onstart = () => {
+        this.isRecordingSpeech = true;
+        if (btnRecord) {
+          btnRecord.classList.add('btn-recording');
+          const label = btnRecord.querySelector('.btn-label');
+          if (label) label.textContent = 'Listening...';
+        }
+        this.showToast('Listening... Speak into your microphone.', 'info');
+      };
+
+      recognition.onresult = (event: any) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        if (event && event.results) {
+          for (let i = 0; i < event.results.length; ++i) {
+            const res = event.results[i];
+            if (res && res[0]) {
+              if (res.isFinal) {
+                finalTranscript += res[0].transcript;
+              } else {
+                interimTranscript += res[0].transcript;
+              }
+            }
+          }
+        }
+
+        const spoken = (finalTranscript + ' ' + interimTranscript).trim();
+        if (promptInput) {
+          const base = this.speechInitialPrompt.trim();
+          promptInput.value = base ? `${base} ${spoken}` : spoken;
+          promptInput.scrollTop = promptInput.scrollHeight;
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        const errType = event?.error;
+        console.warn('[AI Speech Recognition] Error:', errType);
+        if (errType === 'not-allowed') {
+          this.showToast('Microphone access was denied.', 'error');
+        } else if (errType !== 'no-speech' && errType !== 'aborted') {
+          this.showToast(`Speech recognition error: ${errType || 'unknown'}`, 'warning');
+        }
+        this.stopSpeechRecognition();
+      };
+
+      recognition.onend = () => {
+        this.cleanupSpeechRecognitionUI();
+      };
+
+      this.speechRecognition = recognition;
+      recognition.start();
+    } catch (err: any) {
+      console.error('[AI Speech Recognition] Failed to start:', err);
+      this.showToast('Failed to start speech recognition.', 'error');
+      this.cleanupSpeechRecognitionUI();
+    }
+  }
+
+  private stopSpeechRecognition(): void {
+    if (this.speechRecognition) {
+      try {
+        this.speechRecognition.stop();
+      } catch {
+        // ignore
+      }
+    }
+    this.cleanupSpeechRecognitionUI();
+  }
+
+  private cleanupSpeechRecognitionUI(): void {
+    this.isRecordingSpeech = false;
+    this.speechRecognition = null;
+    const btnRecord = this.getElement<HTMLButtonElement>('btnAIRecordSpeech');
+    if (btnRecord) {
+      btnRecord.classList.remove('btn-recording');
+      const label = btnRecord.querySelector('.btn-label');
+      if (label) label.textContent = 'Voice';
+    }
+  }
+
   public async runAIAgentPrompt(promptOverride?: string): Promise<void> {
+    if (this.isRecordingSpeech) {
+      this.stopSpeechRecognition();
+    }
     const promptInput = this.getElement<HTMLTextAreaElement>('aiPromptInput');
     const endpointInput = this.getElement<HTMLInputElement>('aiEndpointUrlInput');
     const apiKeyInput = this.getElement<HTMLInputElement>('aiApiKeyInput');
@@ -3385,7 +3516,12 @@ export class MeshEditorApp {
         images.length > 0
           ? `<div class="ai-msg-images">${images.map((u) => `<img src="${u}" alt="Ref" />`).join('')}</div>`
           : '';
-      userEl.innerHTML = `${imgsHtml}<div class="ai-msg-text">${this.escapeHtml(promptText || '(Image-to-Mesh Reference)')}</div>`;
+      const userMarkdown = marked.parse(promptText || '(Image-to-Mesh Reference)', {
+        async: false,
+        breaks: true,
+        gfm: true,
+      }) as string;
+      userEl.innerHTML = `${imgsHtml}<div class="ai-msg-text">${userMarkdown}</div>`;
       chatLog.appendChild(userEl);
       chatLog.scrollTop = chatLog.scrollHeight;
     }
@@ -3452,7 +3588,12 @@ export class MeshEditorApp {
         },
       });
 
-      textContainer.textContent = result.content || 'Completed 3D mesh operations.';
+      const responseMarkdown = result.content || 'Completed 3D mesh operations.';
+      textContainer.innerHTML = marked.parse(responseMarkdown, {
+        async: false,
+        breaks: true,
+        gfm: true,
+      }) as string;
       if (modelInput) {
         modelInput.value = this.service.aiAgent.getConfig().model;
       }
