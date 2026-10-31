@@ -1193,7 +1193,7 @@ export class MeshEditorApp {
       dialog.classList.add('minimized');
       if (dialog.id === 'dialog-voxel-painter') {
         this.service.voxelPainter.setActive(false);
-      } else if (dialog.id === 'dialog-path-extrusion' || dialog.id === 'dialog-path-ways') {
+      } else if (dialog.id === 'dialog-path-extrusion') {
         this.service.pathExtrusion.setActive(false);
         PathExtrusionStudio.close();
       }
@@ -1206,16 +1206,9 @@ export class MeshEditorApp {
         this.service.voxelPainter.setActive(true);
         if (this.service.pathExtrusion?.isActive) {
           this.service.pathExtrusion.setActive(false);
-          PathExtrusionStudio.close();
         }
-      } else if (dialog.id === 'dialog-path-extrusion' || dialog.id === 'dialog-path-ways') {
+      } else if (dialog.id === 'dialog-path-extrusion') {
         this.service.pathExtrusion.setActive(true);
-        if (this.service.voxelPainter?.isActive) {
-          this.service.voxelPainter.setActive(false);
-        }
-        PathExtrusionStudio.open(this.service, this.service.pathExtrusion, () => {
-          this.updatePanelButtonStates();
-        });
       }
     }
 
@@ -1284,7 +1277,7 @@ export class MeshEditorApp {
         this.renderVoxelTextureGallery();
         this.showToast('Voxel Painter active. Left click to paint, right click to orbit camera.', 'info');
       }
-    } else if (id === 'dialog-path-extrusion' || id === 'dialog-path-ways') {
+    } else if (id === 'dialog-path-extrusion') {
       this.service.pathExtrusion.setActive(willOpen);
       if (willOpen) {
         if (this.service.voxelPainter?.isActive) {
