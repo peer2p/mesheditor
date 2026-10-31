@@ -105,6 +105,11 @@ export function getMeshEditorTemplate(): string {
               <span class="btn-label">Delete Selected</span>
               <span class="shortcut-tag">Del</span>
             </button>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item active" id="btnToggleGrid" title="Toggle ground grid">
+              <span class="btn-icon"><i class="app-icon" data-lucide="grid-3x3"></i></span>
+              <span class="btn-label">Ground Grid</span>
+            </button>
             <div class="dropdown-divider" id="menuActionsPluginsDivider" style="display: none"></div>
             <div id="menuActionsPlugins"></div>
           </div>
@@ -173,11 +178,7 @@ export function getMeshEditorTemplate(): string {
               <span class="btn-icon"><i class="app-icon" data-lucide="film"></i></span>
               <span class="btn-label">Animation Player</span>
             </button>
-            <div class="dropdown-divider"></div>
-            <button class="dropdown-item active" id="btnToggleGrid" title="Toggle ground grid">
-              <span class="btn-icon"><i class="app-icon" data-lucide="grid-3x3"></i></span>
-              <span class="btn-label">Ground Grid</span>
-            </button>
+
             <div class="dropdown-divider" id="menuToolsPluginsDivider" style="display: none"></div>
             <div id="menuToolsPlugins"></div>
           </div>
