@@ -914,15 +914,13 @@ export class MeshEditorApp {
       this.closeAllDropdowns();
       this.toggleDialog('dialog-voxel-painter');
     });
-    (this.getElement('btnTogglePathExtrusion') || this.getElement('btnTogglePathWays'))?.addEventListener('click', () => {
+    this.getElement('btnTogglePathExtrusion')?.addEventListener('click', () => {
       this.closeAllDropdowns();
-      const dlgId = this.getElement('dialog-path-extrusion') ? 'dialog-path-extrusion' : 'dialog-path-ways';
-      this.toggleDialog(dlgId);
+      this.toggleDialog('dialog-path-extrusion');
     });
-    (this.getElement('btnToolbarPathExtrusion') || this.getElement('btnToolbarPathWays'))?.addEventListener('click', () => {
+    this.getElement('btnToolbarPathExtrusion')?.addEventListener('click', () => {
       this.closeAllDropdowns();
-      const dlgId = this.getElement('dialog-path-extrusion') ? 'dialog-path-extrusion' : 'dialog-path-ways';
-      this.toggleDialog(dlgId);
+      this.toggleDialog('dialog-path-extrusion');
     });
     document.getElementById('btnToggleTexturePanel')?.addEventListener('click', () => {
       this.closeAllDropdowns();
@@ -1641,7 +1639,7 @@ export class MeshEditorApp {
     }
 
     // Also update Path Extrusion top toolbar button state
-    const btnToolbarPath = this.getElement('btnToolbarPathExtrusion') || this.getElement('btnToolbarPathWays');
+    const btnToolbarPath = this.getElement('btnToolbarPathExtrusion');
     if (btnToolbarPath) {
       btnToolbarPath.classList.toggle('active', !!this.service.pathExtrusion?.isActive);
     }

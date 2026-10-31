@@ -552,6 +552,3 @@ export class PathExtrusionController {
     this.onStateChanged?.();
   }
 }
-
-export const PathWaysController = PathExtrusionController;
-export type PathWaysController = PathExtrusionController;

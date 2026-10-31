@@ -210,21 +210,18 @@ function sortDiscoveredSkills(list: AIAgentSkillDefinition[]): AIAgentSkillDefin
 export function discoverSkills(): AIAgentSkillDefinition[] {
   // 1. Try Webpack require.context if available
   try {
-    const req = typeof require !== 'undefined' ? (require as any) : null;
-    if (req && typeof req.context === 'function') {
-      const context = req.context('../skills', true, /\\.md$/);
-      const discovered: AIAgentSkillDefinition[] = [];
-      context.keys().forEach((key: string) => {
-        if (/readme/i.test(key)) return;
-        const rawContent = context(key);
-        const text = typeof rawContent === 'string' ? rawContent : rawContent?.default || '';
-        const baseName = key.replace(/^\\.\\//, '').replace(/\\.md$/, '').split('/').pop() || 'skill';
-        const fallbackId = baseName.toUpperCase() === 'SKILL' ? key.split('/')[1] : baseName;
-        discovered.push(parseSkillMarkdown(text, fallbackId));
-      });
-      if (discovered.length > 0) {
-        return sortDiscoveredSkills(discovered);
-      }
+    const context = require.context('../skills', true, /\\.md$/);
+    const discovered: AIAgentSkillDefinition[] = [];
+    context.keys().forEach((key: string) => {
+      if (/readme/i.test(key)) return;
+      const rawContent = context(key);
+      const text = typeof rawContent === 'string' ? rawContent : rawContent?.default || '';
+      const baseName = key.replace(/^\\.\\//, '').replace(/\\.md$/, '').split('/').pop() || 'skill';
+      const fallbackId = baseName.toUpperCase() === 'SKILL' ? key.split('/')[1] : baseName;
+      discovered.push(parseSkillMarkdown(text, fallbackId));
+    });
+    if (discovered.length > 0) {
+      return sortDiscoveredSkills(discovered);
     }
   } catch {
     // Ignore and proceed to fallback

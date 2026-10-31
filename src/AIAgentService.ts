@@ -36,9 +36,11 @@ import {
   createDefaultToolRegistry,
 } from './tools';
 
-export {
+export type {
   ProceduralTextureType,
   ProceduralTextureOptions,
+} from './tools/textureUtils';
+export {
   generateProceduralTextureDataUrl,
 } from './tools/textureUtils';
 
