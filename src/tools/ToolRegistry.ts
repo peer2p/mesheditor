@@ -18,6 +18,7 @@ import {
   MergeMeshesTool,
   SeparateMeshTool,
   TransformMeshTool,
+  VoxelPainterTool,
 } from './builtin';
 
 /**
@@ -119,6 +120,7 @@ export function createDefaultToolRegistry(): ToolRegistry {
     new DeleteMeshTool(),
     new BuildVoxelMeshTool(),
     new ExecuteBabylonCodeTool(),
+    new VoxelPainterTool(),
   ]);
 }
 

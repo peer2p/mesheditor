@@ -40,6 +40,12 @@ import { GridMaterial } from '@babylonjs/materials';
 import { GLTF2Export, OBJExport, RegisterEXT_texture_webp, STLExport } from '@babylonjs/serializers';
 import { AIAgentService } from './AIAgentService';
 import {
+  TextureAtlasManager,
+  TextureAtlasDefinition,
+  VoxelPainterController,
+  EmbeddedTextureInfo,
+} from './voxel';
+import {
   ActionRecord,
   CSGOperationType,
   ExportOptions,
@@ -65,6 +71,8 @@ export class MeshEditorService {
   public highlightLayer: HighlightLayer;
   public gizmoManager: GizmoManager;
   public aiAgent: AIAgentService;
+  public textureAtlasManager: TextureAtlasManager;
+  public voxelPainter: VoxelPainterController;
 
   // Model & Selection state
   public currentModelRoot: TransformNode | null = null;
@@ -140,6 +148,13 @@ export class MeshEditorService {
     this.initBabylon(customEngine);
     this.initGizmosAndPicking();
     this.aiAgent = new AIAgentService(this);
+    this.textureAtlasManager = new TextureAtlasManager(this.scene);
+    this.textureAtlasManager.createProceduralTerrainAtlas('Default Terrain Atlas');
+    this.voxelPainter = new VoxelPainterController(this, this.textureAtlasManager);
+    const defaultAtlas = this.textureAtlasManager.getAtlases()[0];
+    if (defaultAtlas) {
+      this.voxelPainter.useTextureAtlas(defaultAtlas.id);
+    }
   }
 
   /* =========================================================================
@@ -283,6 +298,7 @@ export class MeshEditorService {
       SceneLoader.OnPluginActivatedObservable.remove(this.loaderObserver);
       this.loaderObserver = null;
     }
+    this.voxelPainter?.dispose();
     if (this.engine) {
       this.engine.dispose();
     }
@@ -450,6 +466,11 @@ export class MeshEditorService {
         // If facet editor is active
         if (this.facetEditorActive) {
           this.handleFacetPointer(pointerInfo);
+          return;
+        }
+
+        // If voxel painter is active, ignore default mesh selection
+        if (this.voxelPainter?.isActive) {
           return;
         }
 
@@ -1549,7 +1570,7 @@ export class MeshEditorService {
     }
 
     const mat = new PBRMaterial(`${uniqueName}_mat`, this.scene);
-    mat.albedoColor = Color3.FromHexString(config.color);
+    mat.albedoColor = Color3.FromHexString(config.color || '#4f8cf6');
     mat.roughness = config.roughness !== undefined ? config.roughness : 0.4;
     mat.metallic = config.metallic !== undefined ? config.metallic : 0.1;
     mat.backFaceCulling = false;
@@ -2097,6 +2118,27 @@ export class MeshEditorService {
     return null;
   }
 
+  public applyTextureToSelectedMaterial(url: string, name?: string): boolean {
+    let selMat = this.getSelectedMaterial();
+    if (!selMat && this.selectedMesh) {
+      selMat = this.createNewMaterialForSelected();
+    }
+    if (!selMat) {
+      this.events.onToast?.('Please select a mesh first', 'warning');
+      return false;
+    }
+    const tex = new Texture(url, this.scene, false, false, Texture.NEAREST_SAMPLINGMODE);
+    if (name) tex.name = name;
+    if (selMat instanceof PBRMaterial) {
+      selMat.albedoTexture = tex;
+    } else if (selMat instanceof StandardMaterial) {
+      selMat.diffuseTexture = tex;
+    }
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Applied texture to material "${selMat.name}"`, 'success');
+    return true;
+  }
+
   public applyTriplanarUVs(scale: number = 1.0): void {
     if (!this.selectedMesh) {
       this.events.onToast?.('Please select a mesh first.', 'warning');
@@ -2289,12 +2331,155 @@ export class MeshEditorService {
      ========================================================================= */
   public scanSceneTextures(): Texture[] {
     const texList: Texture[] = [];
+    const internalKeywords = [
+      'RTT',
+      'EffectLayer',
+      'HighlightLayer',
+      'postprocess',
+      'environment',
+      'mirror',
+      'shadowMap',
+      'probe',
+      'reflection',
+      'pass',
+    ];
+
     for (const t of this.scene.textures) {
-      if (t instanceof Texture && t.name !== 'gridMat' && !t.name.startsWith('editor_')) {
-        texList.push(t);
-      }
+      if (!(t instanceof Texture)) continue;
+
+      // Filter out internal RenderTargetTextures, post-processes and Babylon system layers
+      if ((t as any).isRenderTarget || (t as any)._isRenderTarget) continue;
+      if (t.name === 'gridMat' || t.name.startsWith('editor_')) continue;
+      if (internalKeywords.some((kw) => t.name.includes(kw))) continue;
+
+      // Real user / material textures must have a valid URL or buffer
+      if (!t.url && !(t as any)._buffer) continue;
+
+      texList.push(t);
     }
     return texList;
+  }
+
+  /**
+   * Scans and returns detailed metadata for all textures currently embedded in the scene/materials.
+   */
+  public getEmbeddedTexturesInfo(): EmbeddedTextureInfo[] {
+    const textures = this.scanSceneTextures();
+    const atlases = this.textureAtlasManager.getAtlases();
+    const result: EmbeddedTextureInfo[] = [];
+
+    for (const tex of textures) {
+      const size = tex.getSize();
+      const matchingAtlas = atlases.find(
+        (a) => a.texture === tex || a.texture.name === tex.name || (a.dataUrl && a.dataUrl === tex.url)
+      );
+
+      const url = tex.url || matchingAtlas?.dataUrl || '';
+      if (!url) continue;
+
+      const matNames: string[] = [];
+      for (const m of this.scene.materials) {
+        if (m instanceof PBRMaterial) {
+          if (
+            m.albedoTexture === tex ||
+            m.bumpTexture === tex ||
+            m.metallicTexture === tex ||
+            m.emissiveTexture === tex
+          ) {
+            matNames.push(m.name);
+          }
+        } else if (m instanceof StandardMaterial) {
+          if (
+            m.diffuseTexture === tex ||
+            m.bumpTexture === tex ||
+            m.specularTexture === tex ||
+            m.emissiveTexture === tex
+          ) {
+            matNames.push(m.name);
+          }
+        }
+      }
+
+      result.push({
+        id: tex.uniqueId ? String(tex.uniqueId) : tex.name,
+        name: tex.name || 'embedded_texture',
+        width: size.width || 0,
+        height: size.height || 0,
+        url,
+        isAtlas: !!matchingAtlas,
+        atlasId: matchingAtlas?.id,
+        columns: matchingAtlas?.columns,
+        rows: matchingAtlas?.rows,
+        materialsCount: matNames.length,
+        materialNames: matNames,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Adds an embedded texture to the scene from a data URL string.
+   */
+  public addTextureFromDataUrl(name: string, dataUrl: string): Texture {
+    const tex = new Texture(dataUrl, this.scene, false, false);
+    tex.name = name;
+    this.events.onToast?.(`Embedded texture "${name}" added to scene.`, 'success');
+    return tex;
+  }
+
+  /**
+   * Uploads an image file and embeds it into the active scene as a Texture.
+   */
+  public async addTextureFromFile(file: File): Promise<Texture> {
+    return new Promise<Texture>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          const tex = this.addTextureFromDataUrl(file.name, reader.result);
+          resolve(tex);
+        } else {
+          reject(new Error('Failed to read texture file.'));
+        }
+      };
+      reader.onerror = (e) => reject(e);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * Loads a TextureAtlas from an image file (and optional JSON descriptor) into the scene.
+   */
+  public async loadTextureAtlasFromFile(
+    imageFile: File,
+    columns: number = 4,
+    rows: number = 4,
+    jsonFile?: File
+  ): Promise<TextureAtlasDefinition> {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(imageFile);
+    });
+
+    let atlas: TextureAtlasDefinition;
+    if (jsonFile) {
+      const jsonText = await jsonFile.text();
+      atlas = await this.textureAtlasManager.createAtlasFromJson(imageFile.name, dataUrl, jsonText);
+    } else {
+      atlas = await this.textureAtlasManager.createGridAtlasFromImage(
+        imageFile.name,
+        dataUrl,
+        columns,
+        rows
+      );
+    }
+
+    // Automatically connect with Voxel Painter
+    this.voxelPainter.useTextureAtlas(atlas.id);
+    this.events.onToast?.(`Texture Atlas "${atlas.name}" (${atlas.frames.length} tiles) loaded into scene.`, 'success');
+    return atlas;
   }
 
   public async optimizeAllTexturesToWebP(quality: number = 0.85, maxResolution: number = 1024): Promise<number> {

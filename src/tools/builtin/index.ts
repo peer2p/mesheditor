@@ -15,4 +15,5 @@ export * from './SeparateMeshTool';
 export * from './DeleteMeshTool';
 export * from './BuildVoxelMeshTool';
 export * from './ExecuteBabylonCodeTool';
+export * from './VoxelPainterTool';
 

@@ -4,9 +4,12 @@ mesh-editor,
   --bg-primary: #0f1218;
   --bg-panel: rgba(22, 27, 34, 0.92);
   --bg-header: rgba(30, 37, 48, 0.95);
+  --bg-dark: #161b22;
+  --bg-hover: rgba(255, 255, 255, 0.08);
   --border-color: rgba(255, 255, 255, 0.12);
   --text-primary: #f0f6fc;
   --text-secondary: #8b949e;
+  --text-muted: #8b949e;
   --accent-color: #58a6ff;
   --accent-hover: #79c0ff;
   --accent-active: #1f6feb;
@@ -2791,3 +2794,475 @@ progress.loading-spinner:indeterminate {
 }
 
 
+
+/* =========================================================================
+   EMBEDDED TEXTURES & TEXTURE ATLAS GALLERY
+   ========================================================================= */
+.embedded-textures-section {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-color);
+  background: rgba(13, 17, 23, 0.4);
+}
+
+.embedded-textures-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.embedded-textures-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.embedded-textures-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.tool-btn-xs {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 4px;
+  background: #21262d;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #f0f6fc;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tool-btn-xs:hover {
+  background: var(--accent-color);
+  color: #fff;
+  border-color: var(--accent-color);
+}
+
+/* =========================================================================
+   GENERIC BUTTON STYLES (CONSISTENT DARK THEME)
+   ========================================================================= */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: #21262d;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  color: #f0f6fc;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.btn-xs {
+  height: 22px;
+  padding: 0 7px;
+  font-size: 10px;
+}
+
+.btn-primary {
+  background: #238636 !important;
+  border-color: #2ea043 !important;
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: #2ea043 !important;
+  border-color: #3fb950 !important;
+  color: #ffffff !important;
+}
+
+.btn-secondary {
+  background: #21262d !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #f0f6fc !important;
+}
+
+.btn-secondary:hover {
+  background: rgba(248, 81, 73, 0.2) !important;
+  border-color: var(--danger-color) !important;
+  color: var(--danger-color) !important;
+}
+
+.btn-outline {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #8b949e !important;
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #f0f6fc !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+.embedded-textures-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.embedded-texture-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.embedded-texture-card:hover {
+  border-color: var(--accent-color);
+  box-shadow: 0 2px 8px rgba(88, 166, 255, 0.25);
+}
+
+.embedded-texture-card.is-atlas {
+  border-color: #3fb950;
+}
+
+.embedded-texture-thumb {
+  width: 100%;
+  height: 52px;
+  object-fit: cover;
+  background: #111;
+  display: block;
+}
+
+.embedded-texture-info {
+  padding: 3px 4px;
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.embedded-texture-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+
+.embedded-texture-meta {
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1px;
+}
+
+.embedded-texture-badge {
+  display: inline-block;
+  padding: 1px 3px;
+  font-size: 8px;
+  border-radius: 3px;
+  background: rgba(63, 185, 80, 0.2);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, 0.4);
+}
+
+.textures-empty-state {
+  grid-column: 1 / -1;
+  padding: 12px 6px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* =========================================================================
+   VOXEL PAINTER DIALOG STYLES
+   ========================================================================= */
+.voxel-painter-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.voxel-mode-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+}
+
+.voxel-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 5px;
+  background: #21262d;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.voxel-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.voxel-mode-btn.active {
+  background: rgba(88, 166, 255, 0.2);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.voxel-active-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+
+.voxel-active-thumb {
+  width: 38px;
+  height: 38px;
+  border-radius: 4px;
+  border: 2px solid var(--accent-color);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.voxel-active-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.voxel-active-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voxel-active-type {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.voxel-active-actions {
+  display: flex;
+  align-items: center;
+}
+
+.voxel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.voxel-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.voxel-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.voxel-selected-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--accent-color);
+  background: rgba(88, 166, 255, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.voxel-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  max-height: 140px;
+  overflow-y: auto;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.voxel-palette-swatch,
+.voxel-palette-item {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  min-height: 38px;
+  border-radius: 5px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+  position: relative;
+}
+
+.voxel-palette-swatch:hover,
+.voxel-palette-item:hover {
+  transform: scale(1.12);
+  z-index: 5;
+  border-color: #ffffff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+}
+
+.voxel-palette-swatch.active,
+.voxel-palette-item.selected {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.4), 0 2px 8px rgba(0, 0, 0, 0.5);
+  transform: scale(1.08);
+  z-index: 6;
+}
+
+.voxel-texture-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 6px;
+  max-height: 85px;
+  overflow-y: auto;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.voxel-texture-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.voxel-texture-card:hover {
+  border-color: var(--accent-color);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(88, 166, 255, 0.3);
+}
+
+.voxel-texture-card.active {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.4);
+}
+
+.voxel-texture-card-thumb {
+  width: 100%;
+  height: 36px;
+  object-fit: cover;
+  image-rendering: pixelated;
+  background: #000;
+  display: block;
+}
+
+.voxel-texture-card-name {
+  font-size: 8.5px;
+  color: var(--text-secondary);
+  padding: 2px 3px;
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voxel-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.voxel-controls-row label {
+  white-space: nowrap;
+}
+
+.form-input-sm {
+  width: 60px;
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  color: #fff;
+  padding: 3px 6px;
+  font-size: 11px;
+}
+
+.voxel-actions-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 6px;
+}
+
+.voxel-io-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.voxel-blocks-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+}

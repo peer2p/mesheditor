@@ -14,6 +14,10 @@
       <input type="file" id="importFileInput" class="hidden-input" accept=".glb,.gltf,.obj,.stl,.ply,.babylon,.bin,.png,.jpg,.jpeg,.webp" multiple />
       <input type="file" id="textureFileInput" class="hidden-input" accept="image/*" />
       <input type="file" id="aiImageFileInput" class="hidden-input" accept="image/*" multiple />
+      <input type="file" id="embedTextureFileInput" class="hidden-input" accept="image/*" />
+      <input type="file" id="embedAtlasFileInput" class="hidden-input" accept="image/*" />
+      <input type="file" id="voxelAtlasFileInput" class="hidden-input" accept="image/*" />
+      <input type="file" id="voxelJsonFileInput" class="hidden-input" accept=".json" />
 
       <!-- Top Toolbar -->
       <header id="top-toolbar">
@@ -132,6 +136,10 @@
               <span class="btn-icon"><i class="app-icon" data-lucide="zap"></i></span>
               <span class="btn-label">Texture Optimizer</span>
             </button>
+            <button class="dropdown-item active" id="btnToggleVoxelPainter" title="Voxel Painter (3D Grid & Texture Atlas Block Building)">
+              <span class="btn-icon"><i class="app-icon" data-lucide="brush"></i></span>
+              <span class="btn-label">Voxel Painter</span>
+            </button>
             <div class="dropdown-divider"></div>
             <div class="dropdown-header-label">Panels & View</div>
             <button class="dropdown-item active" id="btnToggleOutliner" title="Scene Objects">
@@ -223,6 +231,14 @@
           <button class="tool-btn ai-toolbar-btn active" id="btnToolbarAIAgent" title="Toggle AI Mesh Agent (Text/Image to Mesh & Mesh Update)">
             <span class="btn-icon"><i class="app-icon" data-lucide="bot"></i></span>
             <span class="btn-label">AI Agent</span>
+          </button>
+        </div>
+
+        <!-- Quick Voxel Painter Toggle -->
+        <div class="btn-group voxel-toolbar-group">
+          <button class="tool-btn active" id="btnToolbarVoxelPainter" title="Toggle Voxel Painter (3D Grid & Texture Atlas Block Building)">
+            <span class="btn-icon"><i class="app-icon" data-lucide="brush"></i></span>
+            <span class="btn-label">Voxel Painter</span>
           </button>
         </div>
 
@@ -642,6 +658,18 @@
             </div>
           </div>
           <div class="dialog-body" id="gui-material-container"></div>
+          <div class="embedded-textures-section" id="embeddedTexturesSection">
+            <div class="embedded-textures-header">
+              <span class="embedded-textures-title"><i class="app-icon" data-lucide="image"></i> Embedded Textures (<span id="embeddedTexturesCount">0</span>)</span>
+              <div class="embedded-textures-actions">
+                <button class="tool-btn-xs" id="btnEmbedAddTexture" title="Embed texture file"><i class="app-icon" data-lucide="plus"></i> Add</button>
+                <button class="tool-btn-xs" id="btnEmbedLoadAtlas" title="Load Texture Atlas"><i class="app-icon" data-lucide="grid-3x3"></i> Atlas</button>
+              </div>
+            </div>
+            <div class="embedded-textures-gallery" id="embeddedTexturesGallery">
+              <div class="textures-empty-state">No custom textures embedded yet.</div>
+            </div>
+          </div>
         </div>
 
         <div
@@ -668,6 +696,98 @@
             </div>
           </div>
           <div class="dialog-body" id="gui-textures-container"></div>
+        </div>
+
+        <div id="dialog-voxel-painter" class="floating-dialog" style="top: 100px; left: 348px; width: 340px; display: none">
+          <div class="dialog-header">
+            <span class="dialog-title"><i class="app-icon" data-lucide="brush"></i> Voxel Painter</span>
+            <div class="dialog-actions">
+              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+            </div>
+          </div>
+          <div class="dialog-body voxel-painter-body">
+            <!-- Mode Switcher -->
+            <div class="voxel-mode-group">
+              <button class="voxel-mode-btn active" id="btnVoxelModePaint" title="Paint block on surface">
+                <i class="app-icon" data-lucide="paintbrush"></i> Paint
+              </button>
+              <button class="voxel-mode-btn" id="btnVoxelModeErase" title="Erase block">
+                <i class="app-icon" data-lucide="eraser"></i> Erase
+              </button>
+              <button class="voxel-mode-btn" id="btnVoxelModePick" title="Eyedropper: pick block material">
+                <i class="app-icon" data-lucide="pipette"></i> Pick
+              </button>
+            </div>
+
+            <!-- Active Material Preview Card -->
+            <div class="voxel-active-preview-card" id="voxelActivePreviewCard">
+              <div class="voxel-active-thumb" id="voxelActiveThumb"></div>
+              <div class="voxel-active-meta">
+                <span class="voxel-active-title" id="voxelActiveTitle">Stone</span>
+                <span class="voxel-active-type" id="voxelActiveType">Atlas Tile</span>
+              </div>
+              <div class="voxel-active-actions">
+                <button class="tool-btn-xs" id="btnVoxelAddTexture" title="Add individual texture image from disk"><i class="app-icon" data-lucide="image"></i> Add Image</button>
+              </div>
+            </div>
+            <input type="file" id="voxelTextureFileInput" accept="image/*" style="display: none" />
+
+            <!-- Visual Texture Picker (Scene Textures & Atlases) -->
+            <div class="voxel-section">
+              <div class="voxel-section-header">
+                <span><i class="app-icon" data-lucide="image"></i> Visual Texture Picker</span>
+                <div class="voxel-section-actions">
+                  <button class="tool-btn-xs" id="btnVoxelLoadAtlas" title="Load Texture Atlas Image"><i class="app-icon" data-lucide="upload"></i> Atlas</button>
+                </div>
+              </div>
+              <div class="voxel-texture-gallery" id="voxelTextureGallery">
+                <!-- Dynamically populated visual texture cards -->
+              </div>
+              <select id="voxelAtlasSelect" class="form-select" style="margin-top: 2px">
+                <option value="">Default Terrain Atlas (16 Tiles)</option>
+              </select>
+            </div>
+
+            <!-- Palette Swatches Grid -->
+            <div class="voxel-section">
+              <div class="voxel-section-header">
+                <span><i class="app-icon" data-lucide="palette"></i> Palette Swatches</span>
+                <span id="voxelSelectedMaterialName" class="voxel-selected-label">Stone</span>
+              </div>
+              <div class="voxel-palette-grid" id="voxelPaletteGrid">
+                <!-- Dynamically populated swatches -->
+              </div>
+            </div>
+
+            <!-- Parameters -->
+            <div class="voxel-controls-row">
+              <label for="voxelSizeInput">Size:</label>
+              <input type="number" id="voxelSizeInput" class="form-input-sm" value="1.0" min="0.1" max="5.0" step="0.25" />
+              <label for="voxelIntervalInput">Speed:</label>
+              <input type="range" id="voxelIntervalInput" min="50" max="400" step="25" value="150" title="Continuous paint interval (ms)" />
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="voxel-actions-row">
+              <button class="btn btn-primary btn-sm" id="btnVoxelBake" title="Bake painted voxels into an editable 3D mesh in the scene">
+                <i class="app-icon" data-lucide="box"></i> Bake to 3D Mesh
+              </button>
+              <button class="btn btn-secondary btn-sm" id="btnVoxelClear" title="Clear all voxel blocks">
+                <i class="app-icon" data-lucide="trash-2"></i> Clear
+              </button>
+            </div>
+
+            <div class="voxel-io-row">
+              <button class="btn btn-outline btn-xs" id="btnVoxelImportJson" title="Import RLE Voxel Data JSON">
+                <i class="app-icon" data-lucide="upload"></i> Import JSON
+              </button>
+              <button class="btn btn-outline btn-xs" id="btnVoxelExportJson" title="Export RLE Voxel Data JSON">
+                <i class="app-icon" data-lucide="download"></i> Export JSON
+              </button>
+              <span class="voxel-blocks-badge" id="voxelBlocksCount">0 Blocks</span>
+            </div>
+          </div>
         </div>
       </div>
 

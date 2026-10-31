@@ -53,7 +53,9 @@ import {
   AppWindow,
   Bot,
   Box,
+  Boxes,
   BoxSelect,
+  Brush,
   Camera,
   Check,
   CheckCircle2,
@@ -62,6 +64,7 @@ import {
   createIcons,
   Crosshair,
   Download,
+  Eraser,
   Eye,
   EyeOff,
   File,
@@ -87,7 +90,9 @@ import {
   Mouse,
   Move,
   Palette,
+  Paintbrush,
   PanelRight,
+  Pipette,
   Plus,
   PlusCircle,
   Redo2,
@@ -122,7 +127,9 @@ export const editorIcons = {
   AppWindow,
   Bot,
   Box,
+  Boxes,
   BoxSelect,
+  Brush,
   Camera,
   Check,
   CheckCircle2,
@@ -130,6 +137,7 @@ export const editorIcons = {
   Code,
   Crosshair,
   Download,
+  Eraser,
   Eye,
   EyeOff,
   File,
@@ -155,7 +163,9 @@ export const editorIcons = {
   Mouse,
   Move,
   Palette,
+  Paintbrush,
   PanelRight,
+  Pipette,
   Plus,
   PlusCircle,
   Redo2,
@@ -269,6 +279,7 @@ export class MeshEditorApp {
     'dialog-material',
     'dialog-anim',
     'dialog-textures',
+    'dialog-voxel-painter',
   ];
 
   // AI Agent UI State
@@ -512,6 +523,7 @@ export class MeshEditorApp {
       onModelLoaded: (filename) => {
         this.updateOutliner();
         this.updateCSGGUI();
+        this.renderEmbeddedTextures();
         this.adapter.onModelLoaded?.(filename, this);
         options.events?.onModelLoaded?.(filename);
       },
@@ -880,6 +892,14 @@ export class MeshEditorApp {
       this.closeAllDropdowns();
       this.toggleDialog('dialog-ai-agent');
     });
+    this.getElement('btnToggleVoxelPainter')?.addEventListener('click', () => {
+      this.closeAllDropdowns();
+      this.toggleDialog('dialog-voxel-painter');
+    });
+    this.getElement('btnToolbarVoxelPainter')?.addEventListener('click', () => {
+      this.closeAllDropdowns();
+      this.toggleDialog('dialog-voxel-painter');
+    });
     document.getElementById('btnToggleTexturePanel')?.addEventListener('click', () => {
       this.closeAllDropdowns();
       this.toggleDialog('dialog-textures');
@@ -977,6 +997,8 @@ export class MeshEditorApp {
 
     // Initialize AI Agent Panel UI
     this.initAIAgentUI();
+    this.initVoxelPainterUI();
+    this.initEmbeddedTexturesUI();
 
     // Restore saved window layout and active tools from localStorage
     this.restoreDialogLayout();
@@ -1205,6 +1227,18 @@ export class MeshEditorApp {
       }
     }
 
+    if (id === 'dialog-voxel-painter') {
+      this.service.voxelPainter.setActive(willOpen);
+      if (willOpen) {
+        this.renderVoxelPalette();
+        this.renderVoxelAtlasOptions();
+        this.renderVoxelTextureGallery();
+        this.showToast('Voxel Painter active. Left click to paint, right click to orbit camera.', 'info');
+      }
+    } else if (id === 'dialog-material' && willOpen) {
+      this.renderEmbeddedTextures();
+    }
+
     this.refreshIcons();
     this.updatePanelButtonStates();
     this.saveDialogLayout();
@@ -1395,7 +1429,7 @@ export class MeshEditorApp {
         for (const id of this.dialogIds) {
           const dialog = this.getElement(id);
           if (dialog) {
-            if (id === 'dialog-ai-agent') {
+            if (id === 'dialog-ai-agent' || id === 'dialog-voxel-painter') {
               dialog.style.display = 'none';
             } else {
               dialog.style.display = 'flex';
@@ -1462,6 +1496,15 @@ export class MeshEditorApp {
         }
       }
 
+      const voxelDlg = this.getElement('dialog-voxel-painter');
+      const isVoxelOpen = !!(voxelDlg && voxelDlg.style.display !== 'none');
+      this.service.voxelPainter.setActive(isVoxelOpen);
+      if (isVoxelOpen) {
+        this.renderVoxelPalette();
+        this.renderVoxelAtlasOptions();
+        this.renderVoxelTextureGallery();
+      }
+
       this.updatePanelButtonStates();
       this.refreshIcons();
     } catch (e) {
@@ -1481,6 +1524,7 @@ export class MeshEditorApp {
       'dialog-scene': 'btnToggleScenePanel',
       'dialog-anim': 'btnToggleAnimPanel',
       'dialog-textures': 'btnToggleTexturePanel',
+      'dialog-voxel-painter': 'btnToggleVoxelPainter',
     };
 
     for (const [dialogId, btnId] of Object.entries(mapping)) {
@@ -1501,6 +1545,16 @@ export class MeshEditorApp {
         aiDialog.style.display !== 'none' &&
         (aiDialog.style.display !== '' || window.getComputedStyle(aiDialog).display !== 'none');
       btnToolbarAI.classList.toggle('active', isAIOpen);
+    }
+
+    // Also update Voxel Painter top toolbar button state
+    const voxelDialog = this.getElement('dialog-voxel-painter');
+    const btnToolbarVoxel = this.getElement('btnToolbarVoxelPainter');
+    if (voxelDialog && btnToolbarVoxel) {
+      const isVoxelOpen =
+        voxelDialog.style.display !== 'none' &&
+        (voxelDialog.style.display !== '' || window.getComputedStyle(voxelDialog).display !== 'none');
+      btnToolbarVoxel.classList.toggle('active', isVoxelOpen);
     }
 
     // Also update Ground Grid button state
@@ -2107,6 +2161,7 @@ export class MeshEditorApp {
       this.materialControllers[key]?.updateDisplay();
     }
     this.updateUVGUI();
+    this.renderEmbeddedTextures();
   }
 
   /* =========================================================================
@@ -3620,5 +3675,515 @@ export class MeshEditorApp {
       if (btnStop) btnStop.style.display = 'none';
       if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
     }
+  }
+
+  /* =========================================================================
+     VOXEL PAINTER UI & CONTROLS
+     ========================================================================= */
+  private initVoxelPainterUI(): void {
+    const btnPaint = this.getElement<HTMLButtonElement>('btnVoxelModePaint');
+    const btnErase = this.getElement<HTMLButtonElement>('btnVoxelModeErase');
+    const btnPick = this.getElement<HTMLButtonElement>('btnVoxelModePick');
+    const sizeInput = this.getElement<HTMLInputElement>('voxelSizeInput');
+    const intervalInput = this.getElement<HTMLInputElement>('voxelIntervalInput');
+    const atlasSelect = this.getElement<HTMLSelectElement>('voxelAtlasSelect');
+    const btnLoadAtlas = this.getElement<HTMLButtonElement>('btnVoxelLoadAtlas');
+    const atlasFileInput = this.getElement<HTMLInputElement>('voxelAtlasFileInput');
+    const btnBake = this.getElement<HTMLButtonElement>('btnVoxelBake');
+    const btnClear = this.getElement<HTMLButtonElement>('btnVoxelClear');
+    const btnImport = this.getElement<HTMLButtonElement>('btnVoxelImportJson');
+    const btnExport = this.getElement<HTMLButtonElement>('btnVoxelExportJson');
+    const jsonFileInput = this.getElement<HTMLInputElement>('voxelJsonFileInput');
+    const countBadge = this.getElement<HTMLElement>('voxelBlocksCount');
+
+    const updateModeButtons = (mode: 'paint' | 'erase' | 'pick') => {
+      btnPaint?.classList.toggle('active', mode === 'paint');
+      btnErase?.classList.toggle('active', mode === 'erase');
+      btnPick?.classList.toggle('active', mode === 'pick');
+    };
+
+    btnPaint?.addEventListener('click', () => {
+      this.service.voxelPainter.setMode('paint');
+      updateModeButtons('paint');
+    });
+    btnErase?.addEventListener('click', () => {
+      this.service.voxelPainter.setMode('erase');
+      updateModeButtons('erase');
+    });
+    btnPick?.addEventListener('click', () => {
+      this.service.voxelPainter.setMode('pick');
+      updateModeButtons('pick');
+    });
+
+    sizeInput?.addEventListener('input', () => {
+      const val = parseFloat(sizeInput.value);
+      if (!isNaN(val) && val > 0) {
+        this.service.voxelPainter.setVoxelSize(val);
+      }
+    });
+
+    intervalInput?.addEventListener('input', () => {
+      const val = parseInt(intervalInput.value, 10);
+      if (!isNaN(val) && val >= 50) {
+        this.service.voxelPainter.paintIntervalMs = val;
+      }
+    });
+
+    atlasSelect?.addEventListener('change', () => {
+      const atlasId = atlasSelect.value;
+      if (atlasId) {
+        this.service.voxelPainter.useTextureAtlas(atlasId);
+        this.renderVoxelPalette();
+        this.renderVoxelTextureGallery();
+      }
+    });
+
+    btnLoadAtlas?.addEventListener('click', () => {
+      atlasFileInput?.click();
+    });
+
+    atlasFileInput?.addEventListener('change', async () => {
+      const file = atlasFileInput.files?.[0];
+      if (!file) return;
+      try {
+        const atlas = await this.service.loadTextureAtlasFromFile(file, 4, 4);
+        this.renderVoxelAtlasOptions();
+        this.service.voxelPainter.useTextureAtlas(atlas.id);
+        this.renderVoxelPalette();
+        this.renderVoxelTextureGallery();
+        this.renderEmbeddedTextures();
+        this.showToast(`Loaded atlas "${atlas.name}"`, 'success');
+      } catch (err: any) {
+        this.showToast(`Failed to load atlas: ${err.message}`, 'error');
+      } finally {
+        atlasFileInput.value = '';
+      }
+    });
+
+    const btnAddTex = this.getElement<HTMLButtonElement>('btnVoxelAddTexture');
+    const texFileInput = this.getElement<HTMLInputElement>('voxelTextureFileInput');
+
+    btnAddTex?.addEventListener('click', () => {
+      texFileInput?.click();
+    });
+
+    texFileInput?.addEventListener('change', async () => {
+      const file = texFileInput.files?.[0];
+      if (!file) return;
+      try {
+        const tex = await this.service.addTextureFromFile(file);
+        const url = (tex as any).url || (tex as any)._buffer || '';
+        const name = file.name.replace(/\.[^/.]+$/, '');
+        this.service.voxelPainter.addTexturePaletteItem(name, url, tex);
+        this.renderVoxelPalette();
+        this.renderVoxelTextureGallery();
+        this.renderEmbeddedTextures();
+        this.showToast(`Added texture "${name}" to voxel palette`, 'success');
+      } catch (err: any) {
+        this.showToast(`Failed to load texture: ${err.message}`, 'error');
+      } finally {
+        texFileInput.value = '';
+      }
+    });
+
+    btnBake?.addEventListener('click', () => {
+      const mesh = this.service.voxelPainter.bakeToMesh();
+      if (mesh) {
+        this.showToast(`Baked voxel mesh with ${this.service.voxelPainter.blocks.size} blocks`, 'success');
+        this.updateOutliner();
+        this.updateMeshGUI();
+      } else {
+        this.showToast('No voxel blocks to bake', 'warning');
+      }
+    });
+
+    btnClear?.addEventListener('click', () => {
+      this.service.voxelPainter.clear();
+      this.showToast('Voxel blocks cleared', 'info');
+    });
+
+    btnImport?.addEventListener('click', () => {
+      jsonFileInput?.click();
+    });
+
+    jsonFileInput?.addEventListener('change', async () => {
+      const file = jsonFileInput.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        this.service.voxelPainter.loadVoxelData(data);
+        this.renderVoxelPalette();
+        this.showToast(`Imported ${this.service.voxelPainter.blocks.size} voxel blocks`, 'success');
+      } catch (err: any) {
+        this.showToast(`Failed to import voxels: ${err.message}`, 'error');
+      } finally {
+        jsonFileInput.value = '';
+      }
+    });
+
+    btnExport?.addEventListener('click', async () => {
+      const data = this.service.voxelPainter.exportVoxelData();
+      const jsonStr = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const filename = 'voxels.json';
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      this.showToast('Exported voxel data to JSON', 'info');
+    });
+
+    this.service.voxelPainter.onBlocksChanged = (count) => {
+      if (countBadge) {
+        countBadge.textContent = `${count} Block${count === 1 ? '' : 's'}`;
+      }
+    };
+
+    this.service.voxelPainter.onPaletteChanged = () => {
+      this.renderVoxelPalette();
+      this.renderVoxelTextureGallery();
+    };
+
+    this.service.voxelPainter.onAtlasChanged = () => {
+      this.renderVoxelAtlasOptions();
+      this.renderVoxelTextureGallery();
+    };
+
+    this.service.voxelPainter.onModeChanged = (mode) => {
+      updateModeButtons(mode);
+    };
+
+    this.renderVoxelAtlasOptions();
+    this.renderVoxelPalette();
+    this.renderVoxelTextureGallery();
+  }
+
+  public renderVoxelAtlasOptions(): void {
+    const select = this.getElement<HTMLSelectElement>('voxelAtlasSelect');
+    if (!select) return;
+
+    const atlases = this.service.textureAtlasManager.getAtlases();
+    const currentAtlas = this.service.voxelPainter.currentAtlas;
+    const currentId = currentAtlas ? currentAtlas.id : '';
+
+    select.innerHTML = '';
+    for (const atlas of atlases) {
+      const opt = document.createElement('option');
+      opt.value = atlas.id;
+      opt.textContent = `${atlas.name} (${atlas.frames.length} tiles)`;
+      if (atlas.id === currentId) {
+        opt.selected = true;
+      }
+      select.appendChild(opt);
+    }
+  }
+
+  public renderVoxelPalette(): void {
+    const grid = this.getElement<HTMLElement>('voxelPaletteGrid');
+    const selectedLabel = this.getElement<HTMLElement>('voxelSelectedMaterialName');
+    const activeThumb = this.getElement<HTMLElement>('voxelActiveThumb');
+    const activeTitle = this.getElement<HTMLElement>('voxelActiveTitle');
+    const activeType = this.getElement<HTMLElement>('voxelActiveType');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+    const palette = Array.from(this.service.voxelPainter.palette.values());
+    const currentId = this.service.voxelPainter.currentPaletteId;
+
+    const activeItem = palette.find((p) => p.id === currentId) || palette[0];
+    const updateActivePreview = (item: any) => {
+      if (!item) return;
+      if (selectedLabel) selectedLabel.textContent = item.name;
+      if (activeTitle) activeTitle.textContent = item.name;
+      if (activeType) {
+        activeType.textContent = item.atlasTile
+          ? 'Atlas Tile'
+          : item.textureUrl || item.texture
+            ? 'Texture Image'
+            : 'Solid Color';
+      }
+      if (activeThumb) {
+        const thumb = item.atlasTile?.thumbnailDataUrl || item.textureUrl;
+        if (thumb) {
+          activeThumb.style.backgroundImage = `url("${thumb}")`;
+          activeThumb.style.backgroundColor = 'transparent';
+        } else if (item.color) {
+          activeThumb.style.backgroundImage = 'none';
+          activeThumb.style.backgroundColor = item.color;
+        }
+      }
+    };
+
+    if (activeItem) {
+      updateActivePreview(activeItem);
+    }
+
+    for (const item of palette) {
+      const swatch = document.createElement('div');
+      swatch.className = 'voxel-palette-swatch';
+      swatch.title = `${item.name} (#${item.id})`;
+      if (item.id === currentId) {
+        swatch.classList.add('active');
+      }
+
+      const thumb = item.atlasTile?.thumbnailDataUrl || item.textureUrl;
+      if (thumb) {
+        swatch.style.backgroundImage = `url("${thumb}")`;
+        swatch.style.backgroundSize = 'cover';
+        swatch.style.imageRendering = 'pixelated';
+      } else if (item.color) {
+        swatch.style.backgroundColor = item.color;
+      }
+
+      swatch.addEventListener('click', () => {
+        this.service.voxelPainter.currentPaletteId = item.id;
+        grid.querySelectorAll('.voxel-palette-swatch').forEach((s) => s.classList.remove('active'));
+        swatch.classList.add('active');
+        updateActivePreview(item);
+        this.renderVoxelTextureGallery();
+      });
+
+      grid.appendChild(swatch);
+    }
+  }
+
+  public renderVoxelTextureGallery(): void {
+    const gallery = this.getElement<HTMLElement>('voxelTextureGallery');
+    if (!gallery) return;
+
+    gallery.innerHTML = '';
+    const atlases = this.service.textureAtlasManager.getAtlases();
+    const currentAtlasId = this.service.voxelPainter.currentAtlasId;
+    const currentPaletteId = this.service.voxelPainter.currentPaletteId;
+    const embeddedTextures = this.service.getEmbeddedTexturesInfo();
+
+    // 1. Atlas cards
+    for (const atlas of atlases) {
+      const card = document.createElement('div');
+      card.className = 'voxel-texture-card';
+      if (atlas.id === currentAtlasId) {
+        card.classList.add('active');
+      }
+      card.title = `Atlas: ${atlas.name} (${atlas.frames.length} tiles) - Click to load`;
+
+      const img = document.createElement('img');
+      img.className = 'voxel-texture-card-thumb';
+      img.src = atlas.frames[0]?.thumbnailDataUrl || atlas.dataUrl || '';
+      img.alt = atlas.name;
+
+      const name = document.createElement('div');
+      name.className = 'voxel-texture-card-name';
+      name.textContent = atlas.name;
+
+      card.appendChild(img);
+      card.appendChild(name);
+
+      card.addEventListener('click', () => {
+        this.service.voxelPainter.useTextureAtlas(atlas.id);
+        this.renderVoxelAtlasOptions();
+        this.renderVoxelPalette();
+        this.renderVoxelTextureGallery();
+      });
+
+      gallery.appendChild(card);
+    }
+
+    // 2. Individual embedded textures
+    for (const tex of embeddedTextures) {
+      if (tex.isAtlas) continue;
+      if (!tex.url) continue;
+
+      const card = document.createElement('div');
+      card.className = 'voxel-texture-card';
+      const activeItem = this.service.voxelPainter.palette.get(currentPaletteId);
+      if (activeItem?.textureUrl === tex.url) {
+        card.classList.add('active');
+      }
+      card.title = `Texture: ${tex.name} (${tex.width}x${tex.height}px) - Click to paint with this`;
+
+      const img = document.createElement('img');
+      img.className = 'voxel-texture-card-thumb';
+      img.src = tex.url;
+      img.alt = tex.name;
+
+      const name = document.createElement('div');
+      name.className = 'voxel-texture-card-name';
+      name.textContent = tex.name;
+
+      card.appendChild(img);
+      card.appendChild(name);
+
+      card.addEventListener('click', () => {
+        this.service.voxelPainter.addTexturePaletteItem(tex.name, tex.url);
+        this.renderVoxelPalette();
+        this.renderVoxelTextureGallery();
+      });
+
+      gallery.appendChild(card);
+    }
+  }
+
+  /* =========================================================================
+     EMBEDDED TEXTURES & ATLAS OVERVIEW UI
+     ========================================================================= */
+  private initEmbeddedTexturesUI(): void {
+    const btnAdd = this.getElement<HTMLButtonElement>('btnEmbedAddTexture');
+    const btnLoadAtlas = this.getElement<HTMLButtonElement>('btnEmbedLoadAtlas');
+    const fileInput = this.getElement<HTMLInputElement>('embedTextureFileInput');
+    const atlasInput = this.getElement<HTMLInputElement>('embedAtlasFileInput');
+
+    btnAdd?.addEventListener('click', () => {
+      fileInput?.click();
+    });
+
+    fileInput?.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      try {
+        await this.service.addTextureFromFile(file);
+        this.renderEmbeddedTextures();
+        this.showToast(`Embedded texture "${file.name}"`, 'success');
+      } catch (err: any) {
+        this.showToast(`Failed to add texture: ${err.message}`, 'error');
+      } finally {
+        fileInput.value = '';
+      }
+    });
+
+    btnLoadAtlas?.addEventListener('click', () => {
+      atlasInput?.click();
+    });
+
+    atlasInput?.addEventListener('change', async () => {
+      const file = atlasInput.files?.[0];
+      if (!file) return;
+      try {
+        const atlas = await this.service.loadTextureAtlasFromFile(file, 4, 4);
+        this.renderEmbeddedTextures();
+        this.renderVoxelAtlasOptions();
+        this.service.voxelPainter.useTextureAtlas(atlas.id);
+        this.renderVoxelPalette();
+        this.showToast(`Loaded atlas "${atlas.name}" (16 tiles)`, 'success');
+      } catch (err: any) {
+        this.showToast(`Failed to load atlas: ${err.message}`, 'error');
+      } finally {
+        atlasInput.value = '';
+      }
+    });
+  }
+
+  public renderEmbeddedTextures(): void {
+    const gallery = this.getElement<HTMLElement>('embeddedTexturesGallery');
+    const countBadge = this.getElement<HTMLElement>('embeddedTexturesCount');
+    if (!gallery) return;
+
+    const textures = this.service.getEmbeddedTexturesInfo();
+    if (countBadge) {
+      countBadge.textContent = textures.length.toString();
+    }
+
+    gallery.innerHTML = '';
+    if (textures.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'textures-empty-state';
+      empty.textContent = 'No custom textures embedded yet.';
+      gallery.appendChild(empty);
+      return;
+    }
+
+    for (const tex of textures) {
+      if (!tex.url) continue;
+      const card = document.createElement('div');
+      card.className = 'embedded-texture-card';
+
+      const thumbWrapper = document.createElement('div');
+      thumbWrapper.className = 'embedded-texture-thumb';
+
+      const img = document.createElement('img');
+      img.src = tex.url;
+      img.alt = tex.name;
+      img.style.imageRendering = tex.isAtlas ? 'pixelated' : 'auto';
+      thumbWrapper.appendChild(img);
+
+      const info = document.createElement('div');
+      info.className = 'embedded-texture-info';
+
+      const nameRow = document.createElement('div');
+      nameRow.className = 'embedded-texture-name';
+      nameRow.textContent = tex.name;
+      nameRow.title = tex.name;
+
+      const metaRow = document.createElement('div');
+      metaRow.className = 'embedded-texture-meta';
+      metaRow.textContent = `${tex.width}x${tex.height}px`;
+
+      if (tex.isAtlas) {
+        const badge = document.createElement('span');
+        badge.className = 'embedded-texture-badge';
+        badge.textContent = 'Atlas';
+        metaRow.appendChild(badge);
+      }
+
+      info.appendChild(nameRow);
+      info.appendChild(metaRow);
+
+      const actions = document.createElement('div');
+      actions.className = 'embedded-texture-actions';
+
+      const btnApply = document.createElement('button');
+      btnApply.className = 'tool-btn-xs';
+      btnApply.title = 'Apply texture to selected mesh material';
+      btnApply.innerHTML = '<i class="app-icon" data-lucide="check"></i> Apply';
+      btnApply.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.service.applyTextureToSelectedMaterial(tex.url, tex.name);
+        this.updateMaterialGUI();
+      });
+      actions.appendChild(btnApply);
+
+      if (tex.isAtlas) {
+        const btnVoxel = document.createElement('button');
+        btnVoxel.className = 'tool-btn-xs';
+        btnVoxel.title = 'Use Atlas in Voxel Painter';
+        btnVoxel.innerHTML = '<i class="app-icon" data-lucide="paintbrush"></i> Atlas';
+        btnVoxel.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const atlas = tex.atlasId ? this.service.textureAtlasManager.getAtlas(tex.atlasId) : null;
+          if (atlas) {
+            this.service.voxelPainter.useTextureAtlas(atlas.id);
+            this.toggleDialog('dialog-voxel-painter', true);
+            this.renderVoxelAtlasOptions();
+            this.renderVoxelPalette();
+          }
+        });
+        actions.appendChild(btnVoxel);
+      } else {
+        const btnVoxel = document.createElement('button');
+        btnVoxel.className = 'tool-btn-xs';
+        btnVoxel.title = 'Use texture in Voxel Painter';
+        btnVoxel.innerHTML = '<i class="app-icon" data-lucide="box"></i> Voxel';
+        btnVoxel.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.service.voxelPainter.addTexturePaletteItem(tex.name, tex.url);
+          this.toggleDialog('dialog-voxel-painter', true);
+          this.renderVoxelPalette();
+          this.showToast(`Texture "${tex.name}" added to Voxel Painter palette`, 'success');
+        });
+        actions.appendChild(btnVoxel);
+      }
+
+      card.appendChild(thumbWrapper);
+      card.appendChild(info);
+      card.appendChild(actions);
+
+      gallery.appendChild(card);
+    }
+
+    this.refreshIcons();
+    this.renderVoxelTextureGallery();
   }
 }
