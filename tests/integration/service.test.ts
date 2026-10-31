@@ -351,4 +351,68 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
       expect(service.camera.position).toEqual(new Vector3(0, 2.5, -6));
     });
   });
+
+  describe('10. Babylon Scene & Project State Serialization', () => {
+    it('exports clean .babylon project JSON excluding helper meshes and preserving tool metadata', async () => {
+      // 1. Create a user mesh
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box', name: 'UserBox' }));
+      expect(box).toBeDefined();
+
+      // 2. Add some voxels into VoxelPainter without baking
+      service.voxelPainter.setVoxelSize(1.5);
+      service.voxelPainter.setPaletteItem('stone');
+      service.voxelPainter.blocks.set('0,0,0', { x: 0, y: 0, z: 0, paletteId: 'stone' });
+      service.voxelPainter.blocks.set('0,1,0', { x: 0, y: 1, z: 0, paletteId: 'stone' });
+      service.voxelPainter.blocks.set('1,0,0', { x: 1, y: 0, z: 0, paletteId: 'wood' });
+      expect(service.voxelPainter.blocks.size).toBe(3);
+
+      let exportedBlob: Blob | null = null;
+      let exportedFilename = '';
+      let exportedFormat = '';
+
+      service.events.onExportModel = async (blob, filename, format) => {
+        exportedBlob = blob;
+        exportedFilename = filename;
+        exportedFormat = format;
+        return true;
+      };
+
+      await service.exportCurrentModel({ format: 'babylon', filename: 'my_project' });
+
+      expect(exportedFormat).toBe('babylon');
+      expect(exportedFilename).toBe('my_project');
+      expect(exportedBlob).not.toBeNull();
+
+      // Read back exported JSON
+      const jsonText = await (exportedBlob as unknown as Blob).text();
+      const parsed = JSON.parse(jsonText);
+
+      // Verify metadata
+      expect(parsed.metadata).toBeDefined();
+      expect(parsed.metadata.meshEditor).toBeDefined();
+      expect(parsed.metadata.meshEditor.version).toBe(1);
+      expect(parsed.metadata.meshEditor.tools.voxelPainter).toBeDefined();
+      expect(parsed.metadata.meshEditor.tools.voxelPainter.voxelSize).toBe(1.5);
+      expect(parsed.metadata.meshEditor.tools.voxelPainter.paletteId).toBe('stone');
+      expect(parsed.metadata.meshEditor.tools.voxelPainter.voxelData.runs.length).toBeGreaterThan(0);
+
+      // Verify helper meshes are excluded
+      const exportedMeshNames = (parsed.meshes || []).map((m: any) => m.name);
+      expect(exportedMeshNames).not.toContain('editor_ground_grid');
+      expect(exportedMeshNames).not.toContain('editor_voxel_highlight');
+
+      // 3. Test clearModel resets voxel state
+      service.clearModel();
+      expect(service.voxelPainter.blocks.size).toBe(0);
+
+      // 4. Test restoreProjectState restores voxel blocks and configuration
+      service.restoreProjectState(parsed.metadata.meshEditor);
+      expect(service.voxelPainter.blocks.size).toBe(3);
+      expect(service.voxelPainter.voxelSize).toBe(1.5);
+      expect(service.voxelPainter.currentPaletteId).toBe('stone');
+      expect(service.voxelPainter.blocks.has('0,0,0')).toBe(true);
+      expect(service.voxelPainter.blocks.has('0,1,0')).toBe(true);
+      expect(service.voxelPainter.blocks.has('1,0,0')).toBe(true);
+    });
+  });
 });

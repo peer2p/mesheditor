@@ -54,7 +54,7 @@ export interface PrimitiveConfig {
 export type CSGOperationType = 'subtract' | 'union' | 'intersect' | 'slice';
 
 export interface ExportOptions {
-  format: 'glb' | 'gltf' | 'obj' | 'stl';
+  format: 'glb' | 'gltf' | 'obj' | 'stl' | 'babylon';
   filename: string;
   selectedOnly?: boolean;
 }
@@ -114,5 +114,24 @@ export interface AIAgentRequestOptions {
   signal?: AbortSignal;
   onStep?: (step: AIAgentToolExecutionStep) => void;
   onStatus?: (statusText: string) => void;
+}
+
+export interface MeshEditorVoxelProjectState {
+  voxelSize: number;
+  paletteId: string;
+  atlasId?: string | null;
+  voxelData: any;
+}
+
+export interface MeshEditorProjectData {
+  version: number;
+  generator?: string;
+  timestamp?: number;
+  tools?: {
+    voxelPainter?: MeshEditorVoxelProjectState;
+    pathExtrusion?: any[];
+    pathWays?: any[];
+    [key: string]: any;
+  };
 }
 

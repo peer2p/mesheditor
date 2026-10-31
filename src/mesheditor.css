@@ -3266,3 +3266,197 @@ progress.loading-spinner:indeterminate {
   padding: 2px 6px;
   border-radius: 4px;
 }
+
+/* =========================================================================
+   PATH EXTRUSION DIALOG STYLES
+   ========================================================================= */
+.path-extrusion-body,
+.pathway-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.path-extrusion-control-group,
+.pathway-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.path-extrusion-label,
+.pathway-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.path-extrusion-sublabel,
+.pathway-sublabel {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.path-extrusion-row,
+.pathway-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.btn-action-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: #21262d;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  color: #f0f6fc;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.btn-action-sm:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-action-sm:active {
+  transform: translateY(1px);
+}
+
+.btn-action-sm.btn-danger {
+  color: #f85149;
+}
+
+.btn-action-sm.btn-danger:hover {
+  background: rgba(248, 81, 73, 0.2);
+  border-color: var(--danger-color);
+  color: var(--danger-color);
+}
+
+.path-extrusion-select,
+.pathway-select {
+  flex: 1;
+  background: #21262d;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+.path-extrusion-grid-2,
+.pathway-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.path-extrusion-field,
+.pathway-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.path-extrusion-number,
+.pathway-number {
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  width: 100%;
+}
+
+.path-extrusion-color-row,
+.pathway-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.path-extrusion-color-input,
+.pathway-color-input {
+  width: 32px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: transparent;
+}
+
+.path-extrusion-color-hex,
+.pathway-color-hex {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.path-extrusion-help-box,
+.pathway-help-box {
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.path-extrusion-help-title,
+.pathway-help-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: #38bdf8;
+  margin-bottom: 4px;
+}
+
+.path-extrusion-help-text,
+.pathway-help-text {
+  line-height: 1.4;
+  font-size: 10px;
+}
+
+.path-extrusion-actions,
+.pathway-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.btn-path-extrusion-bake,
+.btn-pathway-bake {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-path-extrusion-bake:hover,
+.btn-pathway-bake:hover {
+  background: #1d4ed8;
+}

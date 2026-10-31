@@ -27,6 +27,7 @@ import {
   Quaternion,
   Scene,
   SceneLoader,
+  SceneSerializer,
   StandardMaterial,
   Texture,
   TransformNode,
@@ -45,10 +46,12 @@ import {
   VoxelPainterController,
   EmbeddedTextureInfo,
 } from './voxel';
+import { PathExtrusionController } from './pathExtrusion';
 import {
   ActionRecord,
   CSGOperationType,
   ExportOptions,
+  MeshEditorProjectData,
   MeshEditorServiceEvents,
   PrimitiveConfig,
   TextureOptimizationInfo,
@@ -73,6 +76,10 @@ export class MeshEditorService {
   public aiAgent: AIAgentService;
   public textureAtlasManager: TextureAtlasManager;
   public voxelPainter: VoxelPainterController;
+  public pathExtrusion: PathExtrusionController;
+  public get pathWays(): PathExtrusionController {
+    return this.pathExtrusion;
+  }
 
   // Model & Selection state
   public currentModelRoot: TransformNode | null = null;
@@ -151,6 +158,7 @@ export class MeshEditorService {
     this.textureAtlasManager = new TextureAtlasManager(this.scene);
     this.textureAtlasManager.createProceduralTerrainAtlas('Default Terrain Atlas');
     this.voxelPainter = new VoxelPainterController(this, this.textureAtlasManager);
+    this.pathExtrusion = new PathExtrusionController(this);
     const defaultAtlas = this.textureAtlasManager.getAtlases()[0];
     if (defaultAtlas) {
       this.voxelPainter.useTextureAtlas(defaultAtlas.id);
@@ -469,8 +477,8 @@ export class MeshEditorService {
           return;
         }
 
-        // If voxel painter is active, ignore default mesh selection
-        if (this.voxelPainter?.isActive) {
+        // If voxel painter or path extrusion tool is active, ignore default mesh selection
+        if (this.voxelPainter?.isActive || this.pathExtrusion?.isActive) {
           return;
         }
 
@@ -2739,6 +2747,79 @@ export class MeshEditorService {
         downloadFallback = () => {
           STLExport.CreateSTL(meshes, true, opts.filename, true, true);
         };
+      } else if (format === 'babylon') {
+        const projectData: MeshEditorProjectData = {
+          version: 1,
+          generator: 'MeshEditor',
+          timestamp: Date.now(),
+          tools: {
+            voxelPainter:
+              this.voxelPainter.blocks.size > 0
+                ? {
+                    voxelSize: this.voxelPainter.voxelSize,
+                    paletteId: this.voxelPainter.currentPaletteId,
+                    atlasId: this.voxelPainter.currentAtlasId,
+                    voxelData: this.voxelPainter.exportVoxelData(),
+                  }
+                : undefined,
+            pathExtrusion:
+              this.pathExtrusion && this.pathExtrusion.paths.length > 0
+                ? this.pathExtrusion.exportState()
+                : undefined,
+            pathWays:
+              this.pathExtrusion && this.pathExtrusion.paths.length > 0
+                ? this.pathExtrusion.exportState()
+                : undefined,
+          },
+        };
+
+        this.scene.metadata = { ...(this.scene.metadata || {}), meshEditor: projectData };
+
+        const originalDoNotSerialize = new Map<any, boolean>();
+        const nodesToInspect: any[] = [
+          this.camera,
+          this.ambientLight,
+          this.sunLight,
+          this.gridMesh,
+          this.facetHighlightMesh,
+          this.selectionProxyNode,
+          ...this.scene.meshes,
+          ...this.scene.transformNodes,
+        ];
+
+        for (const node of nodesToInspect) {
+          if (!node) continue;
+          originalDoNotSerialize.set(node, !!node.doNotSerialize);
+          if (
+            this.isEditorHelper(node) ||
+            node === this.gridMesh ||
+            node === this.camera ||
+            node === this.ambientLight ||
+            node === this.sunLight
+          ) {
+            node.doNotSerialize = true;
+          } else if (opts.selectedOnly && !this.selectedNodes.includes(node)) {
+            node.doNotSerialize = true;
+          }
+        }
+
+        try {
+          const serialized = SceneSerializer.Serialize(this.scene);
+          const jsonText = JSON.stringify(serialized, null, 2);
+          exportedBlob = new Blob([jsonText], { type: 'application/json' });
+          downloadFallback = () => {
+            const url = URL.createObjectURL(exportedBlob!);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${opts.filename}.babylon`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+          };
+        } finally {
+          for (const [node, original] of originalDoNotSerialize.entries()) {
+            node.doNotSerialize = original;
+          }
+        }
       }
 
       let handledByAdapter = false;
@@ -2927,6 +3008,19 @@ export class MeshEditorService {
 
       this.processLoadedScene(result.meshes as Mesh[]);
 
+      // Restore embedded project tool state if loading a .babylon project file
+      if (primaryFile.name.toLowerCase().endsWith('.babylon')) {
+        try {
+          const text = await primaryFile.text();
+          const parsed = JSON.parse(text);
+          if (parsed.metadata?.meshEditor) {
+            this.restoreProjectState(parsed.metadata.meshEditor);
+          }
+        } catch (err) {
+          console.warn('Could not read project metadata from .babylon file:', err);
+        }
+      }
+
       // Ensure any images included in the multi-file drop are immediately applied to materials
       const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif', '.dds', '.ktx2'];
       const imagesInDrop = validFiles.filter((f) => {
@@ -2990,6 +3084,19 @@ export class MeshEditorService {
       FilesInputStore.FilesToLoad[file.name.toLowerCase()] = file;
       const result = await SceneLoader.ImportMeshAsync('', 'file:', file, this.scene);
       this.processImportedMeshes(result.meshes as Mesh[], file.name);
+
+      if (file.name.toLowerCase().endsWith('.babylon')) {
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          if (parsed.metadata?.meshEditor) {
+            this.restoreProjectState(parsed.metadata.meshEditor);
+          }
+        } catch (err) {
+          console.warn('Could not read project metadata from imported .babylon file:', err);
+        }
+      }
+
       this.events.onToast?.(`"${file.name}" imported into scene!`, 'success');
       this.events.onStatusChanged?.('Ready');
     } catch (err: any) {
@@ -3013,6 +3120,19 @@ export class MeshEditorService {
 
       const result = await SceneLoader.ImportMeshAsync('', rootUrl, file, this.scene);
       this.processLoadedScene(result.meshes as Mesh[]);
+
+      if (filename.toLowerCase().endsWith('.babylon')) {
+        try {
+          const res = await fetch(url);
+          const parsed = await res.json();
+          if (parsed.metadata?.meshEditor) {
+            this.restoreProjectState(parsed.metadata.meshEditor);
+          }
+        } catch (err) {
+          console.warn('Could not read project metadata from URL:', err);
+        }
+      }
+
       this.events.onModelLoaded?.(filename);
       this.events.onToast?.(`Model "${filename}" loaded successfully!`, 'success');
       this.events.onStatusChanged?.('Ready');
@@ -3033,6 +3153,19 @@ export class MeshEditorService {
 
       const result = await SceneLoader.ImportMeshAsync('', rootUrl, file, this.scene);
       this.processImportedMeshes(result.meshes as Mesh[], filename);
+
+      if (filename.toLowerCase().endsWith('.babylon')) {
+        try {
+          const res = await fetch(url);
+          const parsed = await res.json();
+          if (parsed.metadata?.meshEditor) {
+            this.restoreProjectState(parsed.metadata.meshEditor);
+          }
+        } catch (err) {
+          console.warn('Could not read project metadata from imported URL:', err);
+        }
+      }
+
       this.events.onToast?.(`Model "${filename}" imported into scene!`, 'success');
       this.events.onStatusChanged?.('Ready');
     } catch (err: any) {
@@ -3040,6 +3173,42 @@ export class MeshEditorService {
       this.events.onToast?.(`Failed to import: ${err.message || err}`, 'error');
       this.events.onStatusChanged?.('Error importing');
     }
+  }
+
+  /**
+   * Restores embedded project state (e.g. VoxelPainter blocks/palette, pathways, custom tool state)
+   * from a loaded .babylon scene file.
+   */
+  public restoreProjectState(projectData: MeshEditorProjectData | any): void {
+    if (!projectData || typeof projectData !== 'object') return;
+    const tools = projectData.tools || {};
+
+    // Restore VoxelPainter state
+    if (tools.voxelPainter) {
+      const vp = tools.voxelPainter;
+      if (vp.voxelSize !== undefined && typeof vp.voxelSize === 'number') {
+        this.voxelPainter.setVoxelSize(vp.voxelSize);
+      }
+      if (vp.atlasId !== undefined) {
+        this.voxelPainter.useTextureAtlas(vp.atlasId || null);
+      }
+      if (vp.paletteId) {
+        this.voxelPainter.setPaletteItem(vp.paletteId);
+      }
+      if (vp.voxelData) {
+        const count = this.voxelPainter.loadVoxelData(vp.voxelData);
+        this.events.onToast?.(`Restored ${count} painted voxels from project state.`, 'info');
+      }
+    }
+
+    // Restore Path Extrusion state
+    const pathsToRestore = tools.pathExtrusion || tools.pathWays;
+    if (pathsToRestore && Array.isArray(pathsToRestore)) {
+      this.pathExtrusion.loadState(pathsToRestore);
+      this.events.onToast?.(`Restored ${pathsToRestore.length} path extrusions from project state.`, 'info');
+    }
+
+    this.events.onSceneModified?.();
   }
 
   private processLoadedScene(newMeshes?: Mesh[]): void {
@@ -3186,6 +3355,14 @@ export class MeshEditorService {
     if (this.currentModelRoot && !this.currentModelRoot.isDisposed()) {
       this.currentModelRoot.dispose();
       this.currentModelRoot = null;
+    }
+
+    if (this.voxelPainter && this.voxelPainter.blocks.size > 0) {
+      this.voxelPainter.clear();
+    }
+
+    if (this.pathExtrusion) {
+      this.pathExtrusion.clear();
     }
 
     // Stop and clear animations

@@ -112,7 +112,7 @@
           </button>
           <div class="dropdown-menu" id="menuTools">
             <div class="dropdown-header-label">Tools</div>
-            <button class="dropdown-item active" id="btnToggleAIAgent" title="AI Mesh Agent (Text/Image to Mesh & Mesh Update)">
+            <button class="dropdown-item" id="btnToggleAIAgent" title="AI Mesh Agent (Text/Image to Mesh & Mesh Update)">
               <span class="btn-icon"><i class="app-icon" data-lucide="bot"></i></span>
               <span class="btn-label">AI Mesh Agent</span>
             </button>
@@ -136,9 +136,13 @@
               <span class="btn-icon"><i class="app-icon" data-lucide="zap"></i></span>
               <span class="btn-label">Texture Optimizer</span>
             </button>
-            <button class="dropdown-item active" id="btnToggleVoxelPainter" title="Voxel Painter (3D Grid & Texture Atlas Block Building)">
+            <button class="dropdown-item" id="btnToggleVoxelPainter" title="Voxel Painter (3D Grid & Texture Atlas Block Building)">
               <span class="btn-icon"><i class="app-icon" data-lucide="brush"></i></span>
               <span class="btn-label">Voxel Painter</span>
+            </button>
+            <button class="dropdown-item" id="btnTogglePathExtrusion" title="Path Extrusion (3D Splines, Curves & Profile Cross-Sections)">
+              <span class="btn-icon"><i class="app-icon" data-lucide="route"></i></span>
+              <span class="btn-label">Path Extrusion</span>
             </button>
             <div class="dropdown-divider"></div>
             <div class="dropdown-header-label">Panels & View</div>
@@ -223,29 +227,11 @@
             <span class="btn-icon"><i class="app-icon" data-lucide="box-select"></i></span><span class="btn-badge">B</span>
           </button>
         </div>
+       
 
         <div class="toolbar-divider"></div>
 
-        <!-- Quick AI Agent Toggle -->
-        <div class="btn-group ai-toolbar-group">
-          <button class="tool-btn ai-toolbar-btn active" id="btnToolbarAIAgent" title="Toggle AI Mesh Agent (Text/Image to Mesh & Mesh Update)">
-            <span class="btn-icon"><i class="app-icon" data-lucide="bot"></i></span>
-            <span class="btn-label">AI Agent</span>
-          </button>
-        </div>
-
-        <!-- Quick Voxel Painter Toggle -->
-        <div class="btn-group voxel-toolbar-group">
-          <button class="tool-btn active" id="btnToolbarVoxelPainter" title="Toggle Voxel Painter (3D Grid & Texture Atlas Block Building)">
-            <span class="btn-icon"><i class="app-icon" data-lucide="brush"></i></span>
-            <span class="btn-label">Voxel Painter</span>
-          </button>
-        </div>
-
-
-        <div class="toolbar-divider"></div>
-
-        <div class="btn-group panel-group">
+        <div style="float: right;" class="btn-group panel-group">
           <button class="tool-btn panel-btn" id="btnHelp" title="Help & Keyboard Shortcuts">
             <span class="btn-icon"><i class="app-icon" data-lucide="help-circle"></i></span>
           </button>
@@ -789,6 +775,56 @@
             </div>
           </div>
         </div>
+
+        <!-- Path Extrusion Floating Dialog -->
+        <div id="dialog-path-extrusion" class="floating-dialog" style="top: 100px; left: 700px; width: 340px; display: none">
+          <div class="dialog-header">
+            <span class="dialog-title"><i class="app-icon" data-lucide="route"></i> Path Extrusion</span>
+            <div class="dialog-actions">
+              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+            </div>
+          </div>
+          <div class="dialog-body path-extrusion-body">
+            <!-- Active Path Extrusion Selector -->
+            <div class="path-extrusion-control-group">
+              <label class="path-extrusion-label" for="pathExtrusionSelect">Active Path Extrusion</label>
+              <div class="path-extrusion-row">
+                <select id="pathExtrusionSelect" class="path-extrusion-select"></select>
+                <button type="button" class="btn btn-secondary btn-action-sm" id="btnPathExtrusionNew" title="Create new path extrusion"><i class="app-icon" data-lucide="plus"></i></button>
+                <button type="button" class="btn btn-secondary btn-action-sm btn-danger" id="btnPathExtrusionDelete" title="Delete path extrusion"><i class="app-icon" data-lucide="trash-2"></i></button>
+              </div>
+            </div>
+
+            <!-- Open Path Extrusion Studio Button -->
+            <button type="button" class="btn btn-primary btn-block mb-3" id="btnOpenPathExtrusionStudio" title="Open Interactive 2D Cross-Section Canvas & Presets Studio" style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:8px 12px;margin-bottom:12px;font-weight:600;">
+              <i class="app-icon" data-lucide="palette"></i> Open Path Extrusion Studio
+            </button>
+
+            <!-- Help / Status info -->
+            <div class="path-extrusion-help-box">
+              <div class="path-extrusion-help-title"><i class="app-icon" data-lucide="info"></i> 3D Spline Sculpting</div>
+              <div class="path-extrusion-help-text">
+                • <strong>Shift + Click</strong> on ground/mesh to place or append points.<br />
+                • Click any point sphere to attach 3D Gizmo and drag in space.
+              </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="path-extrusion-actions">
+              <button type="button" class="btn btn-secondary btn-sm" id="btnPathExtrusionRemovePoint" title="Delete selected waypoint">
+                <i class="app-icon" data-lucide="minus"></i> Remove Point
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnPathExtrusionClearPoints" title="Clear all waypoints for this path extrusion">
+                <i class="app-icon" data-lucide="rotate-cw"></i> Clear Points
+              </button>
+            </div>
+
+            <button type="button" class="btn-path-extrusion-bake" id="btnPathExtrusionBakeMesh">
+              <i class="app-icon" data-lucide="check"></i> Bake to Scene Mesh
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Bottom Status Bar -->
@@ -900,8 +936,7 @@
                 • <strong>Center Pivot:</strong> Click "Center Pivot" if gizmos appear offset from the visual object.<br />
                 • <strong>Pick & Place:</strong> In the Tools menu, choose "Create Mesh..." and click on any surface to spawn new meshes
                 directly in 3D.<br />
-                • <strong>Auto-Saved Windows:</strong> Window positions, sizes, and open states are saved automatically in your browser
-                localStorage.
+                • <strong>Auto-Saved Windows:</strong> Window positions, sizes, and open states are saved automatically.
               </p>
             </div>
           </div>

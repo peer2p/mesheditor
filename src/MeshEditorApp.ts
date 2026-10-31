@@ -8,6 +8,7 @@ import { MenuItemDefinition, MeshEditorPlugin, PluginManager, ToolbarButtonDefin
 import { ensureMeshEditorStyles } from './styles';
 import { AI_CHAT_EMPTY_HTML, getMeshEditorTemplate } from './template';
 import { AIAgentToolExecutionStep, ExportOptions, MeshEditorServiceEvents, PrimitiveShape } from './types';
+import { PathExtrusionStudio } from './pathExtrusion';
 
 export interface MeshEditorAppOptions {
   /**
@@ -98,6 +99,7 @@ import {
   Redo2,
   RefreshCw,
   RotateCw,
+  Route,
   Save,
   Scissors,
   Search,
@@ -171,6 +173,7 @@ export const editorIcons = {
   Redo2,
   RefreshCw,
   RotateCw,
+  Route,
   Save,
   Scissors,
   Search,
@@ -280,6 +283,7 @@ export class MeshEditorApp {
     'dialog-anim',
     'dialog-textures',
     'dialog-voxel-painter',
+    'dialog-path-extrusion',
   ];
 
   // AI Agent UI State
@@ -819,6 +823,16 @@ export class MeshEditorApp {
       this.service.gizmoManager.rotationGizmoEnabled = mode === 'rotate';
       this.service.gizmoManager.scaleGizmoEnabled = mode === 'scale';
       this.service.gizmoManager.boundingBoxGizmoEnabled = mode === 'bounds';
+
+      // Switching to standard transform gizmos deactivates exclusive 3D tool painting/sculpting
+      if (this.service.voxelPainter?.isActive) {
+        this.service.voxelPainter.setActive(false);
+      }
+      if (this.service.pathExtrusion?.isActive) {
+        this.service.pathExtrusion.setActive(false);
+        PathExtrusionStudio.close();
+      }
+      this.updatePanelButtonStates();
     };
 
     btnTranslate?.addEventListener('click', () => updateGizmoButtons('translate'));
@@ -899,6 +913,16 @@ export class MeshEditorApp {
     this.getElement('btnToolbarVoxelPainter')?.addEventListener('click', () => {
       this.closeAllDropdowns();
       this.toggleDialog('dialog-voxel-painter');
+    });
+    (this.getElement('btnTogglePathExtrusion') || this.getElement('btnTogglePathWays'))?.addEventListener('click', () => {
+      this.closeAllDropdowns();
+      const dlgId = this.getElement('dialog-path-extrusion') ? 'dialog-path-extrusion' : 'dialog-path-ways';
+      this.toggleDialog(dlgId);
+    });
+    (this.getElement('btnToolbarPathExtrusion') || this.getElement('btnToolbarPathWays'))?.addEventListener('click', () => {
+      this.closeAllDropdowns();
+      const dlgId = this.getElement('dialog-path-extrusion') ? 'dialog-path-extrusion' : 'dialog-path-ways';
+      this.toggleDialog(dlgId);
     });
     document.getElementById('btnToggleTexturePanel')?.addEventListener('click', () => {
       this.closeAllDropdowns();
@@ -999,6 +1023,7 @@ export class MeshEditorApp {
     this.initAIAgentUI();
     this.initVoxelPainterUI();
     this.initEmbeddedTexturesUI();
+    this.initPathExtrusionUI();
 
     // Restore saved window layout and active tools from localStorage
     this.restoreDialogLayout();
@@ -1168,10 +1193,31 @@ export class MeshEditorApp {
 
     if (willBeMin) {
       dialog.classList.add('minimized');
+      if (dialog.id === 'dialog-voxel-painter') {
+        this.service.voxelPainter.setActive(false);
+      } else if (dialog.id === 'dialog-path-extrusion' || dialog.id === 'dialog-path-ways') {
+        this.service.pathExtrusion.setActive(false);
+        PathExtrusionStudio.close();
+      }
     } else {
       dialog.classList.remove('minimized');
       if (this.layoutMode === 'stackpanel') {
         this.accordionMinimizeOthers(dialog);
+      }
+      if (dialog.id === 'dialog-voxel-painter') {
+        this.service.voxelPainter.setActive(true);
+        if (this.service.pathExtrusion?.isActive) {
+          this.service.pathExtrusion.setActive(false);
+          PathExtrusionStudio.close();
+        }
+      } else if (dialog.id === 'dialog-path-extrusion' || dialog.id === 'dialog-path-ways') {
+        this.service.pathExtrusion.setActive(true);
+        if (this.service.voxelPainter?.isActive) {
+          this.service.voxelPainter.setActive(false);
+        }
+        PathExtrusionStudio.open(this.service, this.service.pathExtrusion, () => {
+          this.updatePanelButtonStates();
+        });
       }
     }
 
@@ -1181,6 +1227,7 @@ export class MeshEditorApp {
       btnMin.title = willBeMin ? 'Expand' : 'Minimize';
     }
     this.refreshIcons();
+    this.updatePanelButtonStates();
     this.saveDialogLayout();
   }
 
@@ -1230,10 +1277,28 @@ export class MeshEditorApp {
     if (id === 'dialog-voxel-painter') {
       this.service.voxelPainter.setActive(willOpen);
       if (willOpen) {
+        if (this.service.pathExtrusion?.isActive) {
+          this.service.pathExtrusion.setActive(false);
+          PathExtrusionStudio.close();
+        }
         this.renderVoxelPalette();
         this.renderVoxelAtlasOptions();
         this.renderVoxelTextureGallery();
         this.showToast('Voxel Painter active. Left click to paint, right click to orbit camera.', 'info');
+      }
+    } else if (id === 'dialog-path-extrusion' || id === 'dialog-path-ways') {
+      this.service.pathExtrusion.setActive(willOpen);
+      if (willOpen) {
+        if (this.service.voxelPainter?.isActive) {
+          this.service.voxelPainter.setActive(false);
+        }
+        this.renderPathExtrusionUI();
+        PathExtrusionStudio.open(this.service, this.service.pathExtrusion, () => {
+          this.updatePanelButtonStates();
+        });
+        this.showToast('Path Extrusion Studio active. 2D Cross-section canvas ready.', 'info');
+      } else {
+        PathExtrusionStudio.close();
       }
     } else if (id === 'dialog-material' && willOpen) {
       this.renderEmbeddedTextures();
@@ -1425,11 +1490,11 @@ export class MeshEditorApp {
     try {
       const saved = localStorage.getItem('mesheditor_window_layout');
       if (!saved) {
-        // First time execution: activate default tools & panels (keep AI Agent dialog closed until toggled)
+        // First time execution: activate default tools & panels (keep specialized studio tools closed until toggled)
         for (const id of this.dialogIds) {
           const dialog = this.getElement(id);
           if (dialog) {
-            if (id === 'dialog-ai-agent' || id === 'dialog-voxel-painter') {
+            if (id === 'dialog-ai-agent' || id === 'dialog-voxel-painter' || id === 'dialog-path-extrusion' || id === 'dialog-path-ways') {
               dialog.style.display = 'none';
             } else {
               dialog.style.display = 'flex';
@@ -1437,6 +1502,9 @@ export class MeshEditorApp {
             }
           }
         }
+        this.service.voxelPainter.setActive(false);
+        this.service.pathExtrusion.setActive(false);
+        PathExtrusionStudio.close();
         this.updatePanelButtonStates();
         this.saveDialogLayout();
         return;
@@ -1484,25 +1552,43 @@ export class MeshEditorApp {
         }
       }
 
-      // Safeguard: If every dialog is closed, activate all tools by default
-      const anyOpen = this.dialogIds.some((id) => {
+      // Safeguard: If every default panel is closed, activate standard panels
+      const defaultPanelIds = [
+        'dialog-outliner',
+        'dialog-create-primitive',
+        'dialog-csg',
+        'dialog-facet',
+        'dialog-scene',
+        'dialog-mesh',
+        'dialog-material',
+        'dialog-anim',
+        'dialog-textures',
+      ];
+      const anyOpen = defaultPanelIds.some((id) => {
         const d = this.getElement(id);
         return d && d.style.display !== 'none';
       });
       if (!anyOpen) {
-        for (const id of this.dialogIds) {
+        for (const id of defaultPanelIds) {
           const d = this.getElement(id);
           if (d) d.style.display = 'flex';
         }
       }
 
       const voxelDlg = this.getElement('dialog-voxel-painter');
-      const isVoxelOpen = !!(voxelDlg && voxelDlg.style.display !== 'none');
+      const isVoxelOpen = !!(voxelDlg && voxelDlg.style.display !== 'none' && !voxelDlg.classList.contains('minimized'));
       this.service.voxelPainter.setActive(isVoxelOpen);
       if (isVoxelOpen) {
         this.renderVoxelPalette();
         this.renderVoxelAtlasOptions();
         this.renderVoxelTextureGallery();
+      }
+
+      const pathDlg = this.getElement('dialog-path-extrusion') || this.getElement('dialog-path-ways');
+      const isPathOpen = !!(pathDlg && pathDlg.style.display !== 'none' && !pathDlg.classList.contains('minimized'));
+      this.service.pathExtrusion.setActive(isPathOpen);
+      if (isPathOpen) {
+        this.renderPathExtrusionUI();
       }
 
       this.updatePanelButtonStates();
@@ -1525,6 +1611,7 @@ export class MeshEditorApp {
       'dialog-anim': 'btnToggleAnimPanel',
       'dialog-textures': 'btnToggleTexturePanel',
       'dialog-voxel-painter': 'btnToggleVoxelPainter',
+      'dialog-path-extrusion': 'btnTogglePathExtrusion',
     };
 
     for (const [dialogId, btnId] of Object.entries(mapping)) {
@@ -1548,13 +1635,15 @@ export class MeshEditorApp {
     }
 
     // Also update Voxel Painter top toolbar button state
-    const voxelDialog = this.getElement('dialog-voxel-painter');
     const btnToolbarVoxel = this.getElement('btnToolbarVoxelPainter');
-    if (voxelDialog && btnToolbarVoxel) {
-      const isVoxelOpen =
-        voxelDialog.style.display !== 'none' &&
-        (voxelDialog.style.display !== '' || window.getComputedStyle(voxelDialog).display !== 'none');
-      btnToolbarVoxel.classList.toggle('active', isVoxelOpen);
+    if (btnToolbarVoxel) {
+      btnToolbarVoxel.classList.toggle('active', !!this.service.voxelPainter?.isActive);
+    }
+
+    // Also update Path Extrusion top toolbar button state
+    const btnToolbarPath = this.getElement('btnToolbarPathExtrusion') || this.getElement('btnToolbarPathWays');
+    if (btnToolbarPath) {
+      btnToolbarPath.classList.toggle('active', !!this.service.pathExtrusion?.isActive);
     }
 
     // Also update Ground Grid button state
@@ -3703,16 +3792,22 @@ export class MeshEditorApp {
     };
 
     btnPaint?.addEventListener('click', () => {
+      this.service.voxelPainter.setActive(true);
       this.service.voxelPainter.setMode('paint');
       updateModeButtons('paint');
+      this.updatePanelButtonStates();
     });
     btnErase?.addEventListener('click', () => {
+      this.service.voxelPainter.setActive(true);
       this.service.voxelPainter.setMode('erase');
       updateModeButtons('erase');
+      this.updatePanelButtonStates();
     });
     btnPick?.addEventListener('click', () => {
+      this.service.voxelPainter.setActive(true);
       this.service.voxelPainter.setMode('pick');
       updateModeButtons('pick');
+      this.updatePanelButtonStates();
     });
 
     sizeInput?.addEventListener('input', () => {
@@ -4185,5 +4280,156 @@ export class MeshEditorApp {
 
     this.refreshIcons();
     this.renderVoxelTextureGallery();
+  }
+
+  /* =========================================================================
+     PATH EXTRUSION & SPLINE STUDIO UI
+     ========================================================================= */
+  private initPathExtrusionUI(): void {
+    const pathSelect = this.getElement<HTMLSelectElement>('pathExtrusionSelect') || this.getElement<HTMLSelectElement>('pathwaySelect');
+    const btnNew = this.getElement<HTMLButtonElement>('btnPathExtrusionNew') || this.getElement<HTMLButtonElement>('btnPathNew');
+    const btnDelete = this.getElement<HTMLButtonElement>('btnPathExtrusionDelete') || this.getElement<HTMLButtonElement>('btnPathDelete');
+    const shapeTypeSelect = this.getElement<HTMLSelectElement>('pathExtrusionShapeType') || this.getElement<HTMLSelectElement>('pathwayShapeType');
+    const widthInput = this.getElement<HTMLInputElement>('pathExtrusionWidth') || this.getElement<HTMLInputElement>('pathwayWidth');
+    const heightInput = this.getElement<HTMLInputElement>('pathExtrusionHeight') || this.getElement<HTMLInputElement>('pathwayHeight');
+    const thicknessInput = this.getElement<HTMLInputElement>('pathExtrusionThickness') || this.getElement<HTMLInputElement>('pathwayThickness');
+    const smoothStepsInput = this.getElement<HTMLInputElement>('pathExtrusionSmoothSteps') || this.getElement<HTMLInputElement>('pathwaySmoothSteps');
+    const scaleInput = this.getElement<HTMLInputElement>('pathExtrusionScale') || this.getElement<HTMLInputElement>('pathwayScale');
+    const twistInput = this.getElement<HTMLInputElement>('pathExtrusionTwist') || this.getElement<HTMLInputElement>('pathwayTwist');
+    const colorInput = this.getElement<HTMLInputElement>('pathExtrusionColor') || this.getElement<HTMLInputElement>('pathwayColor');
+    const colorHex = this.getElement<HTMLElement>('pathExtrusionColorHex') || this.getElement<HTMLElement>('pathwayColorHex');
+    const btnRemovePoint = this.getElement<HTMLButtonElement>('btnPathExtrusionRemovePoint') || this.getElement<HTMLButtonElement>('btnPathRemovePoint');
+    const btnClearPoints = this.getElement<HTMLButtonElement>('btnPathExtrusionClearPoints') || this.getElement<HTMLButtonElement>('btnPathClearPoints');
+    const btnBake = this.getElement<HTMLButtonElement>('btnPathExtrusionBakeMesh') || this.getElement<HTMLButtonElement>('btnPathBakeMesh');
+
+    pathSelect?.addEventListener('change', () => {
+      this.service.pathExtrusion.selectPath(pathSelect.value);
+      this.renderPathExtrusionUI();
+    });
+
+    btnNew?.addEventListener('click', () => {
+      const created = this.service.pathExtrusion.addNewPath();
+      this.renderPathExtrusionUI();
+      this.showToast(`Created new path extrusion "${created.name}"`, 'success');
+    });
+
+    btnDelete?.addEventListener('click', () => {
+      const active = this.service.pathExtrusion.activePath;
+      if (!active) return;
+      this.service.pathExtrusion.deletePath(active.id);
+      this.renderPathExtrusionUI();
+      this.showToast(`Deleted path extrusion "${active.name}"`, 'info');
+    });
+
+    shapeTypeSelect?.addEventListener('change', () => {
+      this.service.pathExtrusion.updateShapeConfig({ shapeType: shapeTypeSelect.value as any });
+    });
+
+    const updateParams = () => {
+      const cfg: any = {};
+      if (widthInput) {
+        const val = parseFloat(widthInput.value) || 1.0;
+        cfg.width = val;
+        cfg.radius = val / 2;
+      }
+      if (heightInput) cfg.height = parseFloat(heightInput.value) || 0.5;
+      if (thicknessInput) cfg.thickness = parseFloat(thicknessInput.value) || 0;
+      if (smoothStepsInput) cfg.smoothSteps = parseInt(smoothStepsInput.value, 10) || 10;
+      if (scaleInput) cfg.scale = parseFloat(scaleInput.value) || 1.0;
+      if (twistInput) cfg.twist = parseFloat(twistInput.value) || 0;
+      this.service.pathExtrusion.updateShapeConfig(cfg);
+    };
+
+    widthInput?.addEventListener('input', updateParams);
+    heightInput?.addEventListener('input', updateParams);
+    thicknessInput?.addEventListener('input', updateParams);
+    smoothStepsInput?.addEventListener('input', updateParams);
+    scaleInput?.addEventListener('input', updateParams);
+    twistInput?.addEventListener('input', updateParams);
+
+    colorInput?.addEventListener('input', () => {
+      if (colorHex) colorHex.textContent = colorInput.value;
+      this.service.pathExtrusion.updateShapeConfig({ color: colorInput.value });
+    });
+
+    btnRemovePoint?.addEventListener('click', () => {
+      this.service.pathExtrusion.removeSelectedPoint();
+    });
+
+    btnClearPoints?.addEventListener('click', () => {
+      this.service.pathExtrusion.clearPoints();
+      this.showToast('Cleared all path extrusion points', 'info');
+    });
+
+    btnBake?.addEventListener('click', () => {
+      const mesh = this.service.pathExtrusion.bakeMesh();
+      if (mesh) {
+        this.renderPathExtrusionUI();
+      }
+    });
+
+    const btnOpenStudio = this.getElement<HTMLButtonElement>('btnOpenPathExtrusionStudio');
+    btnOpenStudio?.addEventListener('click', () => {
+      this.service.pathExtrusion.setActive(true);
+      PathExtrusionStudio.open(this.service, this.service.pathExtrusion, () => {
+        this.updatePanelButtonStates();
+      });
+      this.updatePanelButtonStates();
+    });
+
+    this.service.pathExtrusion.onStateChanged = () => {
+      this.renderPathExtrusionUI();
+      if (PathExtrusionStudio.isOpen()) {
+        PathExtrusionStudio.open(this.service, this.service.pathExtrusion).refresh();
+      }
+    };
+  }
+
+  private renderPathExtrusionUI(): void {
+    const pathSelect = this.getElement<HTMLSelectElement>('pathExtrusionSelect') || this.getElement<HTMLSelectElement>('pathwaySelect');
+    const shapeTypeSelect = this.getElement<HTMLSelectElement>('pathExtrusionShapeType') || this.getElement<HTMLSelectElement>('pathwayShapeType');
+    const widthInput = this.getElement<HTMLInputElement>('pathExtrusionWidth') || this.getElement<HTMLInputElement>('pathwayWidth');
+    const heightInput = this.getElement<HTMLInputElement>('pathExtrusionHeight') || this.getElement<HTMLInputElement>('pathwayHeight');
+    const thicknessInput = this.getElement<HTMLInputElement>('pathExtrusionThickness') || this.getElement<HTMLInputElement>('pathwayThickness');
+    const smoothStepsInput = this.getElement<HTMLInputElement>('pathExtrusionSmoothSteps') || this.getElement<HTMLInputElement>('pathwaySmoothSteps');
+    const scaleInput = this.getElement<HTMLInputElement>('pathExtrusionScale') || this.getElement<HTMLInputElement>('pathwayScale');
+    const twistInput = this.getElement<HTMLInputElement>('pathExtrusionTwist') || this.getElement<HTMLInputElement>('pathwayTwist');
+    const colorInput = this.getElement<HTMLInputElement>('pathExtrusionColor') || this.getElement<HTMLInputElement>('pathwayColor');
+    const colorHex = this.getElement<HTMLElement>('pathExtrusionColorHex') || this.getElement<HTMLElement>('pathwayColorHex');
+
+    if (pathSelect) {
+      const currentVal = this.service.pathExtrusion.activePathId;
+      pathSelect.innerHTML = '';
+      for (const p of this.service.pathExtrusion.paths) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.name} (${p.points.length} pts)`;
+        if (p.id === currentVal) opt.selected = true;
+        pathSelect.appendChild(opt);
+      }
+    }
+
+    const active = this.service.pathExtrusion.activePath;
+    if (!active) return;
+    const cfg = active.shapeConfig;
+
+    if (shapeTypeSelect && cfg.shapeType) shapeTypeSelect.value = cfg.shapeType;
+    if (widthInput && cfg.width !== undefined) widthInput.value = String(cfg.width);
+    if (heightInput && cfg.height !== undefined) heightInput.value = String(cfg.height);
+    if (thicknessInput && cfg.thickness !== undefined) thicknessInput.value = String(cfg.thickness);
+    if (smoothStepsInput && cfg.smoothSteps !== undefined) smoothStepsInput.value = String(cfg.smoothSteps);
+    if (scaleInput && cfg.scale !== undefined) scaleInput.value = String(cfg.scale);
+    if (twistInput && cfg.twist !== undefined) twistInput.value = String(cfg.twist);
+    if (colorInput && cfg.color) colorInput.value = cfg.color;
+    if (colorHex && cfg.color) colorHex.textContent = cfg.color;
+  }
+
+  // Backward compatibility aliases
+  private initPathWaysUI(): void {
+    this.initPathExtrusionUI();
+  }
+
+  private renderPathWaysUI(): void {
+    this.renderPathExtrusionUI();
   }
 }
