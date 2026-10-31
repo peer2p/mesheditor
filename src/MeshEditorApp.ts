@@ -1204,9 +1204,6 @@ export class MeshEditorApp {
       }
       if (dialog.id === 'dialog-voxel-painter') {
         this.service.voxelPainter.setActive(true);
-        if (this.service.pathExtrusion?.isActive) {
-          this.service.pathExtrusion.setActive(false);
-        }
       } else if (dialog.id === 'dialog-path-extrusion') {
         this.service.pathExtrusion.setActive(true);
       }

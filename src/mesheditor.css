@@ -2907,9 +2907,9 @@ progress.loading-spinner:indeterminate {
 }
 
 .btn-secondary:hover {
-  background: rgba(248, 81, 73, 0.2) !important;
-  border-color: var(--danger-color) !important;
-  color: var(--danger-color) !important;
+  background: #21262d;
+  border-color: var(--accent-color) !important;
+  color: var(--accent-color) !important;
 }
 
 .btn-outline {
