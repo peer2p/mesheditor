@@ -4850,21 +4850,6 @@ export class MeshEditorApp {
         });
         actions.appendChild(btnApplyAll);
 
-        const btnVoxel = document.createElement('button');
-        btnVoxel.className = 'tool-btn-xs';
-        btnVoxel.title = 'Use Atlas in Voxel Painter';
-        btnVoxel.innerHTML = '<i class="app-icon" data-lucide="paintbrush"></i> Voxel';
-        btnVoxel.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (atlas) {
-            this.service.voxelPainter.useTextureAtlas(atlas.id);
-            this.toggleDialog('dialog-voxel-painter', true);
-            this.renderVoxelAtlasOptions();
-            this.renderVoxelPalette();
-          }
-        });
-        actions.appendChild(btnVoxel);
-
         card.addEventListener('click', () => {
           this.renderAtlasTilePicker(tex.atlasId!);
         });
@@ -4880,18 +4865,10 @@ export class MeshEditorApp {
         });
         actions.appendChild(btnApply);
 
-        const btnVoxel = document.createElement('button');
-        btnVoxel.className = 'tool-btn-xs';
-        btnVoxel.title = 'Use texture in Voxel Painter';
-        btnVoxel.innerHTML = '<i class="app-icon" data-lucide="box"></i> Voxel';
-        btnVoxel.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.service.voxelPainter.addTexturePaletteItem(tex.name, tex.url);
-          this.toggleDialog('dialog-voxel-painter', true);
-          this.renderVoxelPalette();
-          this.showToast(`Texture "${tex.name}" added to Voxel Painter palette`, 'success');
+        card.addEventListener('click', () => {
+          this.service.applyTextureToSelectedMaterial(tex.url, tex.name);
+          this.updateMaterialGUI();
         });
-        actions.appendChild(btnVoxel);
       }
 
       card.appendChild(thumbWrapper);

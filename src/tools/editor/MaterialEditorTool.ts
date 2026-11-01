@@ -1,7 +1,7 @@
 import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
- * Material & UV Mapping Tool.
+ * Material & Texture Tool.
  * Configure PBR material properties, colors, textures, roughness, metallic, and UV projections.
  */
 export class MaterialEditorTool extends AbstractEditorTool {
@@ -9,7 +9,7 @@ export class MaterialEditorTool extends AbstractEditorTool {
   public readonly dialogId = 'dialog-material';
   public readonly triggerButtonId = 'btnToggleMaterialPanel';
   public readonly menuId = 'menuTools';
-  public readonly menuLabel = 'Material & UV Mapping';
+  public readonly menuLabel = 'Material & Texture';
   public readonly icon = 'palette';
   public readonly order = 10;
   public readonly defaultOpen = true;
@@ -18,7 +18,7 @@ export class MaterialEditorTool extends AbstractEditorTool {
 
   public readonly helpText = `
 <h4><i class="app-icon" data-lucide="info"></i> Overview</h4>
-<p>The <strong>Material & UV Mapping</strong> panel configures Physically Based Rendering (PBR) metallic-roughness materials, texture maps, and automated UV coordinate projections.</p>
+<p>The <strong>Material & Texture</strong> panel configures Physically Based Rendering (PBR) metallic-roughness materials, texture maps, and automated UV coordinate projections.</p>
 
 <h4><i class="app-icon" data-lucide="sparkles"></i> PBR Properties</h4>
 <ul>
