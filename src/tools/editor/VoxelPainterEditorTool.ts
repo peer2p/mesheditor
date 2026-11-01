@@ -42,8 +42,18 @@ export class VoxelPainterEditorTool extends AbstractEditorTool {
     return !!app?.service?.voxelPainter?.isActive;
   }
 
+  public onActivate(app: any): void {
+    app.service?.voxelPainter?.setActive(true);
+    app.updatePanelButtonStates?.();
+  }
+
+  public onDeactivate(app: any): void {
+    app.service?.voxelPainter?.setActive(false);
+    app.updatePanelButtonStates?.();
+  }
+
   public onOpen(app: any): void {
-    app.service.voxelPainter.setActive(true);
+    this.onActivate(app);
     app.renderVoxelPalette?.();
     app.renderVoxelAtlasOptions?.();
     app.renderVoxelTextureGallery?.();
@@ -51,15 +61,15 @@ export class VoxelPainterEditorTool extends AbstractEditorTool {
   }
 
   public onClose(app: any): void {
-    app.service.voxelPainter.setActive(false);
+    this.onDeactivate(app);
   }
 
   public onMinimize(app: any): void {
-    app.service.voxelPainter.setActive(false);
+    this.onDeactivate(app);
   }
 
   public onMaximize(app: any): void {
-    app.service.voxelPainter.setActive(true);
+    this.onActivate(app);
   }
 
   public onUpdateUI(app: any): void {

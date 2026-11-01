@@ -113,16 +113,15 @@ export class PathExtrusionController {
   public setActive(active: boolean): void {
     this.isActive = active;
     if (active) {
+      if (this.service.voxelPainter?.isActive) {
+        this.service.voxelPainter.setActive(false);
+      }
       this.setupPointerEvents();
       this.setupGizmoEvents();
       this.refreshScene();
     } else {
       this.cleanupObservers();
       this.clearMarkers();
-      if (this.previewMesh) {
-        this.previewMesh.dispose();
-        this.previewMesh = null;
-      }
       this.service.gizmoManager.attachToMesh(null);
     }
     this.onStateChanged?.();

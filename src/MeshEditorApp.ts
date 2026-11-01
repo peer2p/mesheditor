@@ -596,6 +596,15 @@ export class MeshEditorApp {
     if (options.autoLoadUrl) {
       this.service.loadFromUrl(options.autoLoadUrl);
     }
+
+    // Set initial focus on canvas so WASD & camera navigation works immediately
+    requestAnimationFrame(() => {
+      try {
+        this.canvas?.focus();
+      } catch {
+        // Ignore in headless/mock environments
+      }
+    });
   }
 
   public getElement<T extends HTMLElement = HTMLElement>(id: string): T | null {
@@ -833,14 +842,10 @@ export class MeshEditorApp {
       this.service.gizmoManager.scaleGizmoEnabled = mode === 'scale';
       this.service.gizmoManager.boundingBoxGizmoEnabled = mode === 'bounds';
 
-      // Switching to standard transform gizmos deactivates and closes exclusive 3D tools (e.g. Voxel Painter, Path Extrusion)
+      // Switching to standard transform gizmos deactivates exclusive 3D tools without closing their dialogs
       for (const tool of this.editorTools) {
         if (tool.isExclusive3DTool) {
-          if (tool.dialogId && this.isDialogOpen(tool.dialogId)) {
-            this.toggleDialog(tool.dialogId, false);
-          } else if (tool.isActive?.(this)) {
-            tool.onClose?.(this);
-          }
+          tool.onDeactivate?.(this);
         }
       }
       this.updatePanelButtonStates();
@@ -911,6 +916,17 @@ export class MeshEditorApp {
         const btnTb = this.getElement(tool.toolbarButtonId) || document.getElementById(tool.toolbarButtonId);
         btnTb?.addEventListener('click', () => {
           this.closeAllDropdowns();
+          if (tool.isExclusive3DTool) {
+            const isCurrentlyOpen = this.isDialogOpen(tool.dialogId!);
+            if (isCurrentlyOpen && !tool.isActive?.(this)) {
+              // Dialog is open but inactive: activate it and bring to front
+              const dlg = this.getElement(tool.dialogId!);
+              if (dlg) {
+                this.bringDialogToFront(dlg);
+                return;
+              }
+            }
+          }
           this.toggleDialog(tool.dialogId!);
         });
       }
@@ -1005,10 +1021,19 @@ export class MeshEditorApp {
     // Help Modal
     const helpModal = document.getElementById('helpModal');
     document.getElementById('btnHelp')?.addEventListener('click', () => helpModal?.classList.add('active'));
-    document.getElementById('btnCloseHelp')?.addEventListener('click', () => helpModal?.classList.remove('active'));
-    document.getElementById('btnHelpDone')?.addEventListener('click', () => helpModal?.classList.remove('active'));
+    document.getElementById('btnCloseHelp')?.addEventListener('click', () => {
+      helpModal?.classList.remove('active');
+      this.canvas?.focus();
+    });
+    document.getElementById('btnHelpDone')?.addEventListener('click', () => {
+      helpModal?.classList.remove('active');
+      this.canvas?.focus();
+    });
     helpModal?.addEventListener('click', (e) => {
-      if (e.target === helpModal) helpModal.classList.remove('active');
+      if (e.target === helpModal) {
+        helpModal.classList.remove('active');
+        this.canvas?.focus();
+      }
     });
 
     // Tool-specific Help Modal Popup
@@ -1016,15 +1041,18 @@ export class MeshEditorApp {
     this.getElement('btnCloseToolHelp')?.addEventListener('click', () => {
       toolHelpModal?.classList.remove('active');
       if (toolHelpModal) toolHelpModal.style.display = 'none';
+      this.canvas?.focus();
     });
     this.getElement('btnDoneToolHelp')?.addEventListener('click', () => {
       toolHelpModal?.classList.remove('active');
       if (toolHelpModal) toolHelpModal.style.display = 'none';
+      this.canvas?.focus();
     });
     toolHelpModal?.addEventListener('click', (e) => {
       if (e.target === toolHelpModal) {
         toolHelpModal.classList.remove('active');
         toolHelpModal.style.display = 'none';
+        this.canvas?.focus();
       }
     });
 
@@ -1353,14 +1381,11 @@ export class MeshEditorApp {
         this.accordionMinimizeOthers(dialog);
       }
 
-      // When opening an exclusive 3D tool or any other tool, close other exclusive 3D tools
-      // so their dialogs disappear and canvas pointer events are restored
-      for (const other of this.editorTools) {
-        if (other !== tool && other.isExclusive3DTool) {
-          if (other.dialogId && this.isDialogOpen(other.dialogId)) {
-            this.toggleDialog(other.dialogId, false);
-          } else if (other.isActive?.(this)) {
-            other.onClose?.(this);
+      // When opening an exclusive 3D tool, deactivate other exclusive 3D tools without closing their dialogs
+      if (tool?.isExclusive3DTool) {
+        for (const other of this.editorTools) {
+          if (other !== tool && other.isExclusive3DTool) {
+            other.onDeactivate?.(this);
           }
         }
       }
@@ -1479,6 +1504,11 @@ export class MeshEditorApp {
   public closeExportDialog(): void {
     const modal = this.getElement('exportModal');
     modal?.classList.remove('active');
+    try {
+      this.canvas?.focus();
+    } catch {
+      // Ignore
+    }
   }
 
   public updateExportScopeDetails(): void {
@@ -2069,6 +2099,21 @@ export class MeshEditorApp {
 
     activeDialog.style.zIndex = '60';
     activeDialog.classList.add('active-focus');
+
+    // If an exclusive 3D tool dialog is brought to front, make it the active 3D tool
+    const targetTool =
+      this.getToolByDialogId(activeDialog.id) ||
+      (activeDialog.id === 'pathExtrusionStudioDialog' ? this.getToolByName('path_extrusion') : null);
+
+    if (targetTool?.isExclusive3DTool && !targetTool.isActive?.(this)) {
+      for (const other of this.editorTools) {
+        if (other !== targetTool && other.isExclusive3DTool) {
+          other.onDeactivate?.(this);
+        }
+      }
+      targetTool.onActivate?.(this);
+      this.updatePanelButtonStates();
+    }
   }
 
   private setupColorPickerEnhancements(): void {
@@ -2721,13 +2766,54 @@ export class MeshEditorApp {
      KEYBOARD SHORTCUTS
      ========================================================================= */
   private initKeyboardShortcuts(): void {
+    const isNavigationKey = (key: string, e: KeyboardEvent): boolean => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return false;
+      return (
+        key === 'w' ||
+        key === 'a' ||
+        key === 's' ||
+        key === 'd' ||
+        key === 'arrowup' ||
+        key === 'arrowdown' ||
+        key === 'arrowleft' ||
+        key === 'arrowright'
+      );
+    };
+
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
-      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT' || activeEl.tagName === 'TEXTAREA')) {
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'SELECT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          (activeEl as HTMLElement).isContentEditable)
+      ) {
         return;
       }
 
       const key = e.key.toLowerCase();
+
+      // Ensure WASD / Arrow camera navigation works even if canvas lost focus (e.g. clicked toolbar button or UI)
+      if (isNavigationKey(key, e) && document.activeElement !== this.canvas) {
+        try {
+          this.canvas?.focus();
+        } catch {
+          // Ignore
+        }
+        if (e.target !== this.canvas) {
+          const forwardEvent = new KeyboardEvent(e.type, {
+            key: e.key,
+            code: e.code,
+            keyCode: e.keyCode,
+            which: e.which,
+            bubbles: true,
+            cancelable: true,
+          });
+          this.canvas?.dispatchEvent(forwardEvent);
+          return;
+        }
+      }
 
       // Undo / Redo
       if ((e.metaKey || e.ctrlKey) && key === 'z') {
@@ -2772,10 +2858,37 @@ export class MeshEditorApp {
           this.service.cancelPlacementMode();
         }
         for (const tool of this.editorTools) {
-          if (tool.isExclusive3DTool && tool.dialogId && this.isDialogOpen(tool.dialogId)) {
-            this.toggleDialog(tool.dialogId, false);
+          if (tool.isExclusive3DTool) {
+            tool.onDeactivate?.(this);
           }
         }
+        this.updatePanelButtonStates();
+      }
+    });
+
+    window.addEventListener('keyup', (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'SELECT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          (activeEl as HTMLElement).isContentEditable)
+      ) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      if (isNavigationKey(key, e) && document.activeElement !== this.canvas && e.target !== this.canvas) {
+        const forwardEvent = new KeyboardEvent(e.type, {
+          key: e.key,
+          code: e.code,
+          keyCode: e.keyCode,
+          which: e.which,
+          bubbles: true,
+          cancelable: true,
+        });
+        this.canvas?.dispatchEvent(forwardEvent);
       }
     });
   }
@@ -2821,6 +2934,13 @@ export class MeshEditorApp {
       this.showSceneLoader(text, 'BABYLON.JS 3D SCENE • PROCESSING MESH PIPELINE');
     } else {
       this.hideSceneLoader();
+      if (!document.activeElement || document.activeElement === document.body) {
+        try {
+          this.canvas?.focus();
+        } catch {
+          // Ignore
+        }
+      }
     }
   }
 
@@ -2828,11 +2948,16 @@ export class MeshEditorApp {
     this.setStartupProgress(78, 'Activating 3D Tools & Panels...');
 
     const t1 = setTimeout(() => {
-      this.setStartupProgress(100, 'Launching 3D Studio...');
+      this.setStartupProgress(100, 'Launching Mesh Editor...');
     }, 260);
 
     const t2 = setTimeout(() => {
       this.hideStartupLoader();
+      try {
+        this.canvas?.focus();
+      } catch {
+        // Ignore
+      }
     }, 560);
 
     this.startupTimerIds.push(t1, t2);
@@ -2843,6 +2968,11 @@ export class MeshEditorApp {
       if (this.sceneLoaderTimerId) clearTimeout(this.sceneLoaderTimerId);
       this.sceneLoaderTimerId = setTimeout(() => {
         this.hideSceneLoader();
+        try {
+          this.canvas?.focus();
+        } catch {
+          // Ignore
+        }
       }, 1050);
     };
 

@@ -25,7 +25,6 @@
           <span class="app-title-logo"><i class="app-icon app-icon-lg" data-lucide="box"></i></span>
           <div class="app-title-info">
             <div class="app-title-text">Mesh Editor</div>
-            <div class="app-subtitle-text">3D Studio</div>
           </div>
         </div>
 
@@ -231,6 +230,33 @@
 
         <div class="toolbar-divider"></div>
 
+        <!-- Quick AI Agent Toggle -->
+        <div class="btn-group ai-toolbar-group">
+          <button class="tool-btn ai-toolbar-btn" id="btnToolbarAIAgent" title="Toggle AI Mesh Agent (Text/Image to Mesh & Mesh Update)">
+            <span class="btn-icon"><i class="app-icon" data-lucide="bot"></i></span>
+            <span class="btn-label">AI Agent</span>
+          </button>
+        </div>
+
+        <!-- Quick Voxel Painter Toggle -->
+        <div class="btn-group voxel-toolbar-group">
+          <button class="tool-btn" id="btnToolbarVoxelPainter" title="Toggle Voxel Painter (3D Grid & Texture Atlas Block Building)">
+            <span class="btn-icon"><i class="app-icon" data-lucide="brush"></i></span>
+            <span class="btn-label">Voxel Painter</span>
+          </button>
+        </div>
+
+        <!-- Quick Path Extrusion Toggle -->
+        <div class="btn-group path-extrusion-toolbar-group">
+          <button class="tool-btn" id="btnToolbarPathExtrusion" title="Toggle Path Extrusion (3D Splines, Curves & Profile Cross-Sections)">
+            <span class="btn-icon"><i class="app-icon" data-lucide="route"></i></span>
+            <span class="btn-label">Path Extrusion</span>
+          </button>
+        </div>
+
+
+        <div class="toolbar-divider"></div>
+
         <div style="float: right;" class="btn-group panel-group">
           <button class="tool-btn panel-btn" id="btnHelp" title="Help & Keyboard Shortcuts">
             <span class="btn-icon"><i class="app-icon" data-lucide="help-circle"></i></span>
@@ -270,7 +296,7 @@
           </div>
           <div class="me-loader-info">
             <div class="me-loader-title">
-              <span class="me-loader-badge">3D STUDIO</span>
+              <span class="me-loader-badge">Loading</span>
               <span>Mesh Editor</span>
             </div>
             <div class="me-loader-status" id="startupLoaderText">Initializing 3D Workspace & Tools...</div>

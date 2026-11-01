@@ -219,6 +219,11 @@ export class MeshEditorService {
     this.canvas.addEventListener('pointerdown', () => {
       this.canvas.focus();
     });
+    try {
+      this.canvas.focus();
+    } catch {
+      // Ignore in headless/SSR environments
+    }
 
     // Prevent default context menu on right click
     this.canvas.addEventListener('contextmenu', (e) => {

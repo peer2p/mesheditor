@@ -45,8 +45,18 @@ export class PathExtrusionEditorTool extends AbstractEditorTool {
     return !!app?.service?.pathExtrusion?.isActive;
   }
 
+  public onActivate(app: any): void {
+    app.service?.pathExtrusion?.setActive(true);
+    app.updatePanelButtonStates?.();
+  }
+
+  public onDeactivate(app: any): void {
+    app.service?.pathExtrusion?.setActive(false);
+    app.updatePanelButtonStates?.();
+  }
+
   public onOpen(app: any): void {
-    app.service.pathExtrusion.setActive(true);
+    this.onActivate(app);
     app.renderPathExtrusionUI?.();
     PathExtrusionStudio.open(app.service, app.service.pathExtrusion, () => {
       app.updatePanelButtonStates?.();
@@ -55,17 +65,17 @@ export class PathExtrusionEditorTool extends AbstractEditorTool {
   }
 
   public onClose(app: any): void {
-    app.service.pathExtrusion.setActive(false);
+    this.onDeactivate(app);
     PathExtrusionStudio.close();
   }
 
   public onMinimize(app: any): void {
-    app.service.pathExtrusion.setActive(false);
+    this.onDeactivate(app);
     PathExtrusionStudio.close();
   }
 
   public onMaximize(app: any): void {
-    app.service.pathExtrusion.setActive(true);
+    this.onActivate(app);
   }
 
   public onUpdateUI(app: any): void {

@@ -168,6 +168,9 @@ export class VoxelPainterController {
       canvas.style.cursor = active ? 'crosshair' : 'default';
     }
     if (active) {
+      if (this.service.pathExtrusion?.isActive) {
+        this.service.pathExtrusion.setActive(false);
+      }
       this.scene.constantlyUpdateMeshUnderPointer = true;
       this.service.gizmoManager?.attachToMesh(null);
       this.renderDirty = true;

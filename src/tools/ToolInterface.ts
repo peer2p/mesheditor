@@ -65,7 +65,8 @@ export interface ToolInterface {
 
   /**
    * If true, this tool takes exclusive control of 3D scene pointer clicks (e.g. voxel painting or path curve editing).
-   * Activating another exclusive tool automatically deactivates this one.
+   * Multiple exclusive tool dialogs can remain open simultaneously, but only the active tool edits 3D viewport state.
+   * Activating one exclusive tool automatically deactivates 3D editing on other exclusive tools without closing their dialogs.
    */
   readonly isExclusive3DTool?: boolean;
 
@@ -96,7 +97,17 @@ export interface ToolInterface {
   isActive?(app?: any): boolean;
 
   /**
-   * Lifecycle hook invoked when the tool dialog/panel is opened or activated.
+   * Lifecycle hook invoked when an interactive 3D tool becomes active for 3D state editing.
+   */
+  onActivate?(app: any): void;
+
+  /**
+   * Lifecycle hook invoked when an interactive 3D tool is deactivated from 3D state editing (without closing its dialog).
+   */
+  onDeactivate?(app: any): void;
+
+  /**
+   * Lifecycle hook invoked when the tool dialog/panel is opened or displayed.
    */
   onOpen?(app: any): void;
 

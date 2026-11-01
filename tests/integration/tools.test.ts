@@ -351,48 +351,57 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       expect(app.service.voxelPainter.isActive).toBe(true);
       expect(app.service.pathExtrusion.isActive).toBe(false);
 
-      // 2. Open Path Extrusion: automatically deactivates and closes Voxel Painter dialog
+      // 2. Open Path Extrusion: deactivates 3D editing of Voxel Painter WITHOUT closing its dialog
       app.toggleDialog('dialog-path-extrusion', true);
       expect(app.service.pathExtrusion.isActive).toBe(true);
       expect(app.service.voxelPainter.isActive).toBe(false);
       const voxelDlg = container.querySelector('#dialog-voxel-painter') as HTMLElement;
-      expect(voxelDlg.style.display).toBe('none');
+      const pathDlg = container.querySelector('#dialog-path-extrusion') as HTMLElement;
+      expect(voxelDlg.style.display).not.toBe('none');
+      expect(pathDlg.style.display).not.toBe('none');
 
-      // 3. Path Extrusion does NOT create a path automatically on activation
+      // 3. Focusing / clicking Voxel Painter dialog reactivates Voxel Painter and deactivates Path Extrusion
+      app.bringDialogToFront(voxelDlg);
+      expect(app.service.voxelPainter.isActive).toBe(true);
+      expect(app.service.pathExtrusion.isActive).toBe(false);
+      expect(voxelDlg.style.display).not.toBe('none');
+      expect(pathDlg.style.display).not.toBe('none');
+
+      // Reactivate Path Extrusion for subsequent tests
+      app.bringDialogToFront(pathDlg);
+      expect(app.service.pathExtrusion.isActive).toBe(true);
+      expect(app.service.voxelPainter.isActive).toBe(false);
+
+      // 4. Path Extrusion does NOT create a path automatically on activation
       expect(app.service.pathExtrusion.paths.length).toBe(0);
 
-      // 4. Minimize Path Extrusion: deactivates path extrusion tool
-      const pathDlg = container.querySelector('#dialog-path-extrusion') as HTMLElement;
+      // 5. Minimize Path Extrusion: deactivates path extrusion tool
       app.toggleDialogMinimize(pathDlg, true);
       expect(pathDlg.classList.contains('minimized')).toBe(true);
       expect(app.service.pathExtrusion.isActive).toBe(false);
 
-      // 5. Maximize Path Extrusion: reactivates path extrusion tool
+      // 6. Maximize Path Extrusion: reactivates path extrusion tool
       app.toggleDialogMinimize(pathDlg, false);
       expect(pathDlg.classList.contains('minimized')).toBe(false);
       expect(app.service.pathExtrusion.isActive).toBe(true);
 
-      // 6. Close Path Extrusion
+      // 7. Close Path Extrusion
       app.toggleDialog('dialog-path-extrusion', false);
       expect(app.service.pathExtrusion.isActive).toBe(false);
 
-      // 7. Switching to standard transform gizmo closes active exclusive 3D tools
+      // 8. Switching to standard transform gizmo deactivates active exclusive 3D tools without closing dialogs
       app.toggleDialog('dialog-voxel-painter', true);
+      app.bringDialogToFront(voxelDlg);
       expect(app.service.voxelPainter.isActive).toBe(true);
       expect(voxelDlg.style.display).toBe('flex');
 
       container.querySelector('#btnGizmoTranslate')?.dispatchEvent(new MouseEvent('click'));
       expect(app.service.voxelPainter.isActive).toBe(false);
-      expect(voxelDlg.style.display).toBe('none');
-
-      // 8. Switching to a standard panel (e.g. Create Mesh) closes active exclusive 3D tools
-      app.toggleDialog('dialog-voxel-painter', true);
-      expect(app.service.voxelPainter.isActive).toBe(true);
       expect(voxelDlg.style.display).toBe('flex');
 
+      // 9. Switching to a standard panel (e.g. Create Mesh) does not close open exclusive 3D tool dialogs
       app.toggleDialog('dialog-create-primitive', true);
-      expect(app.service.voxelPainter.isActive).toBe(false);
-      expect(voxelDlg.style.display).toBe('none');
+      expect(voxelDlg.style.display).toBe('flex');
     });
 
     it('instantiates all decentralized editor tool classes with self-contained configurations and help guides', () => {

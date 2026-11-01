@@ -543,7 +543,7 @@ export class AIAgentService {
 
     const sceneStateJson = JSON.stringify(this.buildSceneSummary(), null, 2);
 
-    return `You are the built-in 3D AI Mesh Agent in **Mesh Editor (Babylon.js 3D Studio)**.
+    return `You are the built-in 3D AI Mesh Agent in **Mesh Editor**.
 Your mission is to procedurally build high-quality 3D meshes or accurately update existing meshes directly in the active Babylon.js 3D scene from text prompts and/or reference images ("Text-to-Mesh", "Image-to-Mesh", "Text/Image-to-Mesh Update").
 
 You have built-in Babylon.js modeling tools (\`modeler_*\`) and the following built-in skills available:
