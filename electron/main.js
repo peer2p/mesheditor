@@ -415,7 +415,7 @@ function createWindow(filePathsToOpen = null) {
       applicationName: 'Mesh Editor',
       applicationVersion: app.getVersion(),
       copyright: 'Copyright © 2026 Daniel Peer',
-      credits: 'A modern 3D Mesh Editor and manipulation studio',
+      credits: 'Mesh Editor can create, edit and convert 3D meshes in common formats',
     });
   }
 

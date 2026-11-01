@@ -2345,28 +2345,56 @@ export class MeshEditorService {
   public scanSceneTextures(): Texture[] {
     const texList: Texture[] = [];
     const internalKeywords = [
-      'RTT',
-      'EffectLayer',
-      'HighlightLayer',
+      'rtt',
+      'effectlayer',
+      'highlightlayer',
       'postprocess',
       'environment',
       'mirror',
-      'shadowMap',
+      'shadowmap',
       'probe',
       'reflection',
       'pass',
+      'depth',
+      'normal',
+      'editor_',
+      'gridmat',
+      'envbrdf',
     ];
 
     for (const t of this.scene.textures) {
       if (!(t instanceof Texture)) continue;
 
-      // Filter out internal RenderTargetTextures, post-processes and Babylon system layers
-      if ((t as any).isRenderTarget || (t as any)._isRenderTarget) continue;
-      if (t.name === 'gridMat' || t.name.startsWith('editor_')) continue;
-      if (internalKeywords.some((kw) => t.name.includes(kw))) continue;
+      const lowerName = (t.name || '').toLowerCase();
+
+      // Filter out internal RenderTargetTextures, cubes, post-processes and Babylon system layers
+      if ((t as any).isRenderTarget || (t as any)._isRenderTarget || (t as any).isCube) continue;
+      if (lowerName === 'gridmat' || lowerName.startsWith('editor_')) continue;
+      if (internalKeywords.some((kw) => lowerName.includes(kw))) continue;
 
       // Real user / material textures must have a valid URL or buffer
       if (!t.url && !(t as any)._buffer) continue;
+
+      // Filter out non-image data URLs like data:application/ or data:Environment or raw .env/.dds
+      if (t.url) {
+        const lowerUrl = t.url.toLowerCase();
+        if (
+          lowerUrl.startsWith('data:application/') ||
+          lowerUrl.startsWith('data:text/') ||
+          lowerUrl.startsWith('data:environment') ||
+          lowerUrl.includes('environment') ||
+          lowerUrl.endsWith('.env') ||
+          lowerUrl.endsWith('.dds')
+        ) {
+          continue;
+        }
+      }
+
+      // Filter out 1x1 dummy colormaps without materials
+      const size = t.getSize();
+      if (size.width <= 1 && size.height <= 1 && lowerName.includes('color')) {
+        continue;
+      }
 
       texList.push(t);
     }
@@ -2381,14 +2409,45 @@ export class MeshEditorService {
     const atlases = this.textureAtlasManager.getAtlases();
     const result: EmbeddedTextureInfo[] = [];
 
-    for (const tex of textures) {
-      const size = tex.getSize();
-      const matchingAtlas = atlases.find(
-        (a) => a.texture === tex || a.texture.name === tex.name || (a.dataUrl && a.dataUrl === tex.url)
-      );
+    // Always include registered atlases
+    for (const atlas of atlases) {
+      if (!atlas.dataUrl) continue;
+      result.push({
+        id: atlas.id,
+        name: atlas.name,
+        width: atlas.width,
+        height: atlas.height,
+        url: atlas.dataUrl,
+        isAtlas: true,
+        atlasId: atlas.id,
+        columns: atlas.columns,
+        rows: atlas.rows,
+        framesCount: atlas.frames.length,
+        materialsCount: 0,
+        materialNames: [],
+      });
+    }
 
-      const url = tex.url || matchingAtlas?.dataUrl || '';
+    for (const tex of textures) {
+      // Don't re-add atlas textures already in result
+      if (atlases.some((a) => a.texture === tex || a.id === tex.name || (a.dataUrl && a.dataUrl === tex.url))) {
+        continue;
+      }
+
+      const size = tex.getSize();
+      const url = tex.url || '';
       if (!url) continue;
+
+      // Validate URL format for 2D images
+      const lowerUrl = url.toLowerCase();
+      const isValidImageUrl =
+        lowerUrl.startsWith('data:image/') ||
+        lowerUrl.startsWith('blob:') ||
+        lowerUrl.startsWith('http://') ||
+        lowerUrl.startsWith('https://') ||
+        lowerUrl.startsWith('./') ||
+        lowerUrl.startsWith('/');
+      if (!isValidImageUrl) continue;
 
       const matNames: string[] = [];
       for (const m of this.scene.materials) {
@@ -2419,10 +2478,7 @@ export class MeshEditorService {
         width: size.width || 0,
         height: size.height || 0,
         url,
-        isAtlas: !!matchingAtlas,
-        atlasId: matchingAtlas?.id,
-        columns: matchingAtlas?.columns,
-        rows: matchingAtlas?.rows,
+        isAtlas: false,
         materialsCount: matNames.length,
         materialNames: matNames,
       });
@@ -2445,6 +2501,10 @@ export class MeshEditorService {
    * Uploads an image file and embeds it into the active scene as a Texture.
    */
   public async addTextureFromFile(file: File): Promise<Texture> {
+    if (/\.(json|tps|xml)$/i.test(file.name)) {
+      throw new Error(`"${file.name}" is an atlas descriptor file. Please load it via the Atlas import button.`);
+    }
+
     return new Promise<Texture>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
@@ -2493,6 +2553,98 @@ export class MeshEditorService {
     this.voxelPainter.useTextureAtlas(atlas.id);
     this.events.onToast?.(`Texture Atlas "${atlas.name}" (${atlas.frames.length} tiles) loaded into scene.`, 'success');
     return atlas;
+  }
+
+  /**
+   * Smart unified loader for Texture Atlases from multi-file selection (image + JSON/TPS/XML).
+   */
+  public async importAtlasFiles(files: FileList | File[]): Promise<TextureAtlasDefinition> {
+    const fileList = Array.from(files);
+    if (fileList.length === 0) {
+      throw new Error('No files provided');
+    }
+
+    const imageFile = fileList.find((f) => /\.(png|jpe?g|webp|bmp|gif)$/i.test(f.name));
+    const descFile = fileList.find((f) => /\.(json|tps|xml)$/i.test(f.name));
+
+    if (imageFile && descFile) {
+      return this.loadTextureAtlasFromFile(imageFile, 4, 4, descFile);
+    } else if (imageFile) {
+      return this.loadTextureAtlasFromFile(imageFile, 4, 4);
+    } else if (descFile) {
+      const descText = await descFile.text();
+      const parsed = this.textureAtlasManager.parseAtlasDescriptor(descText);
+      const expectedImgName = parsed.imagePath?.replace(/^.*[\\/]/, '');
+
+      // Check if image is already in scene
+      const existingTextures = this.scanSceneTextures();
+      const matchedTex = existingTextures.find((t) => {
+        const lower = (t.name || '').toLowerCase();
+        return expectedImgName && lower.includes(expectedImgName.toLowerCase());
+      });
+
+      if (matchedTex && matchedTex.url) {
+        const atlas = await this.textureAtlasManager.createAtlasFromJson(
+          descFile.name.replace(/\.[^/.]+$/, ''),
+          matchedTex.url,
+          descText
+        );
+        this.voxelPainter.useTextureAtlas(atlas.id);
+        this.events.onToast?.(
+          `Texture Atlas "${atlas.name}" (${atlas.frames.length} tiles) paired with scene texture!`,
+          'success'
+        );
+        return atlas;
+      }
+
+      throw new Error(
+        `Descriptor "${descFile.name}" requires an atlas image file${expectedImgName ? ` ("${expectedImgName}")` : ''}. Please select both the image and descriptor files together.`
+      );
+    }
+
+    throw new Error('No supported image or atlas descriptor file found.');
+  }
+
+  /**
+   * Applies an individual frame/tile from a texture atlas to the selected mesh material.
+   * Extracts the tile at native pixel resolution as a crisp standalone texture.
+   */
+  public applyAtlasFrameToSelectedMaterial(atlasId: string, frameId: string): boolean {
+    const atlas = this.textureAtlasManager.getAtlas(atlasId);
+    if (!atlas) {
+      this.events.onToast?.('Atlas not found', 'error');
+      return false;
+    }
+    const frame = atlas.frames.find((f) => f.id === frameId || f.name === frameId);
+    if (!frame) {
+      this.events.onToast?.('Tile not found in atlas', 'error');
+      return false;
+    }
+
+    const tileDataUrl = this.textureAtlasManager.extractFrameDataUrl(atlasId, frame.id);
+    if (!tileDataUrl) {
+      this.events.onToast?.('Failed to extract tile image', 'error');
+      return false;
+    }
+
+    const tileName = `${atlas.name}_${frame.name}`;
+    const success = this.applyTextureToSelectedMaterial(tileDataUrl, tileName);
+    if (success) {
+      this.events.onToast?.(`Applied tile "${frame.name}" from atlas "${atlas.name}" to material!`, 'success');
+    }
+    return success;
+  }
+
+  /**
+   * Sets an atlas frame as the active paint tile in Voxel Painter.
+   */
+  public useAtlasFrameInVoxelPainter(atlasId: string, frameId: string): void {
+    this.voxelPainter.useTextureAtlas(atlasId);
+    const palId = `atlas_${atlasId}_${frameId}`;
+    if (this.voxelPainter.palette.has(palId)) {
+      this.voxelPainter.currentPaletteId = palId;
+    }
+    this.events.onToast?.(`Selected tile for Voxel Painter`, 'info');
   }
 
   public async optimizeAllTexturesToWebP(quality: number = 0.85, maxResolution: number = 1024): Promise<number> {

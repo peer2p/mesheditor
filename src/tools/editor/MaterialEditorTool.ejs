@@ -1,23 +1,51 @@
 <div id="dialog-material" class="floating-dialog" style="top: 260px; left: 16px; width: 320px">
-          <div class="dialog-header">
-            <span class="dialog-title"><i class="app-icon" data-lucide="palette"></i> Material & UV Mapping</span>
-            <div class="dialog-actions">
-              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
-            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
-              <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
-            </div>
-          </div>
-          <div class="dialog-body" id="gui-material-container"></div>
-          <div class="embedded-textures-section" id="embeddedTexturesSection">
-            <div class="embedded-textures-header">
-              <span class="embedded-textures-title"><i class="app-icon" data-lucide="image"></i> Embedded Textures (<span id="embeddedTexturesCount">0</span>)</span>
-              <div class="embedded-textures-actions">
-                <button class="tool-btn-xs" id="btnEmbedAddTexture" title="Embed texture file"><i class="app-icon" data-lucide="plus"></i> Add</button>
-                <button class="tool-btn-xs" id="btnEmbedLoadAtlas" title="Load Texture Atlas"><i class="app-icon" data-lucide="grid-3x3"></i> Atlas</button>
-              </div>
-            </div>
-            <div class="embedded-textures-gallery" id="embeddedTexturesGallery">
-              <div class="textures-empty-state">No custom textures embedded yet.</div>
-            </div>
-          </div>
+  <div class="dialog-header">
+    <span class="dialog-title"><i class="app-icon" data-lucide="palette"></i> Material & UV Mapping</span>
+    <div class="dialog-actions">
+      <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+      <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+      <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+    </div>
+  </div>
+  <div class="dialog-body" id="gui-material-container"></div>
+  <div class="embedded-textures-section" id="embeddedTexturesSection">
+    <div class="embedded-textures-header">
+      <span class="embedded-textures-title"><i class="app-icon" data-lucide="image"></i> Embedded Textures (<span id="embeddedTexturesCount">0</span>)</span>
+      <div class="embedded-textures-actions">
+        <button class="tool-btn-xs" id="btnEmbedAddTexture" title="Embed texture image file"><i class="app-icon" data-lucide="plus"></i> Add</button>
+        <button class="tool-btn-xs" id="btnEmbedLoadAtlas" title="Load Texture Atlas (Image + JSON/TPS/XML)"><i class="app-icon" data-lucide="grid-3x3"></i> Atlas</button>
+      </div>
+    </div>
+    <div class="embedded-textures-gallery" id="embeddedTexturesGallery">
+      <div class="textures-empty-state">No custom textures embedded yet.</div>
+    </div>
+
+    <!-- Atlas Sub-Texture / Tile Picker Section -->
+    <div class="atlas-tile-picker-section" id="atlasTilePickerSection" style="display: none">
+      <div class="atlas-tile-picker-header">
+        <span class="atlas-tile-picker-title" id="atlasTilePickerTitle">
+          <i class="app-icon" data-lucide="grid-3x3"></i> Atlas Tiles
+        </span>
+        <button class="dialog-btn-xs" id="btnCloseAtlasTilePicker" title="Close Tiles"><i class="app-icon" data-lucide="x"></i></button>
+      </div>
+      <div class="atlas-tile-picker-grid" id="atlasTilePickerGrid">
+        <!-- Dynamically populated tiles -->
+      </div>
+      <div class="atlas-tile-selected-bar" id="atlasTileSelectedBar" style="display: none">
+        <div class="atlas-tile-selected-preview" id="atlasTileSelectedPreview"></div>
+        <div class="atlas-tile-selected-info">
+          <div class="atlas-tile-selected-name" id="atlasTileSelectedName">Tile Name</div>
+          <div class="atlas-tile-selected-dim" id="atlasTileSelectedDim">32x32px</div>
         </div>
+        <div class="atlas-tile-selected-actions">
+          <button class="tool-btn-xs tool-btn-primary" id="btnApplyAtlasTileToMaterial" title="Apply this tile to selected mesh material">
+            <i class="app-icon" data-lucide="check"></i> Apply
+          </button>
+          <button class="tool-btn-xs" id="btnUseAtlasTileInVoxel" title="Use tile in Voxel Painter">
+            <i class="app-icon" data-lucide="paintbrush"></i> Voxel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

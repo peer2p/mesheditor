@@ -103,6 +103,77 @@ describe('Voxel Painter & Texture Atlas Integration Tests', () => {
       expect(atlas.frames[0].id).toBe('tile_0_0');
       expect(atlas.frames[0].name).toBe('Tile (0, 0)');
     });
+
+    it('parses and loads TexturePacker JSON Array and Hash atlas descriptors', async () => {
+      const atlasMgr = new TextureAtlasManager(service.scene);
+      const mockDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+      // 1. TexturePacker JSON Array format
+      const jsonArrayDescriptor = JSON.stringify({
+        frames: [
+          { filename: 'trees/oak.png', frame: { x: 0, y: 0, w: 32, h: 64 } },
+          { filename: 'trees/birch.png', frame: { x: 32, y: 0, w: 32, h: 64 } },
+          { filename: 'trees/pine.png', frame: { x: 64, y: 0, w: 32, h: 64 } },
+        ],
+        meta: {
+          image: 'trees.png',
+          size: { w: 128, h: 128 },
+        },
+      });
+
+      const arrayAtlas = await atlasMgr.createAtlasFromJson('Trees Array Atlas', mockDataUrl, jsonArrayDescriptor);
+      expect(arrayAtlas.frames.length).toBe(3);
+      expect(arrayAtlas.frames[0].name).toBe('trees/oak.png');
+      expect(arrayAtlas.frames[1].name).toBe('trees/birch.png');
+      expect(arrayAtlas.frames[2].name).toBe('trees/pine.png');
+      expect(arrayAtlas.frames[0].pixelRect).toEqual({ x: 0, y: 0, w: 32, h: 64 });
+
+      // 2. TexturePacker JSON Hash format
+      const jsonHashDescriptor = JSON.stringify({
+        frames: {
+          'ground/grass.png': { frame: { x: 0, y: 0, w: 32, h: 32 } },
+          'ground/stone.png': { frame: { x: 32, y: 0, w: 32, h: 32 } },
+        },
+        meta: { image: 'ground.png' },
+      });
+
+      const hashAtlas = await atlasMgr.createAtlasFromJson('Ground Hash Atlas', mockDataUrl, jsonHashDescriptor);
+      expect(hashAtlas.frames.length).toBe(2);
+      expect(hashAtlas.frames.map((f) => f.name)).toContain('ground/grass.png');
+      expect(hashAtlas.frames.map((f) => f.name)).toContain('ground/stone.png');
+    });
+
+    it('parses and loads TexturePacker XML / Starling atlas descriptors', async () => {
+      const atlasMgr = new TextureAtlasManager(service.scene);
+      const mockDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+      const xmlDescriptor = `
+        <TextureAtlas imagePath="dungeon.png" width="256" height="256">
+          <SubTexture name="wall_brick" x="0" y="0" width="32" height="32"/>
+          <SubTexture name="floor_stone" x="32" y="0" width="32" height="32"/>
+          <SubTexture name="wooden_door" x="64" y="0" width="32" height="64"/>
+        </TextureAtlas>
+      `;
+
+      const xmlAtlas = await atlasMgr.createAtlasFromJson('Dungeon XML Atlas', mockDataUrl, xmlDescriptor);
+      expect(xmlAtlas.frames.length).toBe(3);
+      expect(xmlAtlas.frames[0].name).toBe('wall_brick');
+      expect(xmlAtlas.frames[1].name).toBe('floor_stone');
+      expect(xmlAtlas.frames[2].name).toBe('wooden_door');
+      expect(xmlAtlas.frames[2].pixelRect).toEqual({ x: 64, y: 0, w: 32, h: 64 });
+    });
+
+    it('extracts cropped frame image data URL at full native resolution', async () => {
+      const atlasMgr = new TextureAtlasManager(service.scene);
+      const mockDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      const atlas = await atlasMgr.createGridAtlasFromImage('Crops Atlas', mockDataUrl, 2, 2);
+
+      const frameId = atlas.frames[0].id;
+      const frameUrl = atlasMgr.extractFrameDataUrl(atlas.id, frameId);
+      expect(frameUrl).toBeDefined();
+      expect(typeof frameUrl).toBe('string');
+      expect(frameUrl?.startsWith('data:image/')).toBe(true);
+    });
   });
 
   describe('2. Embedded Textures Overview & Material Assignment', () => {
@@ -153,6 +224,65 @@ describe('Voxel Painter & Texture Atlas Integration Tests', () => {
 
       rtt1.dispose();
       rtt2.dispose();
+    });
+
+    it('filters out internal Babylon environment and non-image textures (data:Environment, env, dds)', () => {
+      // Simulate Babylon internal Environment textures
+      const envTex = new Texture('data:Environment', service.scene);
+      envTex.name = 'data:Environment';
+      (envTex as any).url = 'data:application/octet-stream;base64,AAA';
+
+      const list = service.scanSceneTextures();
+      expect(list.some((t) => t.name === 'data:Environment')).toBe(false);
+
+      const embedded = service.getEmbeddedTexturesInfo();
+      expect(embedded.some((t) => t.name.includes('Environment'))).toBe(false);
+
+      envTex.dispose();
+    });
+
+    it('applies an individual atlas frame to selected mesh material', async () => {
+      const mesh = service.createPrimitive(createBoxConfig('BoxForAtlasTile'));
+      service.selectMesh(mesh);
+
+      const mockDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      const jsonDesc = JSON.stringify({
+        frames: [
+          { filename: 'tile_rock.png', frame: { x: 0, y: 0, w: 32, h: 32 } },
+          { filename: 'tile_sand.png', frame: { x: 32, y: 0, w: 32, h: 32 } },
+        ],
+      });
+      const atlas = await service.textureAtlasManager.createAtlasFromJson('Desert Atlas', mockDataUrl, jsonDesc);
+
+      // Apply single frame "tile_rock.png" to material
+      const applied = service.applyAtlasFrameToSelectedMaterial(atlas.id, atlas.frames[0].id);
+      expect(applied).toBe(true);
+
+      const curTex = service.getActiveMaterialTexture();
+      expect(curTex).toBeDefined();
+      expect(curTex?.name).toContain('tile_rock.png');
+    });
+
+    it('imports multi-file image + JSON atlas files and pairs them seamlessly', async () => {
+      const imgBlob = new Blob(['fake_png_data'], { type: 'image/png' });
+      const imgFile = new File([imgBlob], 'trees.png', { type: 'image/png' });
+
+      const jsonContent = JSON.stringify({
+        frames: [
+          { filename: 'leaf.png', frame: { x: 0, y: 0, w: 32, h: 32 } },
+          { filename: 'trunk.png', frame: { x: 32, y: 0, w: 32, h: 32 } },
+        ],
+        meta: { image: 'trees.png' },
+      });
+      const jsonBlob = new Blob([jsonContent], { type: 'application/json' });
+      const jsonFile = new File([jsonBlob], 'trees.json', { type: 'application/json' });
+
+      const atlas = await service.importAtlasFiles([imgFile, jsonFile]);
+      expect(atlas).toBeDefined();
+      expect(atlas.name).toBe('trees.png');
+      expect(atlas.frames.length).toBe(2);
+      expect(atlas.frames[0].name).toBe('leaf.png');
+      expect(atlas.frames[1].name).toBe('trunk.png');
     });
   });
 
@@ -420,6 +550,36 @@ describe('Voxel Painter & Texture Atlas Integration Tests', () => {
       app.renderVoxelPalette();
       const updatedSwatches = paletteGrid?.querySelectorAll('.voxel-palette-swatch');
       expect(updatedSwatches?.length).toBeGreaterThan(swatches!.length);
+
+      app.dispose();
+      container.remove();
+    });
+
+    it('renders atlas tile picker in Material Editor and allows selecting tiles', async () => {
+      const container = document.createElement('div');
+      container.id = 'appRoot';
+      document.body.appendChild(container);
+
+      const app = new MeshEditorApp({
+        container,
+        engine,
+      });
+
+      const atlas = app.service.textureAtlasManager.getAtlases()[0];
+      expect(atlas).toBeDefined();
+
+      app.renderAtlasTilePicker(atlas.id);
+      const section = document.getElementById('atlasTilePickerSection');
+      expect(section?.style.display).toBe('flex');
+
+      const swatches = section?.querySelectorAll('.atlas-tile-picker-swatch');
+      expect(swatches?.length).toBe(atlas.frames.length);
+
+      const selectedBar = document.getElementById('atlasTileSelectedBar');
+      expect(selectedBar?.style.display).toBe('flex');
+
+      const selectedName = document.getElementById('atlasTileSelectedName');
+      expect(selectedName?.textContent).toBe(atlas.frames[0].name);
 
       app.dispose();
       container.remove();

@@ -10,6 +10,7 @@ export interface TextureAtlasFrame {
   uMax: number;
   vMax: number;
   thumbnailDataUrl?: string;
+  pixelRect?: { x: number; y: number; w: number; h: number };
 }
 
 export interface TextureAtlasDefinition {
@@ -23,6 +24,7 @@ export interface TextureAtlasDefinition {
   rows: number;
   tileSize: number;
   frames: TextureAtlasFrame[];
+  sourceCanvas?: HTMLCanvasElement;
 }
 
 export interface EmbeddedTextureInfo {
@@ -35,6 +37,7 @@ export interface EmbeddedTextureInfo {
   atlasId?: string;
   columns?: number;
   rows?: number;
+  framesCount?: number;
   materialsCount: number;
   materialNames: string[];
 }

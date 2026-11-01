@@ -32,14 +32,14 @@
                 <button class="tool-btn-xs" id="btnVoxelAddTexture" title="Add individual texture image from disk"><i class="app-icon" data-lucide="image"></i> Add Image</button>
               </div>
             </div>
-            <input type="file" id="voxelTextureFileInput" accept="image/*" style="display: none" />
+            <input type="file" id="voxelTextureFileInput" accept=".png,.jpg,.jpeg,.webp,image/*" style="display: none" />
 
             <!-- Visual Texture Picker (Scene Textures & Atlases) -->
             <div class="voxel-section">
               <div class="voxel-section-header">
                 <span><i class="app-icon" data-lucide="image"></i> Visual Texture Picker</span>
                 <div class="voxel-section-actions">
-                  <button class="tool-btn-xs" id="btnVoxelLoadAtlas" title="Load Texture Atlas Image"><i class="app-icon" data-lucide="upload"></i> Atlas</button>
+                  <button class="tool-btn-xs" id="btnVoxelLoadAtlas" title="Load Texture Atlas (Image + JSON/TPS/XML)"><i class="app-icon" data-lucide="upload"></i> Atlas</button>
                 </div>
               </div>
               <div class="voxel-texture-gallery" id="voxelTextureGallery">

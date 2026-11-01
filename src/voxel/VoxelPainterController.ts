@@ -259,6 +259,13 @@ export class VoxelPainterController {
     const atlas = this.atlasManager.getAtlas(atlasId);
     if (!atlas) return;
 
+    // Clean previous atlas tiles from palette so only the active atlas's tiles are shown
+    for (const [key, item] of this.palette.entries()) {
+      if (item.atlasId && item.atlasId !== atlas.id) {
+        this.palette.delete(key);
+      }
+    }
+
     for (const frame of atlas.frames) {
       const palId = `atlas_${atlas.id}_${frame.id}`;
       this.palette.set(palId, {
@@ -280,6 +287,18 @@ export class VoxelPainterController {
     this.onPaletteChanged?.(Array.from(this.palette.values()));
     this.renderDirty = true;
     this.updateThinInstances();
+  }
+
+  /**
+   * Returns palette items belonging to the currently active texture atlas,
+   * or all custom items if no atlas is selected.
+   */
+  public getActivePaletteItems(): VoxelPaletteItem[] {
+    const all = Array.from(this.palette.values());
+    if (this.currentAtlasId) {
+      return all.filter((p) => !p.atlasId || p.atlasId === this.currentAtlasId);
+    }
+    return all;
   }
 
   /**

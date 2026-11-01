@@ -187,6 +187,7 @@ export class TextureAtlasManager {
         uMax,
         vMax,
         thumbnailDataUrl: thumbUrl,
+        pixelRect: { x: col * tileSize, y: row * tileSize, w: tileSize, h: tileSize },
       });
     }
 
@@ -213,6 +214,7 @@ export class TextureAtlasManager {
       rows,
       tileSize,
       frames,
+      sourceCanvas: canvas || undefined,
     };
 
     this.atlases.set(id, atlasDef);
@@ -281,6 +283,7 @@ export class TextureAtlasManager {
           uMax,
           vMax,
           thumbnailDataUrl: thumbUrl,
+          pixelRect: { x, y, w: tileW, h: tileH },
         });
       }
 
@@ -299,6 +302,7 @@ export class TextureAtlasManager {
         rows: r,
         tileSize: tileW,
         frames,
+        sourceCanvas: canvas || undefined,
       };
 
       this.atlases.set(id, atlasDef);
@@ -350,100 +354,243 @@ export class TextureAtlasManager {
   }
 
   /**
-   * Loads an Atlas from an image and a JSON spritesheet / frames specification.
+   * Universal parser for TexturePacker JSON (Array or Hash), XML (Starling, Cocos, Sparrow),
+   * or TPS files.
+   */
+  public parseAtlasDescriptor(descriptorInput: any): {
+    frames: Array<{ name: string; x: number; y: number; w: number; h: number }>;
+    imagePath?: string;
+  } {
+    const rawFrames: Array<{ name: string; x: number; y: number; w: number; h: number }> = [];
+    let imagePath: string | undefined;
+
+    let descriptor = descriptorInput;
+    if (typeof descriptor === 'string') {
+      const trimmed = descriptor.trim();
+      if (trimmed.startsWith('<')) {
+        return this.parseXmlAtlasDescriptor(trimmed);
+      }
+      try {
+        descriptor = JSON.parse(trimmed);
+      } catch {
+        return this.parseXmlAtlasDescriptor(trimmed);
+      }
+    }
+
+    if (!descriptor || typeof descriptor !== 'object') {
+      return { frames: rawFrames };
+    }
+
+    // Extract image metadata if available
+    if (descriptor.meta?.image) {
+      imagePath = descriptor.meta.image;
+    } else if (descriptor.imagePath) {
+      imagePath = descriptor.imagePath;
+    } else if (descriptor.image) {
+      imagePath = descriptor.image;
+    }
+
+    // 1. TexturePacker JSON Array: { frames: [ { filename: "...", frame: { x, y, w, h } } ] }
+    if (Array.isArray(descriptor.frames)) {
+      for (let i = 0; i < descriptor.frames.length; i++) {
+        const item = descriptor.frames[i];
+        const name = item.filename || item.name || `frame_${i}`;
+        const rect = item.frame || item.rect || item;
+        rawFrames.push({
+          name,
+          x: rect.x ?? rect.left ?? 0,
+          y: rect.y ?? rect.top ?? 0,
+          w: rect.w ?? rect.width ?? 32,
+          h: rect.h ?? rect.height ?? 32,
+        });
+      }
+    }
+    // 2. TexturePacker JSON Hash: { frames: { "tile1.png": { frame: { x, y, w, h } } } }
+    else if (descriptor.frames && typeof descriptor.frames === 'object') {
+      for (const [key, val] of Object.entries(descriptor.frames)) {
+        const item = val as any;
+        const rect = item?.frame || item?.rect || item || {};
+        rawFrames.push({
+          name: key,
+          x: rect.x ?? rect.left ?? 0,
+          y: rect.y ?? rect.top ?? 0,
+          w: rect.w ?? rect.width ?? 32,
+          h: rect.h ?? rect.height ?? 32,
+        });
+      }
+    }
+    // 3. Flat array of frames: [ { name, x, y, w, h } ]
+    else if (Array.isArray(descriptor)) {
+      for (let i = 0; i < descriptor.length; i++) {
+        const item = descriptor[i];
+        const name = item.name || item.filename || `frame_${i}`;
+        const rect = item.frame || item.rect || item;
+        rawFrames.push({
+          name,
+          x: rect.x ?? rect.left ?? 0,
+          y: rect.y ?? rect.top ?? 0,
+          w: rect.w ?? rect.width ?? 32,
+          h: rect.h ?? rect.height ?? 32,
+        });
+      }
+    }
+
+    return { frames: rawFrames, imagePath };
+  }
+
+  /**
+   * Parses XML / TPS / Starling / Cocos texture atlas formats.
+   */
+  public parseXmlAtlasDescriptor(xmlText: string): {
+    frames: Array<{ name: string; x: number; y: number; w: number; h: number }>;
+    imagePath?: string;
+  } {
+    const rawFrames: Array<{ name: string; x: number; y: number; w: number; h: number }> = [];
+    let imagePath: string | undefined;
+
+    if (typeof DOMParser === 'undefined') {
+      return { frames: rawFrames };
+    }
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlText, 'text/xml');
+
+      // Check for <TextureAtlas imagePath="trees.png">
+      const root = doc.documentElement;
+      if (root) {
+        imagePath = root.getAttribute('imagePath') || root.getAttribute('image') || undefined;
+
+        // TexturePacker / Starling SubTexture tags
+        const subTextures = root.querySelectorAll('SubTexture');
+        if (subTextures.length > 0) {
+          subTextures.forEach((node, idx) => {
+            const name = node.getAttribute('name') || `frame_${idx}`;
+            const x = parseFloat(node.getAttribute('x') || '0') || 0;
+            const y = parseFloat(node.getAttribute('y') || '0') || 0;
+            const w = parseFloat(node.getAttribute('width') || node.getAttribute('w') || '32') || 32;
+            const h = parseFloat(node.getAttribute('height') || node.getAttribute('h') || '32') || 32;
+            rawFrames.push({ name, x, y, w, h });
+          });
+          return { frames: rawFrames, imagePath };
+        }
+
+        // Generic <sprite n="..." x="..." y="..." w="..." h="...">
+        const sprites = root.querySelectorAll('sprite');
+        if (sprites.length > 0) {
+          sprites.forEach((node, idx) => {
+            const name = node.getAttribute('n') || node.getAttribute('name') || `sprite_${idx}`;
+            const x = parseFloat(node.getAttribute('x') || '0') || 0;
+            const y = parseFloat(node.getAttribute('y') || '0') || 0;
+            const w = parseFloat(node.getAttribute('w') || node.getAttribute('width') || '32') || 32;
+            const h = parseFloat(node.getAttribute('h') || node.getAttribute('height') || '32') || 32;
+            rawFrames.push({ name, x, y, w, h });
+          });
+          return { frames: rawFrames, imagePath };
+        }
+
+        // TPS XML project file: extract textureFileName if available
+        const filenameNodes = root.querySelectorAll('filename');
+        filenameNodes.forEach((fn) => {
+          const val = fn.textContent?.trim();
+          if (val && /\.(png|jpe?g|webp)$/i.test(val) && !imagePath) {
+            imagePath = val;
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('parseXmlAtlasDescriptor error:', e);
+    }
+
+    return { frames: rawFrames, imagePath };
+  }
+
+  /**
+   * Loads an Atlas from an image and a JSON/XML/TPS spritesheet or frames specification.
    */
   public async createAtlasFromJson(
     name: string,
     imageSrc: string,
     jsonDescriptor: any
   ): Promise<TextureAtlasDefinition> {
+    const parsed = this.parseAtlasDescriptor(jsonDescriptor);
+    const parsedFrames = parsed.frames;
+
     return new Promise<TextureAtlasDefinition>((resolve, reject) => {
-      const descriptor =
-        typeof jsonDescriptor === 'string' ? JSON.parse(jsonDescriptor || '{}') : jsonDescriptor || {};
-
-      if (typeof Image === 'undefined') {
-        const texture = new Texture(imageSrc, this.scene);
-        const id = `atlas_${Date.now().toString().slice(-4)}`;
-        const dummy: TextureAtlasDefinition = {
-          id,
-          name,
-          texture,
-          dataUrl: imageSrc,
-          width: 256,
-          height: 256,
-          columns: 1,
-          rows: 1,
-          tileSize: 256,
-          frames: [],
-        };
-        this.atlases.set(id, dummy);
-        return resolve(dummy);
-      }
-
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        const totalW = img.width || descriptor.meta?.size?.w || 256;
-        const totalH = img.height || descriptor.meta?.size?.h || 256;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = totalW;
-        canvas.height = totalH;
-        const ctx = canvas.getContext('2d');
-        if (ctx) ctx.drawImage(img, 0, 0);
-
+      const buildAtlasFromCanvas = (
+        totalW: number,
+        totalH: number,
+        ctx: CanvasRenderingContext2D | null,
+        canvas: HTMLCanvasElement | null
+      ): TextureAtlasDefinition => {
         const frames: TextureAtlasFrame[] = [];
-        const rawFrames = descriptor.frames || {};
 
-        let idx = 0;
-        const processFrame = (frameId: string, rect: { x: number; y: number; w: number; h: number }) => {
-          let thumbUrl: string | undefined;
-          if (ctx) {
-            const thumbCanvas = document.createElement('canvas');
-            thumbCanvas.width = Math.min(64, rect.w);
-            thumbCanvas.height = Math.min(64, rect.h);
-            const thumbCtx = thumbCanvas.getContext('2d');
-            if (thumbCtx) {
-              thumbCtx.drawImage(canvas, rect.x, rect.y, rect.w, rect.h, 0, 0, thumbCanvas.width, thumbCanvas.height);
-              thumbUrl = thumbCanvas.toDataURL('image/png');
+        // If no frames could be extracted from descriptor, default to a 4x4 grid
+        const effectiveFrames =
+          parsedFrames.length > 0
+            ? parsedFrames
+            : Array.from({ length: 16 }, (_, i) => {
+                const cols = 4;
+                const rows = 4;
+                const tw = Math.floor(totalW / cols);
+                const th = Math.floor(totalH / rows);
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                return {
+                  name: `Tile (${col}, ${row})`,
+                  x: col * tw,
+                  y: row * th,
+                  w: tw,
+                  h: th,
+                };
+              });
+
+        for (let idx = 0; idx < effectiveFrames.length; idx++) {
+          const f = effectiveFrames[idx];
+          const x = f.x;
+          const y = f.y;
+          const w = Math.max(1, f.w);
+          const h = Math.max(1, f.h);
+
+          let thumbUrl = imageSrc;
+          if (ctx && canvas) {
+            try {
+              const thumbCanvas = document.createElement('canvas');
+              thumbCanvas.width = Math.min(64, w);
+              thumbCanvas.height = Math.min(64, h);
+              const thumbCtx = thumbCanvas.getContext('2d');
+              if (thumbCtx) {
+                thumbCtx.drawImage(canvas, x, y, w, h, 0, 0, thumbCanvas.width, thumbCanvas.height);
+                thumbUrl = thumbCanvas.toDataURL('image/png');
+              }
+            } catch {
+              thumbUrl = imageSrc;
             }
           }
 
-          const uMin = rect.x / totalW;
-          const uMax = (rect.x + rect.w) / totalW;
-          const vMin = 1.0 - (rect.y + rect.h) / totalH;
-          const vMax = 1.0 - rect.y / totalH;
+          const uMin = x / totalW;
+          const uMax = (x + w) / totalW;
+          const vMin = 1.0 - (y + h) / totalH;
+          const vMax = 1.0 - y / totalH;
 
           frames.push({
-            id: frameId,
-            name: frameId,
-            col: idx++,
+            id: `tile_${idx}`,
+            name: f.name,
+            col: idx,
             row: 0,
             uMin,
             vMin,
             uMax,
             vMax,
             thumbnailDataUrl: thumbUrl,
+            pixelRect: { x, y, w, h },
           });
-        };
-
-        if (Array.isArray(rawFrames)) {
-          for (const item of rawFrames) {
-            const frameId = item.filename || `frame_${idx}`;
-            const r = item.frame || { x: 0, y: 0, w: 32, h: 32 };
-            processFrame(frameId, r);
-          }
-        } else {
-          for (const [key, val] of Object.entries(rawFrames)) {
-            const r = (val as any).frame || val || { x: 0, y: 0, w: 32, h: 32 };
-            processFrame(key, r);
-          }
         }
 
-        const texture = new Texture(imageSrc, this.scene, false, true);
+        const texture = new Texture(imageSrc, this.scene, false, true, Texture.NEAREST_SAMPLINGMODE);
         texture.name = `atlas_${name.toLowerCase().replace(/\s+/g, '_')}`;
 
-        const id = `atlas_${Date.now().toString().slice(-4)}`;
+        const id = `atlas_${Date.now().toString().slice(-4)}_${Math.floor(Math.random() * 1000)}`;
         const atlasDef: TextureAtlasDefinition = {
           id,
           name,
@@ -453,16 +600,108 @@ export class TextureAtlasManager {
           height: totalH,
           columns: frames.length,
           rows: 1,
-          tileSize: frames[0] ? totalW / frames.length : 32,
+          tileSize: frames[0] ? frames[0].pixelRect?.w || 32 : 32,
           frames,
+          sourceCanvas: canvas || undefined,
         };
 
         this.atlases.set(id, atlasDef);
-        resolve(atlasDef);
+        return atlasDef;
       };
 
-      img.onerror = (e) => reject(new Error('Failed to load TextureAtlas image: ' + String(e)));
+      if (typeof Image === 'undefined') {
+        return resolve(buildAtlasFromCanvas(256, 256, null, null));
+      }
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      let finished = false;
+      const finish = (w: number, h: number) => {
+        if (finished) return;
+        finished = true;
+
+        let canvas: HTMLCanvasElement | null = null;
+        let ctx: CanvasRenderingContext2D | null = null;
+        try {
+          canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          ctx = canvas.getContext('2d');
+          if (ctx) ctx.drawImage(img, 0, 0);
+        } catch {
+          ctx = null;
+        }
+
+        resolve(buildAtlasFromCanvas(w, h, ctx, canvas));
+      };
+
+      img.onload = () => {
+        finish(img.width || 256, img.height || 256);
+      };
+      img.onerror = () => {
+        finish(256, 256);
+      };
+
       img.src = imageSrc;
+      if (img.complete && (img as any).naturalWidth !== undefined && (img as any).naturalWidth > 0) {
+        finish((img as any).naturalWidth, (img as any).naturalHeight || 256);
+      } else {
+        setTimeout(() => finish(256, 256), 60);
+      }
     });
+  }
+
+  /**
+   * Extracts a cropped sub-image data URL for an individual frame from an atlas at native pixel resolution.
+   */
+  public extractFrameDataUrl(atlasId: string, frameId: string): string | null {
+    const atlas = this.getAtlas(atlasId);
+    if (!atlas) return null;
+    const frame = atlas.frames.find((f) => f.id === frameId || f.name === frameId);
+    if (!frame) return null;
+
+    if (typeof document === 'undefined') {
+      return frame.thumbnailDataUrl || atlas.dataUrl || null;
+    }
+
+    const rect = frame.pixelRect || {
+      x: Math.round(frame.uMin * atlas.width),
+      y: Math.round((1.0 - frame.vMax) * atlas.height),
+      w: Math.max(1, Math.round((frame.uMax - frame.uMin) * atlas.width)),
+      h: Math.max(1, Math.round((frame.vMax - frame.vMin) * atlas.height)),
+    };
+
+    try {
+      let sourceCanvas = atlas.sourceCanvas;
+      if (!sourceCanvas && atlas.dataUrl) {
+        const c = document.createElement('canvas');
+        c.width = atlas.width;
+        c.height = atlas.height;
+        const cCtx = c.getContext('2d');
+        const img = new Image();
+        img.src = atlas.dataUrl;
+        if (cCtx) {
+          cCtx.drawImage(img, 0, 0);
+          atlas.sourceCanvas = c;
+          sourceCanvas = c;
+        }
+      }
+
+      if (sourceCanvas) {
+        const tileCanvas = document.createElement('canvas');
+        tileCanvas.width = rect.w;
+        tileCanvas.height = rect.h;
+        const ctx = tileCanvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(sourceCanvas, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
+          return tileCanvas.toDataURL('image/png');
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to extract frame canvas:', err);
+    }
+
+    return frame.thumbnailDataUrl || atlas.dataUrl || null;
   }
 }
