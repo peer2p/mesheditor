@@ -73,7 +73,12 @@ win:
     - target: portable
       arch:
         - x64
-  artifactName: "MeshEditor-${version}-win-${arch}-${target}.${ext}"
+
+nsis:
+  artifactName: "MeshEditor-${version}-win-${arch}-nsis.${ext}"
+
+portable:
+  artifactName: "MeshEditor-${version}-win-${arch}-portable.${ext}"
 
 linux:
   category: Graphics
