@@ -3586,17 +3586,254 @@ progress.loading-spinner:indeterminate {
   color: var(--danger-color);
 }
 
+/* =========================================================================
+   COMMON REUSABLE TOOL GUI STYLES & CONTROLS
+   ========================================================================= */
+
+/* Unified Dark Select Styling for ALL tool GUIs and dialogs */
+.tool-select,
+.form-select,
 .path-extrusion-select,
-.pathway-select {
-  flex: 1;
-  background: #21262d;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: var(--text-primary);
-  border-radius: 4px;
-  padding: 5px 8px;
-  font-size: 11px;
+.pathway-select,
+.ai-select,
+.pes-select,
+.floating-dialog select,
+.dialog-body select,
+.dialog-body .dg select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  color-scheme: dark !important;
+  background-color: #21262d !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 8px center !important;
+  background-size: 12px 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 4px !important;
+  color: var(--text-primary, #f0f6fc) !important;
+  font-size: 11px !important;
+  padding: 5px 26px 5px 8px !important;
+  height: 28px !important;
+  line-height: 1.4 !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+  outline: none !important;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease !important;
 }
 
+.tool-select:hover,
+.form-select:hover,
+.path-extrusion-select:hover,
+.pathway-select:hover,
+.ai-select:hover,
+.pes-select:hover,
+.floating-dialog select:hover,
+.dialog-body select:hover,
+.dialog-body .dg select:hover {
+  background-color: #282e37 !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c9d1d9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+.tool-select:focus,
+.form-select:focus,
+.path-extrusion-select:focus,
+.pathway-select:focus,
+.ai-select:focus,
+.pes-select:focus,
+.floating-dialog select:focus,
+.dialog-body select:focus,
+.dialog-body .dg select:focus {
+  background-color: #1c2128 !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2358a6ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  border-color: var(--accent-color, #58a6ff) !important;
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.25) !important;
+}
+
+.tool-select:disabled,
+.form-select:disabled,
+.path-extrusion-select:disabled,
+.pathway-select:disabled,
+.ai-select:disabled,
+.pes-select:disabled,
+.floating-dialog select:disabled,
+.dialog-body select:disabled,
+.dialog-body .dg select:disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  background-color: #161b22 !important;
+}
+
+/* Dropdown Option List Styling */
+.tool-select option,
+.form-select option,
+.path-extrusion-select option,
+.pathway-select option,
+.ai-select option,
+.pes-select option,
+.floating-dialog select option,
+.dialog-body select option,
+.dialog-body .dg select option {
+  background-color: #161b22 !important;
+  color: #f0f6fc !important;
+  padding: 6px 10px !important;
+}
+
+/* Unified Tool GUI Inputs */
+.tool-input,
+.form-input {
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-primary, #f0f6fc);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  height: 28px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.tool-input:focus,
+.form-input:focus {
+  border-color: var(--accent-color, #58a6ff);
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
+}
+
+.tool-input-sm,
+.tool-number,
+.form-input-sm,
+.path-extrusion-number,
+.pathway-number {
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-primary, #f0f6fc);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 11px;
+  height: 24px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.tool-input-sm:focus,
+.tool-number:focus,
+.form-input-sm:focus,
+.path-extrusion-number:focus,
+.pathway-number:focus {
+  border-color: var(--accent-color, #58a6ff);
+}
+
+/* Tool GUI Layouts */
+.tool-control-group,
+.path-extrusion-control-group,
+.pathway-control-group,
+.ai-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tool-row,
+.path-extrusion-row,
+.pathway-row,
+.ai-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tool-label,
+.path-extrusion-label,
+.pathway-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #8b949e);
+}
+
+.tool-sublabel,
+.path-extrusion-sublabel,
+.pathway-sublabel {
+  font-size: 10px;
+  color: var(--text-muted, #8b949e);
+}
+
+/* Tool Action Buttons */
+.tool-action-btn,
+.btn-action-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: #21262d;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  color: #f0f6fc;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.tool-action-btn:hover,
+.btn-action-sm:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.tool-action-btn:active,
+.btn-action-sm:active {
+  transform: translateY(1px);
+}
+
+.tool-action-btn.btn-danger,
+.btn-action-sm.btn-danger {
+  color: #f85149;
+}
+
+.tool-action-btn.btn-danger:hover,
+.btn-action-sm.btn-danger:hover {
+  background: rgba(248, 81, 73, 0.2);
+  border-color: var(--danger-color, #f85149);
+  color: var(--danger-color, #f85149);
+}
+
+/* Tool Help & Info Callouts */
+.tool-help-box,
+.path-extrusion-help-box,
+.pathway-help-box {
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-secondary, #8b949e);
+}
+
+.tool-help-title,
+.path-extrusion-help-title,
+.pathway-help-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: #38bdf8;
+  margin-bottom: 4px;
+}
+
+.tool-help-text,
+.path-extrusion-help-text,
+.pathway-help-text {
+  line-height: 1.4;
+  font-size: 10px;
+}
+
+/* Tool Grid Containers */
+.tool-grid-2,
 .path-extrusion-grid-2,
 .pathway-grid-2 {
   display: grid;
@@ -3613,17 +3850,6 @@ progress.loading-spinner:indeterminate {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.path-extrusion-number,
-.pathway-number {
-  background: #161b22;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: var(--text-primary);
-  border-radius: 4px;
-  padding: 4px 6px;
-  font-size: 11px;
-  width: 100%;
 }
 
 .path-extrusion-color-row,
@@ -3650,32 +3876,8 @@ progress.loading-spinner:indeterminate {
   font-family: monospace;
 }
 
-.path-extrusion-help-box,
-.pathway-help-box {
-  background: rgba(56, 189, 248, 0.08);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  border-radius: 6px;
-  padding: 8px;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.path-extrusion-help-title,
-.pathway-help-title {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 600;
-  color: #38bdf8;
-  margin-bottom: 4px;
-}
-
-.path-extrusion-help-text,
-.pathway-help-text {
-  line-height: 1.4;
-  font-size: 10px;
-}
-
+/* Tool Action Rows */
+.tool-actions-row,
 .path-extrusion-actions,
 .pathway-actions {
   display: grid;
@@ -3683,6 +3885,7 @@ progress.loading-spinner:indeterminate {
   gap: 6px;
 }
 
+.tool-btn-primary,
 .btn-path-extrusion-bake,
 .btn-pathway-bake {
   display: flex;
@@ -3701,6 +3904,7 @@ progress.loading-spinner:indeterminate {
   transition: background 0.15s ease;
 }
 
+.tool-btn-primary:hover,
 .btn-path-extrusion-bake:hover,
 .btn-pathway-bake:hover {
   background: #1d4ed8;

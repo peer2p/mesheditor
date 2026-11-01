@@ -103,4 +103,18 @@ When adding or modifying an editor tool:
    - Run `npm run sync:templates` (or `npm run build` / `npm test`), which automatically synchronizes `src/tools/editor/toolViews.ts` and `src/template.ts`.
    - If the dialog is not present in the DOM (e.g. custom container or dynamic plugin tool), `MeshEditorApp.toggleDialog` automatically mounts it via `tool.renderView()`.
 
+7. **Unified Tool GUI CSS & Shared Component Classes**:
+   All tool floating dialogs and tool views must use the unified dark theme styling in `src/mesheditor.css`.
+   - **Selects**: All `<select>` elements inside floating dialogs (`.floating-dialog select`, `.tool-select`, `.path-extrusion-select`) are automatically styled with dark backgrounds (`#21262d`), custom SVG chevron carets (`color-scheme: dark`), and no native OS styling (`appearance: none !important`). Use the `.tool-select` class on any `<select>` to ensure consistent dark appearance and dropdown arrows.
+   - **Shared Layout & Input Classes**:
+     - `.tool-control-group`: Group container with vertical spacing (`margin-bottom: 10px`).
+     - `.tool-row`: Horizontal flex container (`display: flex; gap: 8px; align-items: center; justify-content: space-between`).
+     - `.tool-label`: Clean label styling (`font-size: 11px; font-weight: 500; color: #8b949e; text-transform: uppercase`).
+     - `.tool-sublabel`: Muted secondary description text (`font-size: 10px; color: #8b949e`).
+     - `.tool-input`, `.tool-number`: Uniform dark text/number inputs matching `.tool-select`.
+     - `.tool-action-btn`: Standard tool buttons (`background: #21262d; border: 1px solid rgba(255, 255, 255, 0.14)`).
+     - `.tool-btn-primary`: Accent action button (`background: #238636` or theme accent).
+     - `.tool-help-box`: In-dialog informational callout box with border and muted text.
+
+
 
