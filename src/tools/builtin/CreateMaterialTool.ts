@@ -18,6 +18,9 @@ export class CreateMaterialTool extends AbstractTool {
       metallic: { type: 'number', description: '0.0 (dielectric/wood/stone) to 1.0 (pure metal).' },
       alpha: { type: 'number', description: 'Opacity 0.0 to 1.0 (default 1.0).' },
       wireframe: { type: 'boolean' },
+      bumpLevel: { type: 'number', description: 'Bump / normal map intensity (0.0 to 5.0, default 1.0).' },
+      invertNormalMapX: { type: 'boolean', description: 'Invert normal map X axis.' },
+      invertNormalMapY: { type: 'boolean', description: 'Invert normal map Y axis (DirectX standard).' },
       proceduralTexture: {
         type: 'object',
         description: 'Optional generated procedural surface texture.',
@@ -61,6 +64,15 @@ export class CreateMaterialTool extends AbstractTool {
     }
     if (args.wireframe !== undefined) {
       mat.wireframe = !!args.wireframe;
+    }
+    if (args.bumpLevel !== undefined && mat.bumpTexture) {
+      mat.bumpTexture.level = Number(args.bumpLevel);
+    }
+    if (args.invertNormalMapX !== undefined) {
+      mat.invertNormalMapX = !!args.invertNormalMapX;
+    }
+    if (args.invertNormalMapY !== undefined) {
+      mat.invertNormalMapY = !!args.invertNormalMapY;
     }
     mat.backFaceCulling = false;
 

@@ -241,6 +241,22 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
     return true;
   }
 
+  public async openBumpTextureDialog(app: MeshEditorApp): Promise<boolean> {
+    if (!this.bridge) return false;
+    const payloads = await this.bridge.openFilesDialog({
+      title: 'Select Bump / Normal Map Image',
+      multiSelections: false,
+      extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'dds'],
+    });
+    if (!payloads) return true;
+    if (payloads.length > 0) {
+      const files = this.payloadsToFiles(payloads);
+      app.service.applyBumpTextureToSelectedMaterial(files[0]);
+      (app as any).updateMaterialGUI?.();
+    }
+    return true;
+  }
+
   public async saveExportedModel(
     blob: Blob,
     filename: string,

@@ -81,6 +81,12 @@ export interface MeshEditorPlatformAdapter {
   openTextureDialog?(app: MeshEditorApp): Promise<boolean>;
 
   /**
+   * Optional custom handler for "Load Bump Map...".
+   * Return `true` if the adapter handled the bump texture dialog, or `false` to fall back to the browser file input.
+   */
+  openBumpTextureDialog?(app: MeshEditorApp): Promise<boolean>;
+
+  /**
    * Optional custom handler for saving/exporting a 3D model.
    * Return `true` if the adapter handled saving (e.g., native OS save dialog or host app callback),
    * or `false` to fall back to standard browser download.

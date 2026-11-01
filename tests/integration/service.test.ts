@@ -500,6 +500,50 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
       expect(info.mode).toBe(3);
       expect(info.alphaCutOff).toBe(0.4);
     });
+
+    it('supports bump and normal mapping with intensity level and axis inversion', () => {
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box' }));
+      service.selectMesh(box);
+      const mat = service.createNewMaterialForSelected('BumpMat');
+      expect(mat).toBeDefined();
+
+      const dummyNormalDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=';
+      const applied = service.applyBumpTextureToSelectedMaterial(dummyNormalDataUrl, 'stone_normal.png');
+      expect(applied).toBe(true);
+
+      let bumpInfo = service.getMaterialBumpInfo();
+      expect(bumpInfo.hasBump).toBe(true);
+      expect(bumpInfo.name).toBe('stone_normal.png');
+      expect(bumpInfo.level).toBe(1.0);
+      expect(bumpInfo.invertX).toBe(false);
+      expect(bumpInfo.invertY).toBe(false);
+
+      service.setBumpLevel(2.5);
+      service.setInvertNormalMapX(true);
+      service.setInvertNormalMapY(true);
+
+      bumpInfo = service.getMaterialBumpInfo();
+      expect(bumpInfo.level).toBe(2.5);
+      expect(bumpInfo.invertX).toBe(true);
+      expect(bumpInfo.invertY).toBe(true);
+
+      const removed = service.removeBumpTextureFromSelectedMaterial();
+      expect(removed).toBe(true);
+      expect(service.getMaterialBumpInfo().hasBump).toBe(false);
+    });
+
+    it('automatically recognizes dropped normal/bump map textures and assigns them to bumpTexture', async () => {
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box' }));
+      service.selectMesh(box);
+      service.createNewMaterialForSelected('WallMat');
+
+      const normalFile = new File(['fake normal bytes'], 'WallMat_normal.png', { type: 'image/png' });
+      await service.applyDroppedTextures([normalFile]);
+
+      const bumpInfo = service.getMaterialBumpInfo();
+      expect(bumpInfo.hasBump).toBe(true);
+      expect(bumpInfo.name).toBe('WallMat_normal.png');
+    });
   });
 
   describe('9. Camera Focus & Reset', () => {

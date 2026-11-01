@@ -3965,6 +3965,109 @@ export class MeshEditorService {
     return true;
   }
 
+  public applyBumpTextureToSelectedMaterial(fileOrUrl: File | string, name?: string): boolean {
+    let selMat = this.getSelectedMaterial();
+    if (!selMat && this.selectedMesh) {
+      selMat = this.createNewMaterialForSelected();
+    }
+    if (!selMat) {
+      this.events.onToast?.('Please select a mesh first', 'warning');
+      return false;
+    }
+
+    let url: string;
+    let texName = name;
+    if (fileOrUrl instanceof File) {
+      url = URL.createObjectURL(fileOrUrl);
+      this.objectUrls.add(url);
+      if (!texName) texName = fileOrUrl.name;
+      this.registerDroppedFiles([fileOrUrl]);
+    } else {
+      url = fileOrUrl;
+    }
+
+    const tex = new Texture(url, this.scene, false, false, Texture.NEAREST_SAMPLINGMODE);
+    if (texName) tex.name = texName;
+
+    const baseTex = this.getActiveMaterialTexture();
+    if (baseTex) {
+      tex.uOffset = baseTex.uOffset;
+      tex.vOffset = baseTex.vOffset;
+      tex.uScale = baseTex.uScale;
+      tex.vScale = baseTex.vScale;
+      tex.wAng = baseTex.wAng;
+      tex.wrapU = baseTex.wrapU;
+      tex.wrapV = baseTex.wrapV;
+    }
+
+    if (selMat instanceof PBRMaterial || selMat instanceof StandardMaterial) {
+      selMat.bumpTexture = tex;
+      tex.level = 1.0;
+    }
+
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Applied bump/normal map to material "${selMat.name}"`, 'success');
+    return true;
+  }
+
+  public removeBumpTextureFromSelectedMaterial(): boolean {
+    const selMat = this.getSelectedMaterial();
+    if (!selMat) return false;
+    if (selMat instanceof PBRMaterial || selMat instanceof StandardMaterial) {
+      selMat.bumpTexture = null;
+      this.events.onSceneModified?.();
+      this.events.onToast?.(`Removed bump map from material "${selMat.name}"`, 'info');
+      return true;
+    }
+    return false;
+  }
+
+  public setBumpLevel(level: number): void {
+    const selMat = this.getSelectedMaterial();
+    if (!selMat) return;
+    if ((selMat instanceof PBRMaterial || selMat instanceof StandardMaterial) && selMat.bumpTexture) {
+      selMat.bumpTexture.level = level;
+      this.events.onSceneModified?.();
+    }
+  }
+
+  public setInvertNormalMapX(invert: boolean): void {
+    const selMat = this.getSelectedMaterial();
+    if (!selMat) return;
+    if (selMat instanceof PBRMaterial || selMat instanceof StandardMaterial) {
+      selMat.invertNormalMapX = invert;
+      this.events.onSceneModified?.();
+    }
+  }
+
+  public setInvertNormalMapY(invert: boolean): void {
+    const selMat = this.getSelectedMaterial();
+    if (!selMat) return;
+    if (selMat instanceof PBRMaterial || selMat instanceof StandardMaterial) {
+      selMat.invertNormalMapY = invert;
+      this.events.onSceneModified?.();
+    }
+  }
+
+  public getMaterialBumpInfo(): {
+    hasBump: boolean;
+    name: string;
+    level: number;
+    invertX: boolean;
+    invertY: boolean;
+  } {
+    const selMat = this.getSelectedMaterial();
+    if (!selMat || !(selMat instanceof PBRMaterial || selMat instanceof StandardMaterial)) {
+      return { hasBump: false, name: 'None', level: 1.0, invertX: false, invertY: false };
+    }
+    const hasBump = !!selMat.bumpTexture;
+    const name = selMat.bumpTexture?.name || 'None';
+    const level = selMat.bumpTexture?.level ?? 1.0;
+    const invertX = !!selMat.invertNormalMapX;
+    const invertY = !!selMat.invertNormalMapY;
+    return { hasBump, name, level, invertX, invertY };
+  }
+
   public setTextureAlpha(enabled: boolean): void {
     const mat = this.getSelectedMaterial();
     if (!mat) return;
@@ -4159,11 +4262,26 @@ export class MeshEditorService {
       const lowerFileName = file.name.toLowerCase();
       const baseNameWithoutExt = lowerFileName.substring(0, lowerFileName.lastIndexOf('.')) || lowerFileName;
 
+      const isBumpMap =
+        lowerFileName.includes('normal') ||
+        lowerFileName.includes('bump') ||
+        lowerFileName.includes('_norm') ||
+        lowerFileName.includes('_nrm') ||
+        baseNameWithoutExt.endsWith('_n') ||
+        baseNameWithoutExt.endsWith('-n');
+
+      const cleanBumpBase = isBumpMap
+        ? baseNameWithoutExt
+            .replace(/[_\-.](normal|bump|norm|nrm|n)$/i, '')
+            .replace(/^(normal|bump)[_\-.]/i, '')
+        : baseNameWithoutExt;
+
       const isPotentiallyTransparent =
-        lowerFileName.endsWith('.png') ||
-        lowerFileName.endsWith('.webp') ||
-        lowerFileName.endsWith('.gif') ||
-        lowerFileName.endsWith('.svg');
+        !isBumpMap &&
+        (lowerFileName.endsWith('.png') ||
+          lowerFileName.endsWith('.webp') ||
+          lowerFileName.endsWith('.gif') ||
+          lowerFileName.endsWith('.svg'));
 
       if (isPotentiallyTransparent) {
         tex.hasAlpha = true;
@@ -4179,26 +4297,54 @@ export class MeshEditorService {
         const matNameLower = mat.name.toLowerCase();
         let matches = false;
 
-        if (matNameLower === baseNameWithoutExt || matNameLower === lowerFileName) {
+        if (
+          matNameLower === baseNameWithoutExt ||
+          matNameLower === lowerFileName ||
+          (isBumpMap && cleanBumpBase && matNameLower === cleanBumpBase)
+        ) {
           matches = true;
         }
 
         if (!matches) {
           if (mat instanceof PBRMaterial && mat.albedoTexture) {
             const curTexName = (mat.albedoTexture.name || '').toLowerCase();
-            if (curTexName.includes(lowerFileName) || curTexName.includes(baseNameWithoutExt)) {
+            if (
+              curTexName.includes(lowerFileName) ||
+              curTexName.includes(baseNameWithoutExt) ||
+              (isBumpMap && cleanBumpBase && curTexName.includes(cleanBumpBase))
+            ) {
               matches = true;
             }
           } else if (mat instanceof StandardMaterial && mat.diffuseTexture) {
             const curTexName = (mat.diffuseTexture.name || '').toLowerCase();
-            if (curTexName.includes(lowerFileName) || curTexName.includes(baseNameWithoutExt)) {
+            if (
+              curTexName.includes(lowerFileName) ||
+              curTexName.includes(baseNameWithoutExt) ||
+              (isBumpMap && cleanBumpBase && curTexName.includes(cleanBumpBase))
+            ) {
               matches = true;
             }
           }
         }
 
         if (matches) {
-          if (mat instanceof PBRMaterial) {
+          if (isBumpMap) {
+            if (mat instanceof PBRMaterial || mat instanceof StandardMaterial) {
+              mat.bumpTexture = tex;
+              tex.level = 1.0;
+              const baseTex = mat instanceof PBRMaterial ? mat.albedoTexture : mat.diffuseTexture;
+              if (baseTex instanceof Texture) {
+                tex.uOffset = baseTex.uOffset;
+                tex.vOffset = baseTex.vOffset;
+                tex.uScale = baseTex.uScale;
+                tex.vScale = baseTex.vScale;
+                tex.wAng = baseTex.wAng;
+                tex.wrapU = baseTex.wrapU;
+                tex.wrapV = baseTex.wrapV;
+              }
+              fileAppliedCount++;
+            }
+          } else if (mat instanceof PBRMaterial) {
             mat.albedoTexture = tex;
             if (isPotentiallyTransparent) {
               mat.useAlphaFromAlbedoTexture = true;
@@ -4211,12 +4357,30 @@ export class MeshEditorService {
               }
               mat.backFaceCulling = false;
             }
+            if (mat.bumpTexture instanceof Texture) {
+              mat.bumpTexture.uOffset = tex.uOffset;
+              mat.bumpTexture.vOffset = tex.vOffset;
+              mat.bumpTexture.uScale = tex.uScale;
+              mat.bumpTexture.vScale = tex.vScale;
+              mat.bumpTexture.wAng = tex.wAng;
+              mat.bumpTexture.wrapU = tex.wrapU;
+              mat.bumpTexture.wrapV = tex.wrapV;
+            }
             fileAppliedCount++;
           } else if (mat instanceof StandardMaterial) {
             mat.diffuseTexture = tex;
             if (isPotentiallyTransparent) {
               mat.useAlphaFromDiffuseTexture = true;
               mat.backFaceCulling = false;
+            }
+            if (mat.bumpTexture instanceof Texture) {
+              mat.bumpTexture.uOffset = tex.uOffset;
+              mat.bumpTexture.vOffset = tex.vOffset;
+              mat.bumpTexture.uScale = tex.uScale;
+              mat.bumpTexture.vScale = tex.vScale;
+              mat.bumpTexture.wAng = tex.wAng;
+              mat.bumpTexture.wrapU = tex.wrapU;
+              mat.bumpTexture.wrapV = tex.wrapV;
             }
             fileAppliedCount++;
           }
@@ -4226,7 +4390,23 @@ export class MeshEditorService {
       // 2. If no name match was found and a mesh is selected, apply to selected mesh
       if (fileAppliedCount === 0 && this.getSelectedMaterial()) {
         const selMat = this.getSelectedMaterial();
-        if (selMat instanceof PBRMaterial) {
+        if (isBumpMap) {
+          if (selMat instanceof PBRMaterial || selMat instanceof StandardMaterial) {
+            selMat.bumpTexture = tex;
+            tex.level = 1.0;
+            const baseTex = selMat instanceof PBRMaterial ? selMat.albedoTexture : selMat.diffuseTexture;
+            if (baseTex instanceof Texture) {
+              tex.uOffset = baseTex.uOffset;
+              tex.vOffset = baseTex.vOffset;
+              tex.uScale = baseTex.uScale;
+              tex.vScale = baseTex.vScale;
+              tex.wAng = baseTex.wAng;
+              tex.wrapU = baseTex.wrapU;
+              tex.wrapV = baseTex.wrapV;
+            }
+            fileAppliedCount++;
+          }
+        } else if (selMat instanceof PBRMaterial) {
           selMat.albedoTexture = tex;
           if (isPotentiallyTransparent) {
             selMat.useAlphaFromAlbedoTexture = true;
@@ -4239,12 +4419,30 @@ export class MeshEditorService {
             }
             selMat.backFaceCulling = false;
           }
+          if (selMat.bumpTexture instanceof Texture) {
+            selMat.bumpTexture.uOffset = tex.uOffset;
+            selMat.bumpTexture.vOffset = tex.vOffset;
+            selMat.bumpTexture.uScale = tex.uScale;
+            selMat.bumpTexture.vScale = tex.vScale;
+            selMat.bumpTexture.wAng = tex.wAng;
+            selMat.bumpTexture.wrapU = tex.wrapU;
+            selMat.bumpTexture.wrapV = tex.wrapV;
+          }
           fileAppliedCount++;
         } else if (selMat instanceof StandardMaterial) {
           selMat.diffuseTexture = tex;
           if (isPotentiallyTransparent) {
             selMat.useAlphaFromDiffuseTexture = true;
             selMat.backFaceCulling = false;
+          }
+          if (selMat.bumpTexture instanceof Texture) {
+            selMat.bumpTexture.uOffset = tex.uOffset;
+            selMat.bumpTexture.vOffset = tex.vOffset;
+            selMat.bumpTexture.uScale = tex.uScale;
+            selMat.bumpTexture.vScale = tex.vScale;
+            selMat.bumpTexture.wAng = tex.wAng;
+            selMat.bumpTexture.wrapU = tex.wrapU;
+            selMat.bumpTexture.wrapV = tex.wrapV;
           }
           fileAppliedCount++;
         }
@@ -4255,7 +4453,13 @@ export class MeshEditorService {
         for (const mesh of this.importedMeshes) {
           const mat = mesh.material;
           if (!mat || mat.name === 'gridMat' || mat.name.startsWith('editor_')) continue;
-          if (mat instanceof PBRMaterial) {
+          if (isBumpMap) {
+            if (mat instanceof PBRMaterial || mat instanceof StandardMaterial) {
+              mat.bumpTexture = tex;
+              tex.level = 1.0;
+              fileAppliedCount++;
+            }
+          } else if (mat instanceof PBRMaterial) {
             mat.albedoTexture = tex;
             if (isPotentiallyTransparent) {
               mat.useAlphaFromAlbedoTexture = true;

@@ -257,6 +257,7 @@ export class MeshEditorApp {
   private modelFileInput: HTMLInputElement;
   private importFileInput: HTMLInputElement;
   private textureFileInput: HTMLInputElement;
+  private bumpFileInput: HTMLInputElement;
 
   // dat.GUI instances
   private guiScene!: dat.GUI;
@@ -365,6 +366,15 @@ export class MeshEditorApp {
     transparencyMode: 'Alpha Test & Blend',
     twoSided: true,
     alphaCutOff: 0.5,
+    bumpInfo: 'None',
+    bumpLevel: 1.0,
+    invertNormalMapX: false,
+    invertNormalMapY: false,
+    loadBumpTexture: () => this.triggerReplaceBumpTexture(),
+    removeBumpTexture: () => {
+      this.service.removeBumpTextureFromSelectedMaterial();
+      this.updateMaterialGUI();
+    },
     replaceTexture: () => this.triggerReplaceTexture(),
     newMaterial: () => this.service.createNewMaterialForSelected(),
   };
@@ -518,6 +528,7 @@ export class MeshEditorApp {
     this.modelFileInput = this.getElement<HTMLInputElement>('modelFileInput')!;
     this.importFileInput = this.getElement<HTMLInputElement>('importFileInput')!;
     this.textureFileInput = this.getElement<HTMLInputElement>('textureFileInput')!;
+    this.bumpFileInput = this.getElement<HTMLInputElement>('bumpFileInput')!;
 
     this.startupLoaderElement = this.getElement<HTMLElement>('appStartupLoader');
     this.startupLoaderText = this.getElement<HTMLElement>('startupLoaderText');
@@ -684,6 +695,14 @@ export class MeshEditorApp {
       if (handled) return;
     }
     this.textureFileInput?.click();
+  }
+
+  public async triggerReplaceBumpTexture(): Promise<void> {
+    if (this.adapter.openBumpTextureDialog) {
+      const handled = await this.adapter.openBumpTextureDialog(this);
+      if (handled) return;
+    }
+    this.bumpFileInput?.click();
   }
 
   public dispose(): void {
@@ -2140,6 +2159,30 @@ export class MeshEditorApp {
     this.guiMaterial.add(this.materialParams, 'replaceTexture').name('Replace Texture...');
     this.guiMaterial.add(this.materialParams, 'newMaterial').name('New PBR Material');
 
+    const fBump = this.guiMaterial.addFolder('Bump & Normal Map');
+    this.materialControllers['bumpInfo'] = fBump.add(this.materialParams, 'bumpInfo').name('Map').listen();
+    this.materialControllers['bumpLevel'] = fBump
+      .add(this.materialParams, 'bumpLevel', 0, 5, 0.05)
+      .name('Intensity')
+      .onChange((v: number) => {
+        this.service.setBumpLevel(v);
+      });
+    this.materialControllers['invertNormalMapX'] = fBump
+      .add(this.materialParams, 'invertNormalMapX')
+      .name('Invert X')
+      .onChange((v: boolean) => {
+        this.service.setInvertNormalMapX(v);
+      });
+    this.materialControllers['invertNormalMapY'] = fBump
+      .add(this.materialParams, 'invertNormalMapY')
+      .name('Invert Y (DirectX)')
+      .onChange((v: boolean) => {
+        this.service.setInvertNormalMapY(v);
+      });
+    fBump.add(this.materialParams, 'loadBumpTexture').name('Load Bump Map...');
+    fBump.add(this.materialParams, 'removeBumpTexture').name('Remove Bump Map');
+    fBump.open();
+
     const fUV = this.guiMaterial.addFolder('UV Mapping & Texture');
     this.uvControllers['uOffset'] = fUV
       .add(this.uvParams, 'uOffset', -5, 5, 0.05)
@@ -2601,8 +2644,18 @@ export class MeshEditorApp {
       this.materialParams.transparencyMode = modeNames[trans.mode] ?? 'Alpha Test & Blend';
       this.materialParams.twoSided = trans.twoSided;
       this.materialParams.alphaCutOff = trans.alphaCutOff;
+
+      const bump = this.service.getMaterialBumpInfo();
+      this.materialParams.bumpInfo = bump.hasBump ? bump.name : 'None';
+      this.materialParams.bumpLevel = bump.level;
+      this.materialParams.invertNormalMapX = bump.invertX;
+      this.materialParams.invertNormalMapY = bump.invertY;
     } else {
       this.materialParams.materialName = 'No material';
+      this.materialParams.bumpInfo = 'None';
+      this.materialParams.bumpLevel = 1.0;
+      this.materialParams.invertNormalMapX = false;
+      this.materialParams.invertNormalMapY = false;
     }
 
     for (const key in this.materialControllers) {
@@ -2975,6 +3028,14 @@ export class MeshEditorApp {
     this.textureFileInput?.addEventListener('change', (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) this.service.replaceSelectedTexture(file);
+    });
+
+    this.bumpFileInput?.addEventListener('change', (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        this.service.applyBumpTextureToSelectedMaterial(file);
+        this.updateMaterialGUI();
+      }
     });
 
     // Drag & Drop
@@ -3610,21 +3671,33 @@ export class MeshEditorApp {
   }
 
   private applyLiveUVTransform(): void {
-    const tex = this.service.getActiveMaterialTexture();
-    if (!tex) return;
-    tex.uOffset = this.uvParams.uOffset;
-    tex.vOffset = this.uvParams.vOffset;
-    tex.uScale = this.uvParams.uScale;
-    tex.vScale = this.uvParams.vScale;
-    tex.wAng = (this.uvParams.rotation * Math.PI) / 180;
+    const mat = this.service.getSelectedMaterial();
+    const textures: Texture[] = [];
+    const baseTex = this.service.getActiveMaterialTexture();
+    if (baseTex) textures.push(baseTex);
+    if (mat && (mat instanceof PBRMaterial || mat instanceof StandardMaterial) && mat.bumpTexture instanceof Texture) {
+      if (!textures.includes(mat.bumpTexture)) {
+        textures.push(mat.bumpTexture);
+      }
+    }
+    if (textures.length === 0) return;
+
     const mode =
       this.uvParams.wrapMode === 'Clamp'
         ? Texture.CLAMP_ADDRESSMODE
         : this.uvParams.wrapMode === 'Mirror'
           ? Texture.MIRROR_ADDRESSMODE
           : Texture.WRAP_ADDRESSMODE;
-    tex.wrapU = mode;
-    tex.wrapV = mode;
+
+    for (const tex of textures) {
+      tex.uOffset = this.uvParams.uOffset;
+      tex.vOffset = this.uvParams.vOffset;
+      tex.uScale = this.uvParams.uScale;
+      tex.vScale = this.uvParams.vScale;
+      tex.wAng = (this.uvParams.rotation * Math.PI) / 180;
+      tex.wrapU = mode;
+      tex.wrapV = mode;
+    }
     this.service.events.onSceneModified?.();
   }
 
@@ -4864,6 +4937,17 @@ export class MeshEditorApp {
           this.updateMaterialGUI();
         });
         actions.appendChild(btnApply);
+
+        const btnBump = document.createElement('button');
+        btnBump.className = 'tool-btn-xs';
+        btnBump.title = 'Apply as Bump / Normal Map to selected mesh material';
+        btnBump.innerHTML = '<i class="app-icon" data-lucide="layers"></i> Bump';
+        btnBump.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.service.applyBumpTextureToSelectedMaterial(tex.url, tex.name);
+          this.updateMaterialGUI();
+        });
+        actions.appendChild(btnBump);
 
         card.addEventListener('click', () => {
           this.service.applyTextureToSelectedMaterial(tex.url, tex.name);
