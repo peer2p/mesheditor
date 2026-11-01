@@ -68,6 +68,14 @@ describe('Path Extrusion & Spline Extrusion Integration Tests', () => {
     it('manages multiple paths, adds points, updates parameters, and bakes to mesh', () => {
       const controller = service.pathExtrusion;
       expect(controller).toBeDefined();
+      // Does not create a path automatically on activation
+      expect(controller.paths.length).toBe(0);
+      controller.setActive(true);
+      expect(controller.isActive).toBe(true);
+      expect(controller.paths.length).toBe(0);
+
+      // Explicitly initialize or add a path
+      controller.initDefaultPath();
       expect(controller.paths.length).toBe(1);
 
       // Add a point
@@ -110,11 +118,11 @@ describe('Path Extrusion & Spline Extrusion Integration Tests', () => {
     it('serializes path extrusion into .babylon project state and restores them on load', async () => {
       const controller = service.pathExtrusion;
       controller.clear();
-      expect(controller.paths.length).toBe(1);
+      expect(controller.paths.length).toBe(0);
 
-      // Configure a unique path
-      const active = controller.activePath!;
-      active.name = 'Castle Road';
+      // Create a unique path
+      const active = controller.addNewPath('Castle Road');
+      expect(controller.paths.length).toBe(1);
       active.points = [
         { x: -10, y: 0.5, z: 0 },
         { x: -5, y: 1.0, z: 4 },
@@ -149,7 +157,7 @@ describe('Path Extrusion & Spline Extrusion Integration Tests', () => {
 
       // Clear model
       service.clearModel();
-      expect(controller.paths[0].name).not.toBe('Castle Road');
+      expect(controller.paths.length).toBe(0);
 
       // Restore project state
       service.restoreProjectState(parsed.metadata.meshEditor);
@@ -184,6 +192,16 @@ describe('Path Extrusion & Spline Extrusion Integration Tests', () => {
 
       expect(pathDialog.style.display).not.toBe('none');
       expect(app.service.pathExtrusion.isActive).toBe(true);
+      expect(app.service.pathExtrusion.paths.length).toBe(0);
+
+      // Add a path explicitly
+      const btnAddPath = testContainer.querySelector('#btnPathExtrusionAdd') as HTMLButtonElement;
+      if (btnAddPath) {
+        btnAddPath.click();
+      } else {
+        app.service.pathExtrusion.addNewPath();
+      }
+      expect(app.service.pathExtrusion.paths.length).toBe(1);
 
       // Open Studio via dialog button
       const btnOpenStudio = testContainer.querySelector('#btnOpenPathExtrusionStudio') as HTMLButtonElement;
@@ -277,13 +295,19 @@ describe('Path Extrusion & Spline Extrusion Integration Tests', () => {
       const tabs = studioDialog!.querySelectorAll('.pes-tab');
       expect(tabs.length).toBe(3);
 
-      // Check canvas
+      // Create first path extrusion via studio button
+      const btnCreateFirst = studioDialog!.querySelector('#pesCreateFirstBtn') as HTMLElement;
+      expect(btnCreateFirst).not.toBeNull();
+      btnCreateFirst.click();
+      expect(controller.paths.length).toBe(1);
+
+      // Check canvas rendered for active path
       const canvas = studioDialog!.querySelector('.pes-canvas') as HTMLCanvasElement;
       expect(canvas).not.toBeNull();
 
       // Adding points via controller updates preview mesh dynamically
       controller.addPoint(new Vector3(5, 2, 5));
-      expect(controller.activePath?.points.length).toBe(5);
+      expect(controller.activePath?.points.length).toBe(4);
 
       // Close studio
       studio.close();

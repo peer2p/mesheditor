@@ -14,20 +14,56 @@ export interface OpenAIToolDefinition {
 
 /**
  * Common tool interface for modular, self-contained 3D editor & AI agent tools.
- * Enables rapid implementation and registration of new tools.
+ * Enables rapid implementation and registration of new tools, UI panels, and AI actions.
  */
 export interface ToolInterface {
-  /** Unique identifier for the tool (e.g. 'modeler_create_primitive') */
+  /** Unique identifier for the tool (e.g. 'modeler_create_primitive' or 'tool_voxel_painter') */
   readonly name: string;
 
-  /** Human- and LLM-readable description of what this tool does */
+  /** Human- and LLM-readable summary description of what this tool does */
   readonly description: string;
 
-  /** JSON Schema describing the input parameters */
-  readonly parameters: Record<string, any>;
+  /**
+   * Comprehensive user-facing guide and help text explaining the tool's purpose,
+   * features, keyboard/mouse controls, and workflow tips. Rendered in the tool help popup.
+   */
+  readonly helpText?: string;
+
+  /** Lucide icon identifier (e.g. 'brush', 'route', 'bot', 'box', 'palette', 'help-circle') */
+  readonly icon?: string;
+
+  /** DOM element ID of the tool's floating dialog window (e.g. 'dialog-voxel-painter') */
+  readonly dialogId?: string;
+
+  /** DOM element ID of the primary trigger button in menus (e.g. 'btnToggleVoxelPainter') */
+  readonly triggerButtonId?: string;
+
+  /** Optional DOM element ID of a quick-access button in the top toolbar (e.g. 'btnToolbarVoxelPainter') */
+  readonly toolbarButtonId?: string;
+
+  /** Menu identifier where this tool should appear (e.g. 'menuTools' or 'tools') */
+  readonly menuId?: string;
+
+  /** Human-readable menu item and panel title label (e.g. 'Voxel Painter') */
+  readonly menuLabel?: string;
+
+  /**
+   * If true, this tool takes exclusive control of 3D scene pointer clicks (e.g. voxel painting or path curve editing).
+   * Activating another exclusive tool automatically deactivates this one.
+   */
+  readonly isExclusive3DTool?: boolean;
+
+  /** Whether this tool dialog should be open and expanded by default on initial profile load */
+  readonly defaultOpen?: boolean;
+
+  /** Optional sorting order priority in dropdown menus */
+  readonly order?: number;
+
+  /** JSON Schema describing the input parameters for AI function calling */
+  readonly parameters?: Record<string, any>;
 
   /** Formats the tool specification for OpenAI-compatible function calling */
-  getDefinition(): OpenAIToolDefinition;
+  getDefinition?(): OpenAIToolDefinition;
 
   /**
    * Executes the tool logic against the live scene and editor context.
@@ -36,6 +72,35 @@ export interface ToolInterface {
    * @param context Scene, service, and utility context
    * @returns String result (usually JSON) sent back to the LLM or caller
    */
-  execute(args: any, context: ToolExecutionContext): Promise<string> | string;
-}
+  execute?(args: any, context: ToolExecutionContext): Promise<string> | string;
 
+  /**
+   * Dynamic check returning whether this tool is currently active in the editor.
+   */
+  isActive?(app?: any): boolean;
+
+  /**
+   * Lifecycle hook invoked when the tool dialog/panel is opened or activated.
+   */
+  onOpen?(app: any): void;
+
+  /**
+   * Lifecycle hook invoked when the tool dialog/panel is closed or deactivated.
+   */
+  onClose?(app: any): void;
+
+  /**
+   * Lifecycle hook invoked when the tool dialog is collapsed / minimized.
+   */
+  onMinimize?(app: any): void;
+
+  /**
+   * Lifecycle hook invoked when the tool dialog is expanded / maximized.
+   */
+  onMaximize?(app: any): void;
+
+  /**
+   * Lifecycle hook invoked when the editor UI needs to re-synchronize state.
+   */
+  onUpdateUI?(app: any): void;
+}

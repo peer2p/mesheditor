@@ -4,4 +4,5 @@ export * from './AbstractTool';
 export * from './ToolRegistry';
 export * from './textureUtils';
 export * from './builtin';
-
+export * from './editor';
+export * from './editorTools';

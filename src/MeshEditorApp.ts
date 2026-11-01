@@ -9,6 +9,7 @@ import { ensureMeshEditorStyles } from './styles';
 import { AI_CHAT_EMPTY_HTML, getMeshEditorTemplate } from './template';
 import { AIAgentToolExecutionStep, ExportOptions, MeshEditorServiceEvents, PrimitiveShape } from './types';
 import { PathExtrusionStudio } from './pathExtrusion';
+import { getBuiltinEditorTools, ToolInterface } from './tools';
 
 export interface MeshEditorAppOptions {
   /**
@@ -270,21 +271,29 @@ export class MeshEditorApp {
   private startupTimerIds: Array<ReturnType<typeof setTimeout>> = [];
   private sceneLoaderTimerId: ReturnType<typeof setTimeout> | null = null;
 
-  // Dialog IDs
-  private readonly dialogIds: string[] = [
-    'dialog-outliner',
-    'dialog-create-primitive',
-    'dialog-csg',
-    'dialog-facet',
-    'dialog-ai-agent',
-    'dialog-scene',
-    'dialog-mesh',
-    'dialog-material',
-    'dialog-anim',
-    'dialog-textures',
-    'dialog-voxel-painter',
-    'dialog-path-extrusion',
-  ];
+  // Built-in Editor Tools & Abstracted Dialog IDs
+  public readonly editorTools: ToolInterface[] = getBuiltinEditorTools();
+
+  public get dialogIds(): string[] {
+    return this.editorTools.filter((t) => !!t.dialogId).map((t) => t.dialogId!);
+  }
+
+  public getToolByDialogId(dialogId: string): ToolInterface | undefined {
+    return this.editorTools.find((t) => t.dialogId === dialogId);
+  }
+
+  public getToolByName(name: string): ToolInterface | undefined {
+    return this.editorTools.find((t) => t.name === name);
+  }
+
+  public isDialogOpen(dialogId: string): boolean {
+    const dialog = this.getElement(dialogId);
+    if (!dialog) return false;
+    return (
+      dialog.style.display !== 'none' &&
+      (dialog.style.display !== '' || window.getComputedStyle(dialog).display !== 'none')
+    );
+  }
 
   // AI Agent UI State
   private aiPendingImages: string[] = [];
@@ -824,13 +833,15 @@ export class MeshEditorApp {
       this.service.gizmoManager.scaleGizmoEnabled = mode === 'scale';
       this.service.gizmoManager.boundingBoxGizmoEnabled = mode === 'bounds';
 
-      // Switching to standard transform gizmos deactivates exclusive 3D tool painting/sculpting
-      if (this.service.voxelPainter?.isActive) {
-        this.service.voxelPainter.setActive(false);
-      }
-      if (this.service.pathExtrusion?.isActive) {
-        this.service.pathExtrusion.setActive(false);
-        PathExtrusionStudio.close();
+      // Switching to standard transform gizmos deactivates and closes exclusive 3D tools (e.g. Voxel Painter, Path Extrusion)
+      for (const tool of this.editorTools) {
+        if (tool.isExclusive3DTool) {
+          if (tool.dialogId && this.isDialogOpen(tool.dialogId)) {
+            this.toggleDialog(tool.dialogId, false);
+          } else if (tool.isActive?.(this)) {
+            tool.onClose?.(this);
+          }
+        }
       }
       this.updatePanelButtonStates();
     };
@@ -884,67 +895,31 @@ export class MeshEditorApp {
       this.service.deleteSelected();
     });
 
-    // Tools Menu
-    document.getElementById('btnCreatePrimitive')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-create-primitive');
-    });
-    document.getElementById('btnToggleCSG')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-csg');
-      this.updateCSGGUI();
-    });
-    document.getElementById('btnToggleFacetEditor')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-facet');
-    });
-    this.getElement('btnToggleAIAgent')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-ai-agent');
-    });
-    this.getElement('btnToolbarAIAgent')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-ai-agent');
-    });
-    this.getElement('btnToggleVoxelPainter')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-voxel-painter');
-    });
-    this.getElement('btnToolbarVoxelPainter')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-voxel-painter');
-    });
-    this.getElement('btnTogglePathExtrusion')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-path-extrusion');
-    });
-    this.getElement('btnToolbarPathExtrusion')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-path-extrusion');
-    });
-    document.getElementById('btnToggleTexturePanel')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-textures');
-    });
-    document.getElementById('btnToggleOutliner')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-outliner');
-    });
-    document.getElementById('btnToggleMeshPanel')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-mesh');
-    });
-    (document.getElementById('btnToggleMaterialPanel') || document.getElementById('btnToggleMatPanel'))?.addEventListener('click', () => {
+    // Tools Menu & Toolbar Buttons (Dynamically wired from ToolInterface instances)
+    for (const tool of this.editorTools) {
+      if (tool.triggerButtonId && tool.dialogId) {
+        const btn = this.getElement(tool.triggerButtonId) || document.getElementById(tool.triggerButtonId);
+        btn?.addEventListener('click', () => {
+          this.closeAllDropdowns();
+          this.toggleDialog(tool.dialogId!);
+          if (tool.dialogId === 'dialog-csg') {
+            this.updateCSGGUI();
+          }
+        });
+      }
+      if (tool.toolbarButtonId && tool.dialogId) {
+        const btnTb = this.getElement(tool.toolbarButtonId) || document.getElementById(tool.toolbarButtonId);
+        btnTb?.addEventListener('click', () => {
+          this.closeAllDropdowns();
+          this.toggleDialog(tool.dialogId!);
+        });
+      }
+    }
+
+    // Support legacy alias btnToggleMatPanel if present
+    document.getElementById('btnToggleMatPanel')?.addEventListener('click', () => {
       this.closeAllDropdowns();
       this.toggleDialog('dialog-material');
-    });
-    document.getElementById('btnToggleScenePanel')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-scene');
-    });
-    document.getElementById('btnToggleAnimPanel')?.addEventListener('click', () => {
-      this.closeAllDropdowns();
-      this.toggleDialog('dialog-anim');
     });
     document.getElementById('btnToggleGrid')?.addEventListener('click', () => {
       this.closeAllDropdowns();
@@ -1036,6 +1011,23 @@ export class MeshEditorApp {
       if (e.target === helpModal) helpModal.classList.remove('active');
     });
 
+    // Tool-specific Help Modal Popup
+    const toolHelpModal = this.getElement('toolHelpModal');
+    this.getElement('btnCloseToolHelp')?.addEventListener('click', () => {
+      toolHelpModal?.classList.remove('active');
+      if (toolHelpModal) toolHelpModal.style.display = 'none';
+    });
+    this.getElement('btnDoneToolHelp')?.addEventListener('click', () => {
+      toolHelpModal?.classList.remove('active');
+      if (toolHelpModal) toolHelpModal.style.display = 'none';
+    });
+    toolHelpModal?.addEventListener('click', (e) => {
+      if (e.target === toolHelpModal) {
+        toolHelpModal.classList.remove('active');
+        toolHelpModal.style.display = 'none';
+      }
+    });
+
     // Export Modal Dialog
     this.initExportDialog();
 
@@ -1099,7 +1091,24 @@ export class MeshEditorApp {
     const header = dialog.querySelector('.dialog-header') as HTMLElement;
     const btnClose = dialog.querySelector('.btn-close');
     const btnMin = dialog.querySelector('.btn-min');
+    let btnHelp = dialog.querySelector('.btn-help') as HTMLElement | null;
     const title = dialog.querySelector('.dialog-title');
+    const actions = dialog.querySelector('.dialog-actions');
+
+    // Ensure Help button exists directly to the left of Minimize button
+    if (!btnHelp && actions && btnMin) {
+      btnHelp = document.createElement('button');
+      btnHelp.className = 'dialog-btn btn-help';
+      btnHelp.title = 'Help & Tool Guide';
+      btnHelp.setAttribute('aria-label', 'Help');
+      btnHelp.innerHTML = '<i class="app-icon" data-lucide="help-circle"></i>';
+      actions.insertBefore(btnHelp, btnMin);
+    }
+
+    btnHelp?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showToolHelp(dialog.id);
+    });
 
     btnClose?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1185,28 +1194,93 @@ export class MeshEditorApp {
     }
   }
 
+  /**
+   * Opens the rich guide and help popup for any tool or floating dialog.
+   */
+  public showToolHelp(toolOrId: string | ToolInterface): void {
+    const tool =
+      typeof toolOrId === 'string'
+        ? this.getToolByDialogId(toolOrId) || this.getToolByName(toolOrId)
+        : toolOrId;
+    if (!tool) return;
+
+    let modal = this.getElement('toolHelpModal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'toolHelpModal';
+      modal.innerHTML = `
+        <div class="tool-help-dialog" role="dialog" aria-modal="true" aria-labelledby="toolHelpTitle">
+          <div class="tool-help-header">
+            <div class="tool-help-title-group">
+              <span class="tool-help-icon" id="toolHelpIcon"><i class="app-icon" data-lucide="help-circle"></i></span>
+              <div class="tool-help-title-col">
+                <div class="tool-help-title-row">
+                  <h3 class="tool-help-title" id="toolHelpTitle">Tool Guide</h3>
+                  <span class="tool-help-badge" id="toolHelpBadge">3D Tool</span>
+                </div>
+                <div class="tool-help-desc" id="toolHelpDesc">Tool overview and capabilities guide.</div>
+              </div>
+            </div>
+            <button class="dialog-btn btn-close" id="btnCloseToolHelp" title="Close Guide"><i class="app-icon" data-lucide="x"></i></button>
+          </div>
+          <div class="tool-help-body" id="toolHelpBody"></div>
+          <div class="tool-help-footer">
+            <button class="tool-btn btn-primary" id="btnDoneToolHelp">Got it!</button>
+          </div>
+        </div>
+      `;
+      (this.rootContainer || document.body).appendChild(modal);
+      this.getElement('btnCloseToolHelp')?.addEventListener('click', () => {
+        modal!.classList.remove('active');
+        modal!.style.display = 'none';
+      });
+      this.getElement('btnDoneToolHelp')?.addEventListener('click', () => {
+        modal!.classList.remove('active');
+        modal!.style.display = 'none';
+      });
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal!.classList.remove('active');
+          modal!.style.display = 'none';
+        }
+      });
+    }
+
+    const titleEl = modal.querySelector('#toolHelpTitle') || this.getElement('toolHelpTitle');
+    const descEl = modal.querySelector('#toolHelpDesc') || this.getElement('toolHelpDesc');
+    const iconEl = modal.querySelector('#toolHelpIcon') || this.getElement('toolHelpIcon');
+    const bodyEl = modal.querySelector('#toolHelpBody') || this.getElement('toolHelpBody');
+    const badgeEl = modal.querySelector('#toolHelpBadge') || this.getElement('toolHelpBadge');
+
+    if (titleEl) titleEl.textContent = tool.menuLabel || tool.name;
+    if (descEl) descEl.textContent = tool.description || '';
+    if (badgeEl) badgeEl.textContent = tool.isExclusive3DTool ? 'Interactive 3D Tool' : 'Editor Tool';
+    if (iconEl) {
+      iconEl.innerHTML = `<i class="app-icon" data-lucide="${tool.icon || 'help-circle'}"></i>`;
+    }
+    if (bodyEl) {
+      bodyEl.innerHTML = tool.helpText || `<p>${tool.description}</p>`;
+    }
+
+    this.refreshIcons();
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+  }
+
   public toggleDialogMinimize(dialog: HTMLElement, forceState?: boolean): void {
     const isCurrentlyMin = dialog.classList.contains('minimized');
     const willBeMin = forceState !== undefined ? forceState : !isCurrentlyMin;
+    const tool = this.getToolByDialogId(dialog.id);
 
     if (willBeMin) {
       dialog.classList.add('minimized');
-      if (dialog.id === 'dialog-voxel-painter') {
-        this.service.voxelPainter.setActive(false);
-      } else if (dialog.id === 'dialog-path-extrusion') {
-        this.service.pathExtrusion.setActive(false);
-        PathExtrusionStudio.close();
-      }
+      tool?.onMinimize?.(this);
     } else {
       dialog.classList.remove('minimized');
       if (this.layoutMode === 'stackpanel') {
         this.accordionMinimizeOthers(dialog);
       }
-      if (dialog.id === 'dialog-voxel-painter') {
-        this.service.voxelPainter.setActive(true);
-      } else if (dialog.id === 'dialog-path-extrusion') {
-        this.service.pathExtrusion.setActive(true);
-      }
+      tool?.onMaximize?.(this);
     }
 
     const btnMin = dialog.querySelector('.btn-min') as HTMLElement | null;
@@ -1233,6 +1307,8 @@ export class MeshEditorApp {
             btnMin.innerHTML = '<i class="app-icon" data-lucide="plus"></i>';
             btnMin.title = 'Expand';
           }
+          const otherTool = this.getToolByDialogId(id);
+          otherTool?.onMinimize?.(this);
         }
       }
     }
@@ -1249,6 +1325,8 @@ export class MeshEditorApp {
     const willOpen = forceOpen !== undefined ? forceOpen : !isCurrentlyOpen;
     dialog.style.display = willOpen ? 'flex' : 'none';
 
+    const tool = this.getToolByDialogId(id);
+
     if (willOpen) {
       this.bringDialogToFront(dialog);
       dialog.classList.remove('minimized');
@@ -1260,36 +1338,21 @@ export class MeshEditorApp {
       if (this.layoutMode === 'stackpanel') {
         this.accordionMinimizeOthers(dialog);
       }
-    }
 
-    if (id === 'dialog-voxel-painter') {
-      this.service.voxelPainter.setActive(willOpen);
-      if (willOpen) {
-        if (this.service.pathExtrusion?.isActive) {
-          this.service.pathExtrusion.setActive(false);
-          PathExtrusionStudio.close();
+      // When opening an exclusive 3D tool or any other tool, close other exclusive 3D tools
+      // so their dialogs disappear and canvas pointer events are restored
+      for (const other of this.editorTools) {
+        if (other !== tool && other.isExclusive3DTool) {
+          if (other.dialogId && this.isDialogOpen(other.dialogId)) {
+            this.toggleDialog(other.dialogId, false);
+          } else if (other.isActive?.(this)) {
+            other.onClose?.(this);
+          }
         }
-        this.renderVoxelPalette();
-        this.renderVoxelAtlasOptions();
-        this.renderVoxelTextureGallery();
-        this.showToast('Voxel Painter active. Left click to paint, right click to orbit camera.', 'info');
       }
-    } else if (id === 'dialog-path-extrusion') {
-      this.service.pathExtrusion.setActive(willOpen);
-      if (willOpen) {
-        if (this.service.voxelPainter?.isActive) {
-          this.service.voxelPainter.setActive(false);
-        }
-        this.renderPathExtrusionUI();
-        PathExtrusionStudio.open(this.service, this.service.pathExtrusion, () => {
-          this.updatePanelButtonStates();
-        });
-        this.showToast('Path Extrusion Studio active. 2D Cross-section canvas ready.', 'info');
-      } else {
-        PathExtrusionStudio.close();
-      }
-    } else if (id === 'dialog-material' && willOpen) {
-      this.renderEmbeddedTextures();
+      tool?.onOpen?.(this);
+    } else {
+      tool?.onClose?.(this);
     }
 
     this.refreshIcons();
@@ -1479,20 +1542,19 @@ export class MeshEditorApp {
       const saved = localStorage.getItem('mesheditor_window_layout');
       if (!saved) {
         // First time execution: activate default tools & panels (keep specialized studio tools closed until toggled)
-        for (const id of this.dialogIds) {
-          const dialog = this.getElement(id);
+        for (const tool of this.editorTools) {
+          if (!tool.dialogId) continue;
+          const dialog = this.getElement(tool.dialogId);
           if (dialog) {
-            if (id === 'dialog-ai-agent' || id === 'dialog-voxel-painter' || id === 'dialog-path-extrusion' || id === 'dialog-path-ways') {
-              dialog.style.display = 'none';
-            } else {
-              dialog.style.display = 'flex';
+            dialog.style.display = tool.defaultOpen ? 'flex' : 'none';
+            if (tool.defaultOpen) {
               dialog.classList.remove('minimized');
             }
           }
+          if (!tool.defaultOpen) {
+            tool.onClose?.(this);
+          }
         }
-        this.service.voxelPainter.setActive(false);
-        this.service.pathExtrusion.setActive(false);
-        PathExtrusionStudio.close();
         this.updatePanelButtonStates();
         this.saveDialogLayout();
         return;
@@ -1541,17 +1603,9 @@ export class MeshEditorApp {
       }
 
       // Safeguard: If every default panel is closed, activate standard panels
-      const defaultPanelIds = [
-        'dialog-outliner',
-        'dialog-create-primitive',
-        'dialog-csg',
-        'dialog-facet',
-        'dialog-scene',
-        'dialog-mesh',
-        'dialog-material',
-        'dialog-anim',
-        'dialog-textures',
-      ];
+      const defaultPanelIds = this.editorTools
+        .filter((t) => t.defaultOpen && t.dialogId)
+        .map((t) => t.dialogId!);
       const anyOpen = defaultPanelIds.some((id) => {
         const d = this.getElement(id);
         return d && d.style.display !== 'none';
@@ -1563,20 +1617,16 @@ export class MeshEditorApp {
         }
       }
 
-      const voxelDlg = this.getElement('dialog-voxel-painter');
-      const isVoxelOpen = !!(voxelDlg && voxelDlg.style.display !== 'none' && !voxelDlg.classList.contains('minimized'));
-      this.service.voxelPainter.setActive(isVoxelOpen);
-      if (isVoxelOpen) {
-        this.renderVoxelPalette();
-        this.renderVoxelAtlasOptions();
-        this.renderVoxelTextureGallery();
-      }
-
-      const pathDlg = this.getElement('dialog-path-extrusion') || this.getElement('dialog-path-ways');
-      const isPathOpen = !!(pathDlg && pathDlg.style.display !== 'none' && !pathDlg.classList.contains('minimized'));
-      this.service.pathExtrusion.setActive(isPathOpen);
-      if (isPathOpen) {
-        this.renderPathExtrusionUI();
+      // Synchronize tool lifecycle state from open dialogs
+      for (const tool of this.editorTools) {
+        if (!tool.dialogId) continue;
+        const d = this.getElement(tool.dialogId);
+        const isOpenAndActive = !!(d && d.style.display !== 'none' && !d.classList.contains('minimized'));
+        if (isOpenAndActive) {
+          tool.onOpen?.(this);
+        } else {
+          tool.onClose?.(this);
+        }
       }
 
       this.updatePanelButtonStates();
@@ -1587,51 +1637,28 @@ export class MeshEditorApp {
   }
 
   public updatePanelButtonStates(): void {
-    const mapping: { [dialogId: string]: string } = {
-      'dialog-outliner': 'btnToggleOutliner',
-      'dialog-create-primitive': 'btnCreatePrimitive',
-      'dialog-csg': 'btnToggleCSG',
-      'dialog-facet': 'btnToggleFacetEditor',
-      'dialog-ai-agent': 'btnToggleAIAgent',
-      'dialog-mesh': 'btnToggleMeshPanel',
-      'dialog-material': 'btnToggleMaterialPanel',
-      'dialog-scene': 'btnToggleScenePanel',
-      'dialog-anim': 'btnToggleAnimPanel',
-      'dialog-textures': 'btnToggleTexturePanel',
-      'dialog-voxel-painter': 'btnToggleVoxelPainter',
-      'dialog-path-extrusion': 'btnTogglePathExtrusion',
-    };
-
-    for (const [dialogId, btnId] of Object.entries(mapping)) {
-      const dialog = this.getElement(dialogId);
-      const btn = this.getElement(btnId);
-      if (dialog && btn) {
-        const isOpen =
-          dialog.style.display !== 'none' && (dialog.style.display !== '' || window.getComputedStyle(dialog).display !== 'none');
-        btn.classList.toggle('active', isOpen);
+    for (const tool of this.editorTools) {
+      if (tool.dialogId && tool.triggerButtonId) {
+        const dialog = this.getElement(tool.dialogId);
+        const btn = this.getElement(tool.triggerButtonId) || document.getElementById(tool.triggerButtonId);
+        if (dialog && btn) {
+          const isOpen =
+            dialog.style.display !== 'none' &&
+            (dialog.style.display !== '' || window.getComputedStyle(dialog).display !== 'none');
+          btn.classList.toggle('active', isOpen);
+        }
       }
-    }
-
-    // Also update AI Agent top toolbar button state
-    const aiDialog = this.getElement('dialog-ai-agent');
-    const btnToolbarAI = this.getElement('btnToolbarAIAgent');
-    if (aiDialog && btnToolbarAI) {
-      const isAIOpen =
-        aiDialog.style.display !== 'none' &&
-        (aiDialog.style.display !== '' || window.getComputedStyle(aiDialog).display !== 'none');
-      btnToolbarAI.classList.toggle('active', isAIOpen);
-    }
-
-    // Also update Voxel Painter top toolbar button state
-    const btnToolbarVoxel = this.getElement('btnToolbarVoxelPainter');
-    if (btnToolbarVoxel) {
-      btnToolbarVoxel.classList.toggle('active', !!this.service.voxelPainter?.isActive);
-    }
-
-    // Also update Path Extrusion top toolbar button state
-    const btnToolbarPath = this.getElement('btnToolbarPathExtrusion');
-    if (btnToolbarPath) {
-      btnToolbarPath.classList.toggle('active', !!this.service.pathExtrusion?.isActive);
+      if (tool.toolbarButtonId) {
+        const btnToolbar = this.getElement(tool.toolbarButtonId) || document.getElementById(tool.toolbarButtonId);
+        if (btnToolbar) {
+          const isActive = tool.isActive
+            ? tool.isActive(this)
+            : tool.dialogId
+              ? this.isDialogOpen(tool.dialogId)
+              : false;
+          btnToolbar.classList.toggle('active', isActive);
+        }
+      }
     }
 
     // Also update Ground Grid button state
@@ -2714,9 +2741,15 @@ export class MeshEditorApp {
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         this.service.deleteSelected();
       } else if (e.key === 'Escape') {
+        this.closeAllDropdowns();
         this.closeExportDialog();
         if (this.service.isPlaceModeActive) {
           this.service.cancelPlacementMode();
+        }
+        for (const tool of this.editorTools) {
+          if (tool.isExclusive3DTool && tool.dialogId && this.isDialogOpen(tool.dialogId)) {
+            this.toggleDialog(tool.dialogId, false);
+          }
         }
       }
     });
@@ -4388,12 +4421,19 @@ export class MeshEditorApp {
     if (pathSelect) {
       const currentVal = this.service.pathExtrusion.activePathId;
       pathSelect.innerHTML = '';
-      for (const p of this.service.pathExtrusion.paths) {
+      if (this.service.pathExtrusion.paths.length === 0) {
         const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = `${p.name} (${p.points.length} pts)`;
-        if (p.id === currentVal) opt.selected = true;
+        opt.value = '';
+        opt.textContent = 'No paths created yet';
         pathSelect.appendChild(opt);
+      } else {
+        for (const p of this.service.pathExtrusion.paths) {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = `${p.name} (${p.points.length} pts)`;
+          if (p.id === currentVal) opt.selected = true;
+          pathSelect.appendChild(opt);
+        }
       }
     }
 

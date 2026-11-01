@@ -10,6 +10,16 @@ import { OpenAIToolDefinition, ToolInterface } from './ToolInterface';
 export abstract class AbstractTool implements ToolInterface {
   public abstract readonly name: string;
   public abstract readonly description: string;
+  public readonly helpText?: string;
+  public readonly icon?: string;
+  public readonly dialogId?: string;
+  public readonly triggerButtonId?: string;
+  public readonly toolbarButtonId?: string;
+  public readonly menuId?: string;
+  public readonly menuLabel?: string;
+  public readonly isExclusive3DTool?: boolean;
+  public readonly defaultOpen?: boolean;
+  public readonly order?: number;
   public abstract readonly parameters: Record<string, any>;
 
   /**

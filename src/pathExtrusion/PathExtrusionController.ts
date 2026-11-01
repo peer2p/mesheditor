@@ -49,7 +49,7 @@ export class PathExtrusionController {
   public onStateChanged?: () => void;
 
   constructor(private service: MeshEditorService) {
-    this.initDefaultPath();
+    // Initialized without default paths so activating the tool keeps the scene clean.
   }
 
   public get activePath(): PathExtrusionItem | null {
@@ -529,7 +529,7 @@ export class PathExtrusionController {
     if (this.paths.length > 0) {
       this.activePathId = this.paths[0].id;
     } else {
-      this.initDefaultPath();
+      this.activePathId = null;
     }
     this.selectedPointIndex = null;
     if (this.isActive) {
@@ -548,7 +548,6 @@ export class PathExtrusionController {
     this.activePathId = null;
     this.selectedPointIndex = null;
     this.service.gizmoManager.attachToMesh(null);
-    this.initDefaultPath();
     this.onStateChanged?.();
   }
 }

@@ -405,6 +405,7 @@ export function getMeshEditorTemplate(): string {
         <div class="dialog-header">
           <span class="dialog-title"><i class="app-icon" data-lucide="list-tree"></i> Scene Objects</span>
           <div class="dialog-actions">
+            <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
             <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
             <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
           </div>
@@ -426,7 +427,8 @@ export function getMeshEditorTemplate(): string {
               <button class="dialog-btn" id="btnAISettingsToggle" title="Configure OpenAI-Compatible Endpoint & Skills">
                 <i class="app-icon" data-lucide="settings"></i>
               </button>
-              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
             </div>
           </div>
@@ -590,7 +592,8 @@ export function getMeshEditorTemplate(): string {
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="plus-circle"></i> Create Mesh</span>
             <div class="dialog-actions">
-              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
             </div>
           </div>
@@ -601,7 +604,8 @@ export function getMeshEditorTemplate(): string {
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="shapes"></i> Sculpting</span>
             <div class="dialog-actions">
-              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
             </div>
           </div>
@@ -627,7 +631,8 @@ export function getMeshEditorTemplate(): string {
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="triangle"></i> Facet & Vertex Editor</span>
             <div class="dialog-actions">
-              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
             </div>
           </div>
@@ -653,7 +658,8 @@ export function getMeshEditorTemplate(): string {
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="sun-medium"></i> Scene & Environment</span>
             <div class="dialog-actions">
-              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
             </div>
           </div>
@@ -664,7 +670,8 @@ export function getMeshEditorTemplate(): string {
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="box"></i> Mesh Properties</span>
             <div class="dialog-actions">
-              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
             </div>
           </div>
@@ -675,7 +682,8 @@ export function getMeshEditorTemplate(): string {
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="palette"></i> Material & UV Mapping</span>
             <div class="dialog-actions">
-              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
             </div>
           </div>
@@ -702,7 +710,8 @@ export function getMeshEditorTemplate(): string {
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="film"></i> Animation Player</span>
             <div class="dialog-actions">
-              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
             </div>
           </div>
@@ -713,7 +722,8 @@ export function getMeshEditorTemplate(): string {
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="zap"></i> Texture Optimizer</span>
             <div class="dialog-actions">
-              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
             </div>
           </div>
@@ -724,7 +734,8 @@ export function getMeshEditorTemplate(): string {
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="brush"></i> Voxel Painter</span>
             <div class="dialog-actions">
-              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
             </div>
           </div>
@@ -817,7 +828,8 @@ export function getMeshEditorTemplate(): string {
           <div class="dialog-header">
             <span class="dialog-title"><i class="app-icon" data-lucide="route"></i> Path Extrusion</span>
             <div class="dialog-actions">
-              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
             </div>
           </div>
@@ -883,6 +895,29 @@ export function getMeshEditorTemplate(): string {
           <div class="stats-item"><span>Polygons:</span> <strong id="statsPolys">0</strong></div>
         </div>
       </footer>
+
+      <!-- Tool Help Guide Modal Popup -->
+      <div id="toolHelpModal">
+        <div class="tool-help-dialog" role="dialog" aria-modal="true" aria-labelledby="toolHelpTitle">
+          <div class="tool-help-header">
+            <div class="tool-help-title-group">
+              <span class="tool-help-icon" id="toolHelpIcon"><i class="app-icon" data-lucide="help-circle"></i></span>
+              <div class="tool-help-title-col">
+                <div class="tool-help-title-row">
+                  <h3 class="tool-help-title" id="toolHelpTitle">Tool Guide</h3>
+                  <span class="tool-help-badge" id="toolHelpBadge">3D Tool</span>
+                </div>
+                <div class="tool-help-desc" id="toolHelpDesc">Tool overview and capabilities guide.</div>
+              </div>
+            </div>
+            <button class="dialog-btn btn-close" id="btnCloseToolHelp" title="Close Guide"><i class="app-icon" data-lucide="x"></i></button>
+          </div>
+          <div class="tool-help-body" id="toolHelpBody"></div>
+          <div class="tool-help-footer">
+            <button class="tool-btn btn-primary" id="btnDoneToolHelp">Got it!</button>
+          </div>
+        </div>
+      </div>
 
       <!-- Help Modal Dialog -->
       <div id="helpModal">

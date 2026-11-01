@@ -1,5 +1,6 @@
 import { NullEngine, MeshBuilder, Mesh, Vector3 } from '@babylonjs/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { MeshEditorApp } from '../../src/MeshEditorApp';
 import { MeshEditorService } from '../../src/MeshEditorService';
 import {
   AbstractTool,
@@ -9,6 +10,20 @@ import {
   createDefaultToolRegistry,
   CreatePrimitiveTool,
   GetSceneInfoTool,
+  getBuiltinEditorTools,
+  createBuiltinEditorTools,
+  OutlinerEditorTool,
+  CreatePrimitiveEditorTool,
+  CSGEditorTool,
+  FacetEditorTool,
+  TextureOptimizerEditorTool,
+  VoxelPainterEditorTool,
+  PathExtrusionEditorTool,
+  AIAgentEditorTool,
+  MeshPropertiesEditorTool,
+  MaterialEditorTool,
+  SceneEnvironmentEditorTool,
+  AnimationPlayerEditorTool,
 } from '../../src/tools';
 
 describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)', () => {
@@ -224,6 +239,222 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       const mesh = service.importedMeshes.find((m) => m.name === 'Giza_Pyramid');
       expect(mesh).toBeDefined();
       expect(mesh?.position.y).toBe(1.5);
+    });
+  });
+
+  describe('4. Tool Abstraction, In-App Help Guides & Dialog Wiring', () => {
+    it('provides unified ToolInterface metadata and comprehensive English help text for all 12 editor tools', () => {
+      const editorTools = getBuiltinEditorTools();
+      expect(editorTools.length).toBe(12);
+
+      const requiredTools = [
+        'scene_outliner',
+        'create_primitive',
+        'csg_sculpting',
+        'facet_editor',
+        'texture_optimizer',
+        'voxel_painter',
+        'path_extrusion',
+        'ai_agent',
+        'mesh_properties',
+        'material_uv',
+        'scene_environment',
+        'animation_player',
+      ];
+
+      for (const name of requiredTools) {
+        const tool = editorTools.find((t) => t.name === name);
+        expect(tool, `Tool ${name} should be registered`).toBeDefined();
+        expect(tool!.dialogId).toBeDefined();
+        expect(tool!.triggerButtonId).toBeDefined();
+        expect(tool!.icon).toBeDefined();
+        expect(tool!.description).toBeDefined();
+        expect(tool!.helpText).toBeDefined();
+        expect(tool!.helpText!.length).toBeGreaterThan(100);
+        // Ensure help text is strictly in English (not German)
+        expect(tool!.helpText).not.toMatch(/Benutzer|Möglichkeiten|Einstellungen|Werkzeug/i);
+      }
+    });
+
+    it('renders a help (?) button directly to the left of the minimize button in dialog headers and opens help modal', () => {
+      document.body.innerHTML = '';
+      const container = document.createElement('div');
+      container.id = 'app-test-container';
+      document.body.appendChild(container);
+
+      const app = new MeshEditorApp({
+        container,
+        engine,
+      });
+
+      // Verify that every floating dialog header has a .btn-help before .btn-min
+      for (const tool of app.editorTools) {
+        if (!tool.dialogId) continue;
+        const dialog = container.querySelector(`#${tool.dialogId}`) as HTMLElement | null;
+        expect(dialog, `Dialog #${tool.dialogId} should exist`).not.toBeNull();
+
+        const btnMin = dialog!.querySelector('.btn-min') as HTMLElement | null;
+        const btnHelp = dialog!.querySelector('.btn-help') as HTMLElement | null;
+        expect(btnMin, `btn-min in ${tool.dialogId} should exist`).not.toBeNull();
+        expect(btnHelp, `btn-help in ${tool.dialogId} should exist`).not.toBeNull();
+
+        // Check DOM ordering: btn-help must precede btn-min
+        const actions = dialog!.querySelector('.dialog-actions')!;
+        const children = Array.from(actions.children);
+        const helpIndex = children.indexOf(btnHelp!);
+        const minIndex = children.indexOf(btnMin!);
+        expect(helpIndex).toBeLessThan(minIndex);
+      }
+
+      // Test opening help modal via the Voxel Painter ? button
+      const voxelDlg = container.querySelector('#dialog-voxel-painter') as HTMLElement;
+      const btnVoxelHelp = voxelDlg.querySelector('.btn-help') as HTMLButtonElement;
+      btnVoxelHelp.click();
+
+      const helpModal = container.querySelector('#toolHelpModal') as HTMLElement;
+      expect(helpModal).not.toBeNull();
+      expect(helpModal.classList.contains('active')).toBe(true);
+
+      const titleEl = container.querySelector('#toolHelpTitle');
+      expect(titleEl?.textContent).toContain('Voxel Painter');
+
+      const bodyEl = container.querySelector('#toolHelpBody');
+      expect(bodyEl?.innerHTML).toContain('Left Click');
+
+      // Test closing via close button
+      const btnClose = container.querySelector('#btnCloseToolHelp') as HTMLButtonElement;
+      btnClose.click();
+      expect(helpModal.classList.contains('active')).toBe(false);
+
+      // Reopen and test closing via "Got it!" button
+      btnVoxelHelp.click();
+      expect(helpModal.classList.contains('active')).toBe(true);
+
+      const btnDone = container.querySelector('#btnDoneToolHelp') as HTMLButtonElement;
+      btnDone.click();
+      expect(helpModal.classList.contains('active')).toBe(false);
+    });
+
+    it('abstracts tool lifecycle hooks: handles open, close, minimize, maximize, and exclusive 3D tool deactivation', () => {
+      document.body.innerHTML = '';
+      const container = document.createElement('div');
+      container.id = 'app-test-container-lifecycle';
+      document.body.appendChild(container);
+
+      const app = new MeshEditorApp({
+        container,
+        engine,
+      });
+
+      // 1. Open Voxel Painter: sets active = true
+      app.toggleDialog('dialog-voxel-painter', true);
+      expect(app.service.voxelPainter.isActive).toBe(true);
+      expect(app.service.pathExtrusion.isActive).toBe(false);
+
+      // 2. Open Path Extrusion: automatically deactivates and closes Voxel Painter dialog
+      app.toggleDialog('dialog-path-extrusion', true);
+      expect(app.service.pathExtrusion.isActive).toBe(true);
+      expect(app.service.voxelPainter.isActive).toBe(false);
+      const voxelDlg = container.querySelector('#dialog-voxel-painter') as HTMLElement;
+      expect(voxelDlg.style.display).toBe('none');
+
+      // 3. Path Extrusion does NOT create a path automatically on activation
+      expect(app.service.pathExtrusion.paths.length).toBe(0);
+
+      // 4. Minimize Path Extrusion: deactivates path extrusion tool
+      const pathDlg = container.querySelector('#dialog-path-extrusion') as HTMLElement;
+      app.toggleDialogMinimize(pathDlg, true);
+      expect(pathDlg.classList.contains('minimized')).toBe(true);
+      expect(app.service.pathExtrusion.isActive).toBe(false);
+
+      // 5. Maximize Path Extrusion: reactivates path extrusion tool
+      app.toggleDialogMinimize(pathDlg, false);
+      expect(pathDlg.classList.contains('minimized')).toBe(false);
+      expect(app.service.pathExtrusion.isActive).toBe(true);
+
+      // 6. Close Path Extrusion
+      app.toggleDialog('dialog-path-extrusion', false);
+      expect(app.service.pathExtrusion.isActive).toBe(false);
+
+      // 7. Switching to standard transform gizmo closes active exclusive 3D tools
+      app.toggleDialog('dialog-voxel-painter', true);
+      expect(app.service.voxelPainter.isActive).toBe(true);
+      expect(voxelDlg.style.display).toBe('flex');
+
+      container.querySelector('#btnGizmoTranslate')?.dispatchEvent(new MouseEvent('click'));
+      expect(app.service.voxelPainter.isActive).toBe(false);
+      expect(voxelDlg.style.display).toBe('none');
+
+      // 8. Switching to a standard panel (e.g. Create Mesh) closes active exclusive 3D tools
+      app.toggleDialog('dialog-voxel-painter', true);
+      expect(app.service.voxelPainter.isActive).toBe(true);
+      expect(voxelDlg.style.display).toBe('flex');
+
+      app.toggleDialog('dialog-create-primitive', true);
+      expect(app.service.voxelPainter.isActive).toBe(false);
+      expect(voxelDlg.style.display).toBe('none');
+    });
+
+    it('instantiates all decentralized editor tool classes with self-contained configurations and help guides', () => {
+      const tools = createBuiltinEditorTools();
+      expect(tools.length).toBe(12);
+
+      const outliner = new OutlinerEditorTool();
+      expect(outliner.name).toBe('scene_outliner');
+      expect(outliner.dialogId).toBe('dialog-outliner');
+      expect(outliner.helpText).toContain('Scene Objects Outliner');
+
+      const createMesh = new CreatePrimitiveEditorTool();
+      expect(createMesh.name).toBe('create_primitive');
+      expect(createMesh.dialogId).toBe('dialog-create-primitive');
+      expect(createMesh.helpText).toContain('Create Mesh');
+
+      const csg = new CSGEditorTool();
+      expect(csg.name).toBe('csg_sculpting');
+      expect(csg.dialogId).toBe('dialog-csg');
+      expect(csg.helpText).toContain('Constructive Solid Geometry');
+
+      const facet = new FacetEditorTool();
+      expect(facet.name).toBe('facet_editor');
+      expect(facet.dialogId).toBe('dialog-facet');
+
+      const tex = new TextureOptimizerEditorTool();
+      expect(tex.name).toBe('texture_optimizer');
+      expect(tex.dialogId).toBe('dialog-textures');
+
+      const voxel = new VoxelPainterEditorTool();
+      expect(voxel.name).toBe('voxel_painter');
+      expect(voxel.isExclusive3DTool).toBe(true);
+
+      const path = new PathExtrusionEditorTool();
+      expect(path.name).toBe('path_extrusion');
+      expect(path.isExclusive3DTool).toBe(true);
+
+      const ai = new AIAgentEditorTool();
+      expect(ai.name).toBe('ai_agent');
+      expect(ai.dialogId).toBe('dialog-ai-agent');
+
+      const props = new MeshPropertiesEditorTool();
+      expect(props.name).toBe('mesh_properties');
+
+      const mat = new MaterialEditorTool();
+      expect(mat.name).toBe('material_uv');
+
+      const scene = new SceneEnvironmentEditorTool();
+      expect(scene.name).toBe('scene_environment');
+
+      const anim = new AnimationPlayerEditorTool();
+      expect(anim.name).toBe('animation_player');
+
+      // Verify each decentralized tool is an instance of ToolInterface with complete metadata
+      for (const t of tools) {
+        expect(t.name).toBeTruthy();
+        expect(t.menuLabel).toBeTruthy();
+        expect(t.icon).toBeTruthy();
+        expect(t.dialogId).toBeTruthy();
+        expect(t.helpText).toBeTruthy();
+        expect(t.description).toBeTruthy();
+      }
     });
   });
 });
