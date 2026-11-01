@@ -68,6 +68,10 @@ module.exports = (env, argv) => {
           const ejs = require('ejs');
           const templatePath = path.resolve(__dirname, 'src/mesheditor.ejs');
           compilation.fileDependencies.add(templatePath);
+          const iconPath = path.resolve(__dirname, 'build/app-icon.svg');
+          if (fs.existsSync(iconPath)) {
+            compilation.fileDependencies.add(iconPath);
+          }
           const editorToolsDir = path.resolve(__dirname, 'src/tools/editor');
           if (fs.existsSync(editorToolsDir)) {
             const editorFiles = fs.readdirSync(editorToolsDir);

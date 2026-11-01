@@ -7,9 +7,8 @@ app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 
-let mainWindow = null;
-let isRendererReady = false;
-const pendingFilesToOpen = [];
+const openWindows = new Set();
+const pendingInitialFiles = [];
 
 const MIME_MAP = {
   '.glb': 'model/gltf-binary',
@@ -91,35 +90,56 @@ function resolveFilePayloads(filePaths) {
 }
 
 /**
- * Dispatches files to the renderer or queues them until the window is ready.
+ * Dispatches files to a specific target window.
  */
-function dispatchFilesToRenderer(filePaths) {
-  if (!filePaths || filePaths.length === 0) return;
-
-  if (isRendererReady && mainWindow && !mainWindow.isDestroyed()) {
-    const payloads = resolveFilePayloads(filePaths);
-    if (payloads.length > 0) {
-      mainWindow.webContents.send('file:open-from-os', payloads);
-      // Track in recent documents
-      if (process.platform === 'darwin' && payloads[0]?.path) {
-        app.addRecentDocument(payloads[0].path);
-      }
+function dispatchFilesToWindow(win, filePaths) {
+  if (!win || win.isDestroyed() || !filePaths || filePaths.length === 0) return;
+  const payloads = resolveFilePayloads(filePaths);
+  if (payloads.length > 0) {
+    win.webContents.send('file:open-from-os', payloads);
+    win._hasLoadedDocument = true;
+    if (process.platform === 'darwin' && payloads[0]?.path) {
+      app.addRecentDocument(payloads[0].path);
     }
-  } else {
-    pendingFilesToOpen.push(...filePaths);
   }
+}
+
+/**
+ * Resolves the active or event target window dynamically.
+ */
+function getTargetWindow(event) {
+  if (event && event.sender) {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed()) return win;
+  }
+  const focused = BrowserWindow.getFocusedWindow();
+  if (focused && !focused.isDestroyed()) return focused;
+  if (openWindows.size > 0) {
+    return Array.from(openWindows)[0];
+  }
+  return null;
 }
 
 // macOS "Open With" / Double-click in Finder / Drag & Drop to Dock handler
 app.on('open-file', (event, filePath) => {
   event.preventDefault();
-  dispatchFilesToRenderer([filePath]);
+  if (!app.isReady()) {
+    pendingInitialFiles.push(filePath);
+    return;
+  }
+
+  const focused = BrowserWindow.getFocusedWindow();
+  if (focused && focused._isRendererReady && !focused._hasLoadedDocument) {
+    dispatchFilesToWindow(focused, [filePath]);
+  } else {
+    createWindow([filePath]);
+  }
 });
 
 // Process command-line file arguments (Windows / Linux / macOS CLI)
-function checkCommandLineFileArgs() {
+function getCommandLineFileArgs() {
   const args = process.argv.slice(1);
-  const fileArgs = args.filter((arg) => {
+  return args.filter((arg) => {
     if (arg.startsWith('-') || arg.startsWith('http:') || arg.startsWith('https:')) return false;
     try {
       if (fs.existsSync(arg) && fs.statSync(arg).isFile()) {
@@ -131,9 +151,24 @@ function checkCommandLineFileArgs() {
     }
     return false;
   });
+}
 
-  if (fileArgs.length > 0) {
-    dispatchFilesToRenderer(fileArgs);
+async function handleMenuOpen() {
+  const targetWin = BrowserWindow.getFocusedWindow();
+  if (targetWin && !targetWin.isDestroyed()) {
+    targetWin.webContents.send('menu:command', 'file:open');
+  } else {
+    const result = await dialog.showOpenDialog(null, {
+      title: 'Open 3D Model',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: '3D Models & Assets', extensions: ['glb', 'gltf', 'obj', 'stl', 'ply', 'babylon'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+    if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
+      createWindow(result.filePaths);
+    }
   }
 }
 
@@ -141,8 +176,9 @@ function createApplicationMenu() {
   const isMac = process.platform === 'darwin';
 
   const sendMenuCommand = (cmd, payload) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('menu:command', cmd, payload);
+    const targetWin = BrowserWindow.getFocusedWindow() || (openWindows.size > 0 ? Array.from(openWindows)[0] : null);
+    if (targetWin && !targetWin.isDestroyed()) {
+      targetWin.webContents.send('menu:command', cmd, payload);
     }
   };
 
@@ -169,9 +205,15 @@ function createApplicationMenu() {
       label: 'File',
       submenu: [
         {
+          label: 'New Window',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => createWindow(),
+        },
+        { type: 'separator' },
+        {
           label: 'Open 3D Model...',
           accelerator: 'CmdOrCtrl+O',
-          click: () => sendMenuCommand('file:open'),
+          click: () => handleMenuOpen(),
         },
         {
           label: 'Import 3D Model...',
@@ -209,7 +251,12 @@ function createApplicationMenu() {
               { type: 'separator' },
             ]
           : []),
-        isMac ? { role: 'close' } : { role: 'quit' },
+        {
+          label: 'Close Window',
+          accelerator: 'CmdOrCtrl+W',
+          role: 'close',
+        },
+        ...(!isMac ? [{ type: 'separator' }, { role: 'quit' }] : []),
       ],
     },
     {
@@ -299,7 +346,14 @@ function createApplicationMenu() {
       submenu: [
         { role: 'minimize' },
         { role: 'zoom' },
-        ...(isMac ? [{ type: 'separator' }, { role: 'front' }] : [{ role: 'close' }]),
+        ...(isMac
+          ? [
+              { type: 'separator' },
+              { role: 'front' },
+              { type: 'separator' },
+              { role: 'window' },
+            ]
+          : [{ role: 'close' }]),
       ],
     },
     {
@@ -323,11 +377,11 @@ function createApplicationMenu() {
   Menu.setApplicationMenu(menu);
 }
 
-function createWindow() {
+function createWindow(filePathsToOpen = null) {
   const isMac = process.platform === 'darwin';
   const iconPath = path.join(__dirname, '..', 'build', isMac ? 'icon.icns' : 'icon.png');
 
-  mainWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     width: 1480,
     height: 920,
     minWidth: 960,
@@ -351,6 +405,11 @@ function createWindow() {
     },
   });
 
+  win._pendingFiles = Array.isArray(filePathsToOpen) && filePathsToOpen.length > 0 ? [...filePathsToOpen] : [];
+  win._isRendererReady = false;
+  win._hasLoadedDocument = false;
+  openWindows.add(win);
+
   if (isMac && app.setAboutPanelOptions) {
     app.setAboutPanelOptions({
       applicationName: 'Mesh Editor',
@@ -360,36 +419,41 @@ function createWindow() {
     });
   }
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
+  win.once('ready-to-show', () => {
+    win.show();
   });
 
   const devUrl = process.env.MESHEDITOR_DEV_URL || (process.argv.includes('--dev') ? 'http://localhost:8080' : null);
   if (devUrl) {
-    mainWindow.loadURL(devUrl);
+    win.loadURL(devUrl);
   } else {
     const indexPath = path.join(__dirname, '..', 'dist', 'index.html');
-    mainWindow.loadFile(indexPath);
+    win.loadFile(indexPath);
   }
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-    isRendererReady = false;
+  win.on('closed', () => {
+    openWindows.delete(win);
   });
+
+  return win;
 }
 
 // IPC Handlers
-ipcMain.on('app:ready', () => {
-  isRendererReady = true;
-  if (pendingFilesToOpen.length > 0) {
-    const files = [...pendingFilesToOpen];
-    pendingFilesToOpen.length = 0;
-    dispatchFilesToRenderer(files);
+ipcMain.on('app:ready', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) {
+    win._isRendererReady = true;
+    if (win._pendingFiles && win._pendingFiles.length > 0) {
+      const files = [...win._pendingFiles];
+      win._pendingFiles.length = 0;
+      dispatchFilesToWindow(win, files);
+    }
   }
 });
 
-ipcMain.handle('dialog:openFiles', async (_event, options = {}) => {
-  if (!mainWindow) return null;
+ipcMain.handle('dialog:openFiles', async (event, options = {}) => {
+  const targetWin = getTargetWindow(event);
+  if (!targetWin) return null;
 
   const extensions = options.extensions || [
     'glb',
@@ -410,7 +474,7 @@ ipcMain.handle('dialog:openFiles', async (_event, options = {}) => {
     properties.push('multiSelections');
   }
 
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const result = await dialog.showOpenDialog(targetWin, {
     title: options.title || 'Open 3D Model',
     properties,
     filters: [
@@ -423,11 +487,13 @@ ipcMain.handle('dialog:openFiles', async (_event, options = {}) => {
     return null;
   }
 
+  targetWin._hasLoadedDocument = true;
   return resolveFilePayloads(result.filePaths);
 });
 
-ipcMain.handle('dialog:saveFile', async (_event, options = {}) => {
-  if (!mainWindow || !options.data) return { saved: false };
+ipcMain.handle('dialog:saveFile', async (event, options = {}) => {
+  const targetWin = getTargetWindow(event);
+  if (!targetWin || !options.data) return { saved: false };
 
   const format = (options.format || 'glb').toLowerCase();
   const defaultPath = options.defaultPath || `model_edited.${format}`;
@@ -441,7 +507,7 @@ ipcMain.handle('dialog:saveFile', async (_event, options = {}) => {
 
   const primaryFilter = filterMap[format] || { name: '3D Model', extensions: [format] };
 
-  const result = await dialog.showSaveDialog(mainWindow, {
+  const result = await dialog.showSaveDialog(targetWin, {
     title: options.title || 'Save 3D Model',
     defaultPath,
     filters: [primaryFilter, { name: 'All Files', extensions: ['*'] }],
@@ -460,30 +526,37 @@ ipcMain.handle('dialog:saveFile', async (_event, options = {}) => {
   return { saved: true, filePath: result.filePath };
 });
 
-ipcMain.on('window:setTitle', (_event, title) => {
-  if (mainWindow && !mainWindow.isDestroyed() && typeof title === 'string') {
-    mainWindow.setTitle(title);
+ipcMain.on('window:setTitle', (event, title) => {
+  const targetWin = getTargetWindow(event);
+  if (targetWin && !targetWin.isDestroyed() && typeof title === 'string') {
+    targetWin.setTitle(title);
   }
 });
 
-ipcMain.on('window:setRepresentedFilename', (_event, filePath) => {
-  if (process.platform === 'darwin' && mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.setRepresentedFilename(filePath || '');
-    if (filePath && fs.existsSync(filePath)) {
-      app.addRecentDocument(filePath);
+ipcMain.on('window:setRepresentedFilename', (event, filePath) => {
+  const targetWin = getTargetWindow(event);
+  if (process.platform === 'darwin' && targetWin && !targetWin.isDestroyed()) {
+    targetWin.setRepresentedFilename(filePath || '');
+    if (filePath) {
+      targetWin._hasLoadedDocument = true;
+      if (fs.existsSync(filePath)) {
+        app.addRecentDocument(filePath);
+      }
     }
   }
 });
 
-ipcMain.on('window:setDocumentEdited', (_event, isEdited) => {
-  if (process.platform === 'darwin' && mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.setDocumentEdited(Boolean(isEdited));
+ipcMain.on('window:setDocumentEdited', (event, isEdited) => {
+  const targetWin = getTargetWindow(event);
+  if (process.platform === 'darwin' && targetWin && !targetWin.isDestroyed()) {
+    targetWin.setDocumentEdited(Boolean(isEdited));
   }
 });
 
 // macOS Quick Look Preview Handlers
-ipcMain.handle('preview:file', async (_event, { filePath, displayName }) => {
-  if (process.platform === 'darwin' && mainWindow && !mainWindow.isDestroyed()) {
+ipcMain.handle('preview:file', async (event, { filePath, displayName }) => {
+  const targetWin = getTargetWindow(event);
+  if (process.platform === 'darwin' && targetWin && !targetWin.isDestroyed()) {
     if (filePath && fs.existsSync(filePath)) {
       const ext = path.extname(filePath).toLowerCase();
       const nativeMacQuickLookExts = new Set([
@@ -505,7 +578,7 @@ ipcMain.handle('preview:file', async (_event, { filePath, displayName }) => {
           fallbackToSnapshot: true,
         };
       }
-      mainWindow.previewFile(filePath, displayName || path.basename(filePath));
+      targetWin.previewFile(filePath, displayName || path.basename(filePath));
       return { success: true };
     }
     return { success: false, error: 'File does not exist on disk' };
@@ -513,8 +586,9 @@ ipcMain.handle('preview:file', async (_event, { filePath, displayName }) => {
   return { success: false, error: 'Quick Look is only supported on macOS' };
 });
 
-ipcMain.handle('preview:snapshot', async (_event, { base64Data, filename, displayName }) => {
-  if (process.platform === 'darwin' && mainWindow && !mainWindow.isDestroyed()) {
+ipcMain.handle('preview:snapshot', async (event, { base64Data, filename, displayName }) => {
+  const targetWin = getTargetWindow(event);
+  if (process.platform === 'darwin' && targetWin && !targetWin.isDestroyed()) {
     try {
       const cleanBase64 = (base64Data || '').replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(cleanBase64, 'base64');
@@ -529,7 +603,7 @@ ipcMain.handle('preview:snapshot', async (_event, { base64Data, filename, displa
         cleanDisplayName = `${cleanDisplayName}.png`;
       }
 
-      mainWindow.previewFile(tempFilePath, cleanDisplayName);
+      targetWin.previewFile(tempFilePath, cleanDisplayName);
       return { success: true, filePath: tempFilePath };
     } catch (err) {
       console.warn('[Electron] Could not show Quick Look preview snapshot:', err);
@@ -541,11 +615,14 @@ ipcMain.handle('preview:snapshot', async (_event, { base64Data, filename, displa
 
 app.whenReady().then(() => {
   createApplicationMenu();
-  createWindow();
-  checkCommandLineFileArgs();
+
+  const cliFiles = getCommandLineFileArgs();
+  const initialFiles = pendingInitialFiles.length > 0 ? pendingInitialFiles : cliFiles;
+
+  createWindow(initialFiles.length > 0 ? initialFiles : null);
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (openWindows.size === 0) {
       createWindow();
     }
   });

@@ -15,7 +15,7 @@ const ICONSET_DOC_DIR = path.join(BUILD_DIR, 'document-3d.iconset');
 });
 
 // App Icon SVG:
-// - Extra-large 3D Mesh Cube filling almost the entire canvas (radius 416, Y 96 to 928, X 152 to 872)
+// - Balanced 3D Mesh Cube with generous margin inside the squircle (radius 340, Y 172 to 852, X 218 to 806)
 // - Styled after the 3D Startup & Scene Loader Animation:
 //   * Cybernetic glass faces with dark cobalt/obsidian depth
 //   * Radiant 3D wireframe mesh grid in bright light blue & cyan (#58a6ff / #79c0ff / #00d2ff)
@@ -23,8 +23,7 @@ const ICONSET_DOC_DIR = path.join(BUILD_DIR, 'document-3d.iconset');
 //   * Glowing inner core octahedron / energy diamond
 //   * Precision gizmo orbit arcs
 //   * Radiant white-hot 3D vertex nodes with glowing cyan coronas
-const appIconSvg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+const appIconSvg = `<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <!-- Background Squircle Gradient (Obsidian / Dark Cyber Space) -->
     <linearGradient id="bgGrad" x1="512" y1="80" x2="512" y2="944" gradientUnits="userSpaceOnUse">
@@ -47,7 +46,7 @@ const appIconSvg = `<?xml version="1.0" encoding="UTF-8"?>
 
     <!-- Neon Glow Filter for Outer Edges & Nodes -->
     <filter id="neonGlow" x="-25%" y="-25%" width="150%" height="150%">
-      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feGaussianBlur stdDeviation="10" result="blur" />
       <feMerge>
         <feMergeNode in="blur" />
         <feMergeNode in="blur" />
@@ -56,7 +55,7 @@ const appIconSvg = `<?xml version="1.0" encoding="UTF-8"?>
     </filter>
 
     <!-- Soft Bloom for Inner Core -->
-    <radialGradient id="ambientGlow" cx="512" cy="512" r="430" gradientUnits="userSpaceOnUse">
+    <radialGradient id="ambientGlow" cx="512" cy="512" r="380" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#1f6feb" stop-opacity="0.36" />
       <stop offset="35%" stop-color="#00d2ff" stop-opacity="0.18" />
       <stop offset="70%" stop-color="#090d16" stop-opacity="0.05" />
@@ -64,7 +63,7 @@ const appIconSvg = `<?xml version="1.0" encoding="UTF-8"?>
     </radialGradient>
 
     <!-- Edge Specular Highlight: Center Vertical Ridge -->
-    <linearGradient id="centerRidgeSpec" x1="512" y1="96" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+    <linearGradient id="centerRidgeSpec" x1="512" y1="172" x2="512" y2="512" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
       <stop offset="20%" stop-color="#a5f3fc" stop-opacity="0.95" />
       <stop offset="70%" stop-color="#38bdf8" stop-opacity="0.65" />
@@ -72,42 +71,42 @@ const appIconSvg = `<?xml version="1.0" encoding="UTF-8"?>
     </linearGradient>
 
     <!-- Edge Specular Highlight: Top Left Edge -->
-    <linearGradient id="topLeftSpec" x1="152" y1="304" x2="512" y2="96" gradientUnits="userSpaceOnUse">
+    <linearGradient id="topLeftSpec" x1="218" y1="342" x2="512" y2="172" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.4" />
       <stop offset="65%" stop-color="#e0f2fe" stop-opacity="0.9" />
       <stop offset="100%" stop-color="#ffffff" stop-opacity="1" />
     </linearGradient>
 
     <!-- Edge Specular Highlight: Top Right Edge -->
-    <linearGradient id="topRightSpec" x1="512" y1="96" x2="872" y2="304" gradientUnits="userSpaceOnUse">
+    <linearGradient id="topRightSpec" x1="512" y1="172" x2="806" y2="342" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
       <stop offset="35%" stop-color="#79c0ff" stop-opacity="0.85" />
       <stop offset="100%" stop-color="#1f6feb" stop-opacity="0.3" />
     </linearGradient>
 
     <!-- Top Face Glass Fill -->
-    <linearGradient id="topFaceGrad" x1="152" y1="96" x2="872" y2="512" gradientUnits="userSpaceOnUse">
+    <linearGradient id="topFaceGrad" x1="218" y1="172" x2="806" y2="512" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#1f6feb" stop-opacity="0.25" />
       <stop offset="50%" stop-color="#0e2340" stop-opacity="0.45" />
       <stop offset="100%" stop-color="#091424" stop-opacity="0.7" />
     </linearGradient>
 
     <!-- Left Face Glass Fill -->
-    <linearGradient id="leftFaceGrad" x1="152" y1="304" x2="512" y2="928" gradientUnits="userSpaceOnUse">
+    <linearGradient id="leftFaceGrad" x1="218" y1="342" x2="512" y2="852" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#0f294a" stop-opacity="0.55" />
       <stop offset="60%" stop-color="#0a192f" stop-opacity="0.75" />
       <stop offset="100%" stop-color="#050d18" stop-opacity="0.9" />
     </linearGradient>
 
     <!-- Right Face Glass Fill -->
-    <linearGradient id="rightFaceGrad" x1="872" y1="304" x2="512" y2="928" gradientUnits="userSpaceOnUse">
+    <linearGradient id="rightFaceGrad" x1="806" y1="342" x2="512" y2="852" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#0a1a30" stop-opacity="0.7" />
       <stop offset="60%" stop-color="#06101e" stop-opacity="0.85" />
       <stop offset="100%" stop-color="#02060b" stop-opacity="0.95" />
     </linearGradient>
 
     <!-- Inner Core Diamond Gradient -->
-    <radialGradient id="octaCoreGlow" cx="512" cy="512" r="145" gradientUnits="userSpaceOnUse">
+    <radialGradient id="octaCoreGlow" cx="512" cy="512" r="125" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
       <stop offset="25%" stop-color="#00f0ff" stop-opacity="0.8" />
       <stop offset="60%" stop-color="#1f6feb" stop-opacity="0.4" />
@@ -119,139 +118,139 @@ const appIconSvg = `<?xml version="1.0" encoding="UTF-8"?>
   <rect x="80" y="80" width="864" height="864" rx="195" fill="url(#bgGrad)" filter="url(#squircleShadow)" stroke="url(#rimGrad)" stroke-width="2.5" />
 
   <!-- Background Orbit Gizmo Rings (Loader Animation Style) -->
-  <circle cx="512" cy="512" r="440" stroke="#1f6feb" stroke-width="2.2" stroke-dasharray="10 14" stroke-opacity="0.32" />
-  <circle cx="512" cy="512" r="474" stroke="#00f0ff" stroke-width="1.8" stroke-opacity="0.22" />
-  <path d="M 140 320 A 440 440 0 0 1 512 72" fill="none" stroke="#00f0ff" stroke-width="3.5" stroke-linecap="round" stroke-opacity="0.65" />
-  <path d="M 884 704 A 474 474 0 0 1 512 986" fill="none" stroke="#58a6ff" stroke-width="2.8" stroke-linecap="round" stroke-opacity="0.55" />
+  <circle cx="512" cy="512" r="380" stroke="#1f6feb" stroke-width="2" stroke-dasharray="8 12" stroke-opacity="0.32" />
+  <circle cx="512" cy="512" r="414" stroke="#00f0ff" stroke-width="1.6" stroke-opacity="0.22" />
+  <path d="M 190 350 A 380 380 0 0 1 512 132" fill="none" stroke="#00f0ff" stroke-width="3" stroke-linecap="round" stroke-opacity="0.65" />
+  <path d="M 834 674 A 414 414 0 0 1 512 926" fill="none" stroke="#58a6ff" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.55" />
 
   <!-- Ambient Volumetric Center Glow -->
-  <circle cx="512" cy="512" r="420" fill="url(#ambientGlow)" />
+  <circle cx="512" cy="512" r="360" fill="url(#ambientGlow)" />
 
   <!-- ======================================================== -->
   <!-- 3D CUBE TRANSLUCENT FACETS                                -->
   <!-- ======================================================== -->
-  <polygon points="512,96 872,304 512,512 152,304" fill="url(#topFaceGrad)" />
-  <polygon points="152,304 512,512 512,928 152,720" fill="url(#leftFaceGrad)" />
-  <polygon points="512,512 872,304 872,720 512,928" fill="url(#rightFaceGrad)" />
+  <polygon points="512,172 806,342 512,512 218,342" fill="url(#topFaceGrad)" />
+  <polygon points="218,342 512,512 512,852 218,682" fill="url(#leftFaceGrad)" />
+  <polygon points="512,512 806,342 806,682 512,852" fill="url(#rightFaceGrad)" />
 
   <!-- ======================================================== -->
   <!-- INNER 3D OCTAHEDRON / DIAMOND CORE (Loader Style)         -->
   <!-- ======================================================== -->
-  <circle cx="512" cy="512" r="145" fill="url(#octaCoreGlow)" />
+  <circle cx="512" cy="512" r="120" fill="url(#octaCoreGlow)" />
   <!-- Octahedron Facets -->
-  <polygon points="512,394 614,463 512,594 410,463" fill="#00f0ff" fill-opacity="0.32" stroke="#67e8f9" stroke-width="4.5" stroke-linejoin="round" />
-  <polygon points="512,394 614,463 512,512" fill="#79c0ff" fill-opacity="0.45" />
-  <polygon points="410,463 512,394 512,512" fill="#38bdf8" fill-opacity="0.35" />
-  <polygon points="512,594 614,463 512,512" fill="#1f6feb" fill-opacity="0.5" />
-  <polygon points="512,594 410,463 512,512" fill="#0f2744" fill-opacity="0.6" />
+  <polygon points="512,415 594,472 512,578 430,472" fill="#00f0ff" fill-opacity="0.32" stroke="#67e8f9" stroke-width="4" stroke-linejoin="round" />
+  <polygon points="512,415 594,472 512,512" fill="#79c0ff" fill-opacity="0.45" />
+  <polygon points="430,472 512,415 512,512" fill="#38bdf8" fill-opacity="0.35" />
+  <polygon points="512,578 594,472 512,512" fill="#1f6feb" fill-opacity="0.5" />
+  <polygon points="512,578 430,472 512,512" fill="#0f2744" fill-opacity="0.6" />
 
   <!-- ======================================================== -->
   <!-- 3D WIREFRAME MESH GRID IN LIGHT BLUE (#58a6ff / #79c0ff)  -->
   <!-- ======================================================== -->
-  <g stroke="#79c0ff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.88">
+  <g stroke="#79c0ff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.88">
     <!-- Top Face Grid -->
-    <line x1="272" y1="373" x2="632" y2="165" />
-    <line x1="392" y1="443" x2="752" y2="235" />
-    <line x1="272" y1="235" x2="632" y2="443" />
-    <line x1="392" y1="165" x2="752" y2="373" />
+    <line x1="316" y1="399" x2="610" y2="229" />
+    <line x1="414" y1="455" x2="708" y2="285" />
+    <line x1="316" y1="285" x2="610" y2="455" />
+    <line x1="414" y1="229" x2="708" y2="399" />
     <!-- Diagonal Triangulation of Top Face -->
-    <line x1="152" y1="304" x2="872" y2="304" stroke-width="11" stroke-opacity="0.55" />
+    <line x1="218" y1="342" x2="806" y2="342" stroke-width="9" stroke-opacity="0.55" />
 
     <!-- Left Face Grid -->
-    <line x1="272" y1="373" x2="272" y2="789" />
-    <line x1="392" y1="443" x2="392" y2="859" />
-    <line x1="152" y1="443" x2="512" y2="651" />
-    <line x1="152" y1="581" x2="512" y2="789" />
+    <line x1="316" y1="399" x2="316" y2="739" />
+    <line x1="414" y1="455" x2="414" y2="795" />
+    <line x1="218" y1="455" x2="512" y2="625" />
+    <line x1="218" y1="569" x2="512" y2="739" />
     <!-- Diagonal Triangulation of Left Face -->
-    <line x1="152" y1="304" x2="512" y2="928" stroke-width="11" stroke-opacity="0.5" />
+    <line x1="218" y1="342" x2="512" y2="852" stroke-width="9" stroke-opacity="0.5" />
 
     <!-- Right Face Grid -->
-    <line x1="632" y1="443" x2="632" y2="859" />
-    <line x1="752" y1="373" x2="752" y2="789" />
-    <line x1="512" y1="651" x2="872" y2="443" />
-    <line x1="512" y1="789" x2="872" y2="581" />
+    <line x1="610" y1="455" x2="610" y2="795" />
+    <line x1="708" y1="399" x2="708" y2="739" />
+    <line x1="512" y1="625" x2="806" y2="455" />
+    <line x1="512" y1="739" x2="806" y2="569" />
     <!-- Diagonal Triangulation of Right Face -->
-    <line x1="872" y1="304" x2="512" y2="928" stroke-width="11" stroke-opacity="0.5" />
+    <line x1="806" y1="342" x2="512" y2="852" stroke-width="9" stroke-opacity="0.5" />
   </g>
 
   <!-- Dashed Sub-Wireframe Accents (Matching .me-mesh-face span) -->
-  <g stroke="#38bdf8" stroke-width="4" stroke-dasharray="8 8" stroke-opacity="0.5">
-    <line x1="152" y1="304" x2="872" y2="720" />
-    <line x1="872" y1="304" x2="152" y2="720" />
+  <g stroke="#38bdf8" stroke-width="3.5" stroke-dasharray="7 7" stroke-opacity="0.5">
+    <line x1="218" y1="342" x2="806" y2="682" />
+    <line x1="806" y1="342" x2="218" y2="682" />
   </g>
 
   <!-- ======================================================== -->
   <!-- MAIN BOLD CUBE WIREFRAME EDGES (Vibrant Electric Blue)    -->
   <!-- ======================================================== -->
   <!-- Subtle Neon Glow Underlayer -->
-  <g stroke="#1f6feb" stroke-width="48" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" filter="url(#neonGlow)">
-    <path d="M 512 96 L 872 304 L 872 720 L 512 928 L 152 720 L 152 304 Z" fill="none" />
-    <path d="M 512 512 L 512 96 M 512 512 L 152 720 M 512 512 L 872 720" fill="none" />
+  <g stroke="#1f6feb" stroke-width="42" stroke-linecap="round" stroke-linejoin="round" opacity="0.45" filter="url(#neonGlow)">
+    <path d="M 512 172 L 806 342 L 806 682 L 512 852 L 218 682 L 218 342 Z" fill="none" />
+    <path d="M 512 512 L 512 172 M 512 512 L 218 682 M 512 512 L 806 682" fill="none" />
   </g>
 
   <!-- Primary Solid Cube Wireframe (#2563eb / #1f6feb) -->
-  <g stroke="#2563eb" stroke-width="36" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M 512 96 L 872 304 L 872 720 L 512 928 L 152 720 L 152 304 Z" fill="none" />
-    <path d="M 512 512 L 512 96 M 512 512 L 152 720 M 512 512 L 872 720" fill="none" />
+  <g stroke="#2563eb" stroke-width="32" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 512 172 L 806 342 L 806 682 L 512 852 L 218 682 L 218 342 Z" fill="none" />
+    <path d="M 512 512 L 512 172 M 512 512 L 218 682 M 512 512 L 806 682" fill="none" />
   </g>
 
   <!-- ======================================================== -->
   <!-- SPECULAR EDGE RIM HIGHLIGHTS (Crest Glow)                 -->
   <!-- ======================================================== -->
   <!-- Center Vertical Crest Ridge -->
-  <line x1="512" y1="96" x2="512" y2="512" stroke="url(#centerRidgeSpec)" stroke-width="16" stroke-linecap="round" />
+  <line x1="512" y1="172" x2="512" y2="512" stroke="url(#centerRidgeSpec)" stroke-width="14" stroke-linecap="round" />
   <!-- Top Left Crest Ridge -->
-  <line x1="152" y1="304" x2="512" y2="96" stroke="url(#topLeftSpec)" stroke-width="16" stroke-linecap="round" />
+  <line x1="218" y1="342" x2="512" y2="172" stroke="url(#topLeftSpec)" stroke-width="14" stroke-linecap="round" />
   <!-- Top Right Crest Ridge -->
-  <line x1="512" y1="96" x2="872" y2="304" stroke="url(#topRightSpec)" stroke-width="16" stroke-linecap="round" />
+  <line x1="512" y1="172" x2="806" y2="342" stroke="url(#topRightSpec)" stroke-width="14" stroke-linecap="round" />
 
   <!-- Lower Edge Crest Highlights -->
-  <line x1="152" y1="720" x2="512" y2="512" stroke="#58a6ff" stroke-width="12" stroke-linecap="round" stroke-opacity="0.4" />
-  <line x1="872" y1="720" x2="512" y2="512" stroke="#388bfd" stroke-width="12" stroke-linecap="round" stroke-opacity="0.35" />
+  <line x1="218" y1="682" x2="512" y2="512" stroke="#58a6ff" stroke-width="10" stroke-linecap="round" stroke-opacity="0.4" />
+  <line x1="806" y1="682" x2="512" y2="512" stroke="#388bfd" stroke-width="10" stroke-linecap="round" stroke-opacity="0.35" />
 
   <!-- ======================================================== -->
   <!-- RADIANT 3D VERTEX CORNER NODES (Loader Style)            -->
   <!-- ======================================================== -->
   <!-- Top Apex Vertex Node -->
-  <circle cx="512" cy="96" r="22" fill="#00f0ff" opacity="0.35" filter="url(#neonGlow)" />
-  <circle cx="512" cy="96" r="14" fill="#ffffff" stroke="#00f0ff" stroke-width="4.5" />
+  <circle cx="512" cy="172" r="20" fill="#00f0ff" opacity="0.35" filter="url(#neonGlow)" />
+  <circle cx="512" cy="172" r="13" fill="#ffffff" stroke="#00f0ff" stroke-width="4" />
 
   <!-- Center Hub Vertex Node -->
-  <circle cx="512" cy="512" r="26" fill="#00f0ff" opacity="0.45" filter="url(#neonGlow)" />
-  <circle cx="512" cy="512" r="17" fill="#ffffff" stroke="#00f0ff" stroke-width="5" />
+  <circle cx="512" cy="512" r="24" fill="#00f0ff" opacity="0.45" filter="url(#neonGlow)" />
+  <circle cx="512" cy="512" r="15" fill="#ffffff" stroke="#00f0ff" stroke-width="4.5" />
 
   <!-- Upper Left Vertex Node -->
-  <circle cx="152" cy="304" r="18" fill="#38bdf8" opacity="0.35" filter="url(#neonGlow)" />
-  <circle cx="152" cy="304" r="12" fill="#ffffff" stroke="#38bdf8" stroke-width="4" />
+  <circle cx="218" cy="342" r="16" fill="#38bdf8" opacity="0.35" filter="url(#neonGlow)" />
+  <circle cx="218" cy="342" r="11" fill="#ffffff" stroke="#38bdf8" stroke-width="3.5" />
 
   <!-- Upper Right Vertex Node -->
-  <circle cx="872" cy="304" r="18" fill="#38bdf8" opacity="0.35" filter="url(#neonGlow)" />
-  <circle cx="872" cy="304" r="12" fill="#ffffff" stroke="#38bdf8" stroke-width="4" />
+  <circle cx="806" cy="342" r="16" fill="#38bdf8" opacity="0.35" filter="url(#neonGlow)" />
+  <circle cx="806" cy="342" r="11" fill="#ffffff" stroke="#38bdf8" stroke-width="3.5" />
 
   <!-- Lower Left Vertex Node -->
-  <circle cx="152" cy="720" r="16" fill="#1f6feb" opacity="0.3" filter="url(#neonGlow)" />
-  <circle cx="152" cy="720" r="11" fill="#e0f2fe" stroke="#1f6feb" stroke-width="3.5" />
+  <circle cx="218" cy="682" r="15" fill="#1f6feb" opacity="0.3" filter="url(#neonGlow)" />
+  <circle cx="218" cy="682" r="10" fill="#e0f2fe" stroke="#1f6feb" stroke-width="3" />
 
   <!-- Lower Right Vertex Node -->
-  <circle cx="872" cy="720" r="16" fill="#1f6feb" opacity="0.3" filter="url(#neonGlow)" />
-  <circle cx="872" cy="720" r="11" fill="#e0f2fe" stroke="#1f6feb" stroke-width="3.5" />
+  <circle cx="806" cy="682" r="15" fill="#1f6feb" opacity="0.3" filter="url(#neonGlow)" />
+  <circle cx="806" cy="682" r="10" fill="#e0f2fe" stroke="#1f6feb" stroke-width="3" />
 
   <!-- Bottom Apex Vertex Node -->
-  <circle cx="512" cy="928" r="18" fill="#00d2ff" opacity="0.35" filter="url(#neonGlow)" />
-  <circle cx="512" cy="928" r="12" fill="#ffffff" stroke="#00d2ff" stroke-width="4" />
+  <circle cx="512" cy="852" r="16" fill="#00d2ff" opacity="0.35" filter="url(#neonGlow)" />
+  <circle cx="512" cy="852" r="11" fill="#ffffff" stroke="#00d2ff" stroke-width="3.5" />
 
   <!-- Subtle Interior Grid Intersection Micro-Nodes -->
   <g fill="#79c0ff">
-    <circle cx="392" cy="443" r="4.5" />
-    <circle cx="632" cy="443" r="4.5" />
-    <circle cx="272" cy="373" r="4.5" />
-    <circle cx="752" cy="373" r="4.5" />
-    <circle cx="392" cy="165" r="4" />
-    <circle cx="632" cy="165" r="4" />
-    <circle cx="272" cy="789" r="4" />
-    <circle cx="392" cy="859" r="4" />
-    <circle cx="632" cy="859" r="4" />
-    <circle cx="752" cy="789" r="4" />
+    <circle cx="414" cy="455" r="4" />
+    <circle cx="610" cy="455" r="4" />
+    <circle cx="316" cy="399" r="4" />
+    <circle cx="708" cy="399" r="4" />
+    <circle cx="414" cy="229" r="3.5" />
+    <circle cx="610" cy="229" r="3.5" />
+    <circle cx="316" cy="739" r="3.5" />
+    <circle cx="414" cy="795" r="3.5" />
+    <circle cx="610" cy="795" r="3.5" />
+    <circle cx="708" cy="739" r="3.5" />
   </g>
 </svg>`;
 
@@ -288,33 +287,33 @@ const docIconSvg = `<?xml version="1.0" encoding="UTF-8"?>
 
   <!-- Bold High-Tech 3D Cube in Center -->
   <g transform="translate(102, 35) scale(0.8)">
-    <polygon points="512,132 841,322 512,512 183,322" fill="#00d2ff" fill-opacity="0.25" />
-    <polygon points="183,322 512,512 512,892 183,702" fill="#1f6feb" fill-opacity="0.38" />
-    <polygon points="512,512 841,322 841,702 512,892" fill="#0c172a" fill-opacity="0.55" />
+    <polygon points="512,172 806,342 512,512 218,342" fill="#00d2ff" fill-opacity="0.25" />
+    <polygon points="218,342 512,512 512,852 218,682" fill="#1f6feb" fill-opacity="0.38" />
+    <polygon points="512,512 806,342 806,682 512,852" fill="#0c172a" fill-opacity="0.55" />
 
     <!-- Grid lines -->
-    <g stroke="#00f0ff" stroke-width="14" stroke-linecap="round">
-      <line x1="293" y1="385" x2="622" y2="195" />
-      <line x1="402" y1="449" x2="731" y2="259" />
-      <line x1="293" y1="259" x2="622" y2="449" />
-      <line x1="402" y1="195" x2="731" y2="385" />
-      <line x1="293" y1="385" x2="293" y2="765" />
-      <line x1="402" y1="449" x2="402" y2="829" />
-      <line x1="622" y1="449" x2="622" y2="829" />
-      <line x1="731" y1="385" x2="731" y2="765" />
+    <g stroke="#00f0ff" stroke-width="12" stroke-linecap="round">
+      <line x1="316" y1="399" x2="610" y2="229" />
+      <line x1="414" y1="455" x2="708" y2="285" />
+      <line x1="316" y1="285" x2="610" y2="455" />
+      <line x1="414" y1="229" x2="708" y2="399" />
+      <line x1="316" y1="399" x2="316" y2="739" />
+      <line x1="414" y1="455" x2="414" y2="795" />
+      <line x1="610" y1="455" x2="610" y2="795" />
+      <line x1="708" y1="399" x2="708" y2="739" />
     </g>
 
     <!-- Outer cube -->
-    <path d="M 512 132 L 841 322 L 841 702 L 512 892 L 183 702 L 183 322 Z"
-          fill="none" stroke="#1f6feb" stroke-width="34" stroke-linecap="round" stroke-linejoin="round" />
-    <path d="M 512 512 L 512 132 M 512 512 L 183 702 M 512 512 L 841 702"
-          fill="none" stroke="#1f6feb" stroke-width="34" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M 512 172 L 806 342 L 806 682 L 512 852 L 218 682 L 218 342 Z"
+          fill="none" stroke="#1f6feb" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M 512 512 L 512 172 M 512 512 L 218 682 M 512 512 L 806 682"
+          fill="none" stroke="#1f6feb" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" />
 
     <!-- Core glow & Nodes -->
-    <circle cx="512" cy="132" r="16" fill="#ffffff" stroke="#00f0ff" stroke-width="4" />
-    <circle cx="512" cy="512" r="18" fill="#ffffff" stroke="#00f0ff" stroke-width="4.5" />
-    <circle cx="183" cy="322" r="14" fill="#ffffff" stroke="#38bdf8" stroke-width="3.5" />
-    <circle cx="841" cy="322" r="14" fill="#ffffff" stroke="#38bdf8" stroke-width="3.5" />
+    <circle cx="512" cy="172" r="14" fill="#ffffff" stroke="#00f0ff" stroke-width="3.5" />
+    <circle cx="512" cy="512" r="16" fill="#ffffff" stroke="#00f0ff" stroke-width="4" />
+    <circle cx="218" cy="342" r="12" fill="#ffffff" stroke="#38bdf8" stroke-width="3" />
+    <circle cx="806" cy="342" r="12" fill="#ffffff" stroke="#38bdf8" stroke-width="3" />
   </g>
 
   <!-- Format Tag at Bottom -->

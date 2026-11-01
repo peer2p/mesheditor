@@ -95,7 +95,8 @@ body.is-electron-mac #top-toolbar input,
 body.is-electron-mac #top-toolbar select,
 body.is-electron-mac #top-toolbar .dropdown-wrapper,
 body.is-electron-mac #top-toolbar .dropdown-menu,
-body.is-electron-mac #top-toolbar .gizmo-btn-group {
+body.is-electron-mac #top-toolbar .gizmo-btn-group,
+body.is-electron-mac #top-toolbar .toolbar-brand {
   -webkit-app-region: no-drag;
 }
 
@@ -111,9 +112,26 @@ body.is-electron-mac #top-toolbar .gizmo-btn-group {
 .toolbar-brand {
   display: flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
   margin-right: 4px;
   flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toolbar-brand svg {
+  width: 28px;
+  height: 28px;
+  display: block;
+  flex-shrink: 0;
+  border-radius: 6px;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.45));
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.toolbar-brand:hover svg {
+  transform: scale(1.06);
+  filter: drop-shadow(0 2px 8px rgba(88, 166, 255, 0.45));
 }
 
 .app-title-logo {
