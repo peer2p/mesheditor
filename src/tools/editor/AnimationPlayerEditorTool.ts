@@ -1,10 +1,10 @@
-import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * Animation Player Tool.
  * Play, pause, scrub, and inspect skeletal animations and animation groups imported with 3D models.
  */
-export class AnimationPlayerEditorTool implements ToolInterface {
+export class AnimationPlayerEditorTool extends AbstractEditorTool {
   public readonly name = 'animation_player';
   public readonly dialogId = 'dialog-anim';
   public readonly triggerButtonId = 'btnToggleAnimPanel';

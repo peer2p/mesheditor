@@ -14,13 +14,32 @@ The Mesh Editor is structured into decoupled layers to ensure complete isolation
 
 ```
 src/
-├── index.ts                          # Public exports (App, Service, Adapters, Web Component, Plugins)
+├── index.ts                          # Public exports (App, Service, Adapters, Web Component, Plugins, Tools)
 ├── types.ts                          # Shared data types, callbacks, and events
 ├── plugin.ts                         # Plugin interfaces (MeshEditorPlugin, Context, PluginManager)
-├── template.ts                       # Self-contained HTML UI template
+├── template.ts                       # Self-contained HTML UI template (compiled from mesheditor.ejs & tool views)
 ├── styles.ts                         # Auto-injected CSS stylesheet for Web Component / NPM usage
 ├── MeshEditorService.ts              # Core 3D engine: meshes, gizmos, CSG2, facets, materials
 ├── MeshEditorApp.ts                  # UI coordinator: dat.GUI panels, outliner, window management
+├── tools/                            # Modular tool architecture
+│   ├── ToolInterface.ts              # Tool contracts, metadata, lifecycle hooks, AI function schemas
+│   ├── AbstractTool.ts               # Base class with math & scene helper utilities
+│   ├── ToolRegistry.ts               # Runtime tool registry & execution dispatcher
+│   └── editor/                       # Decentralized editor tools & EJS views
+│       ├── AbstractEditorTool.ts     # Base editor tool with auto-template & DOM rendering
+│       ├── toolViews.ts              # Auto-compiled EJS view templates
+│       ├── OutlinerEditorTool.ts / .ejs
+│       ├── AIAgentEditorTool.ts / .ejs
+│       ├── CreatePrimitiveEditorTool.ts / .ejs
+│       ├── CSGEditorTool.ts / .ejs
+│       ├── FacetEditorTool.ts / .ejs
+│       ├── SceneEnvironmentEditorTool.ts / .ejs
+│       ├── MeshPropertiesEditorTool.ts / .ejs
+│       ├── MaterialEditorTool.ts / .ejs
+│       ├── AnimationPlayerEditorTool.ts / .ejs
+│       ├── TextureOptimizerEditorTool.ts / .ejs
+│       ├── VoxelPainterEditorTool.ts / .ejs
+│       └── PathExtrusionEditorTool.ts / .ejs
 ├── adapters/
 │   ├── PlatformAdapter.ts            # Platform adapter contract (open/save dialogs, native menu bridge)
 │   ├── BrowserPlatformAdapter.ts     # Standalone browser file input & download adapter
@@ -28,7 +47,7 @@ src/
 │   └── HostAppAdapter.ts             # Embedded host application adapter (callbacks & custom save button)
 ├── web-component/
 │   └── MeshEditorElement.ts          # <mesh-editor> Custom Element
-├── mesheditor.ejs                    # Standalone HTML entry template
+├── mesheditor.ejs                    # Modular HTML entry template with EJS tool includes
 └── mesheditor.css                    # Theme styles, layouts (Floating vs Stackpanel), dialogs
 electron/
 ├── main.js                           # Electron main process (macOS, Windows, Linux native dialogs & menu)
@@ -81,6 +100,198 @@ electron/
 | **⌘V / Ctrl+V**        | Paste copy at cursor position                               |
 | **⌘D / Ctrl+D**        | Duplicate selected mesh in place                            |
 | **Esc**                | Cancel active Pick & Place placement mode / close dropdowns |
+
+---
+
+## Modular Tool Architecture & Creating New Tools
+
+The Mesh Editor features a **Decentralized Modular Tool Architecture** where every 3D tool (such as Voxel Painter, Path Extrusion, CSG Sculpting, Material UV Editor, and the AI Mesh Agent) is a fully self-contained unit. Rather than hardcoding tool logic and dialog HTML into monolithic files, each tool encapsulates:
+
+- **Logic & Configuration**: A TypeScript class extending [`AbstractEditorTool`](src/tools/editor/AbstractEditorTool.ts) (which implements [`ToolInterface`](src/tools/ToolInterface.ts)).
+- **Dedicated EJS View**: Its own `.ejs` dialog template (e.g. `VoxelPainterEditorTool.ejs`) located right beside the class in `src/tools/editor/`.
+- **In-App Help Guide**: An HTML `helpText` string explaining tool features, keyboard/mouse shortcuts, and tips rendered inside the `?` header button guide popup.
+- **Lifecycle Hooks**: Methods (`onOpen`, `onClose`, `onMinimize`, `onMaximize`, `onUpdateUI`, `isActive`) managing activation, viewport event capturing, and cleanup.
+- **Dynamic DOM Mounting**: If a tool dialog is not already present in the DOM (e.g. in custom mounting containers or dynamically registered plugin tools), the tool automatically mounts itself into `#stackpanelRightSidebar` via `renderView()`.
+
+---
+
+### Step-by-Step Guide: How to Create a New Tool
+
+Follow these steps to build and register a new tool in the Mesh Editor:
+
+#### Step 1: Create the EJS View Template
+
+Create `src/tools/editor/MyCustomEditorTool.ejs` to define the floating dialog markup:
+
+```html
+<div id="dialog-my-custom-tool" class="floating-dialog" style="top: 100px; left: 348px; width: 340px; display: none">
+  <div class="dialog-header">
+    <span class="dialog-title"><i class="app-icon" data-lucide="wand-2"></i> Custom Tool</span>
+    <div class="dialog-actions">
+      <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+      <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+      <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+    </div>
+  </div>
+  <div class="dialog-body my-custom-tool-body" style="padding: 10px">
+    <p style="margin-bottom: 8px; font-size: 12px; color: var(--text-secondary)">
+      Parametric procedural generator for custom geometries.
+    </p>
+    <div class="form-group" style="margin-bottom: 8px">
+      <label for="customParam" style="font-size: 11px">Size Parameter:</label>
+      <input type="number" id="customParam" class="form-input-sm" value="1.0" min="0.1" max="10.0" step="0.5" />
+    </div>
+    <button class="btn btn-primary btn-sm" id="btnMyCustomAction" style="width: 100%">
+      <i class="app-icon" data-lucide="play"></i> Run Operation
+    </button>
+  </div>
+</div>
+```
+
+> [!TIP]
+> Always include the three standard header action buttons: `btn-help` (`?` guide popup), `btn-min` (collapse/expand), and `btn-close` (`x` close).
+
+#### Step 2: Create the Tool Class
+
+Create `src/tools/editor/MyCustomEditorTool.ts` extending `AbstractEditorTool`:
+
+```typescript
+import { AbstractEditorTool } from './AbstractEditorTool';
+
+export class MyCustomEditorTool extends AbstractEditorTool {
+  public readonly name = 'my_custom_tool';
+  public readonly dialogId = 'dialog-my-custom-tool';
+  public readonly triggerButtonId = 'btnToggleMyCustomTool';
+  public readonly toolbarButtonId = 'btnToolbarMyCustomTool'; // Optional quick-access toolbar button
+  public readonly menuId = 'menuTools';
+  public readonly menuLabel = 'Custom Tool';
+  public readonly icon = 'wand-2'; // Lucide icon identifier
+  public readonly order = 15;
+  public readonly isExclusive3DTool = false; // Set to true if the tool takes exclusive control of 3D canvas clicks
+  public readonly defaultOpen = false;
+  public readonly description = 'Parametric procedural generator for custom geometries.';
+
+  public readonly helpText = `
+<h4><i class="app-icon" data-lucide="info"></i> Overview</h4>
+<p>The <strong>Custom Tool</strong> enables procedural generation and editing of custom 3D geometries.</p>
+
+<h4><i class="app-icon" data-lucide="mouse-pointer"></i> Viewport Controls</h4>
+<ul>
+  <li><strong>Left Click:</strong> Select mesh or target position.</li>
+  <li><strong>Right Click + Drag:</strong> Orbit camera freely.</li>
+</ul>
+
+<h4><i class="app-icon" data-lucide="sparkles"></i> Options & Tips</h4>
+<ul>
+  <li>Adjust <code>Size Parameter</code> to control the procedural generation resolution.</li>
+  <li>Click <strong>Run Operation</strong> to generate meshes in the active scene.</li>
+</ul>
+`.trim();
+
+  public onOpen(app: any): void {
+    app.showToast('Custom Tool activated.', 'info');
+    const btn = document.getElementById('btnMyCustomAction');
+    if (btn) {
+      btn.onclick = () => {
+        app.showToast('Custom action executed!', 'success');
+      };
+    }
+  }
+
+  public onClose(app: any): void {
+    // Teardown active viewport helpers or event listeners if necessary
+  }
+
+  public onMinimize(app: any): void {
+    // Optional: pause rendering or interactive listeners
+  }
+
+  public onMaximize(app: any): void {
+    // Optional: resume interactive listeners
+  }
+
+  public onUpdateUI(app: any): void {
+    // Sync UI elements with active selection
+  }
+}
+```
+
+#### Step 3: Include in `src/mesheditor.ejs`
+
+Add the EJS partial include inside `#stackpanelRightSidebar` in `src/mesheditor.ejs`:
+
+```html
+<div id="stackpanelRightSidebar" class="stackpanel-sidebar">
+  ...
+  <%- include('./tools/editor/MyCustomEditorTool.ejs') %>
+</div>
+```
+
+*(Note: Even if omitted from `mesheditor.ejs`, `tool.renderView()` automatically mounts the dialog into `#stackpanelRightSidebar` when opened).*
+
+#### Step 4: Register in `src/tools/editor/index.ts`
+
+Export and instantiate the new tool in `createBuiltinEditorTools()`:
+
+```typescript
+import { MyCustomEditorTool } from './MyCustomEditorTool';
+
+export {
+  ...
+  MyCustomEditorTool,
+};
+
+export function createBuiltinEditorTools(): ToolInterface[] {
+  return [
+    ...
+    new MyCustomEditorTool(),
+  ];
+}
+```
+
+#### Step 5: Synchronize Templates & Verify
+
+Run the template sync script:
+
+```bash
+npm run sync:templates
+```
+
+This compiles your `.ejs` file into `src/tools/editor/toolViews.ts` and updates `src/template.ts` for Web Components and library bundles.
+
+Then verify with tests and build:
+
+```bash
+npm run type-check
+npm test
+npm run build
+```
+
+---
+
+### Optional: AI Function Calling Support
+
+If your tool should also be executable by the AI Mesh Agent (or LLMs via OpenAI-compatible function calling), implement `execute(args, context)` and the `parameters` JSON schema:
+
+```typescript
+import { ToolExecutionContext } from '../ToolExecutionContext';
+
+export class MyCustomEditorTool extends AbstractEditorTool {
+  ...
+  public readonly parameters = {
+    type: 'object',
+    properties: {
+      size: { type: 'number', description: 'Size of the generated box', default: 1.0 },
+    },
+    required: ['size'],
+  };
+
+  public async execute(args: any, context: ToolExecutionContext): Promise<string> {
+    const mesh = context.service.createBox(`custom_box_${Date.now()}`, { size: args.size });
+    return JSON.stringify({ success: true, meshName: mesh.name });
+  }
+}
+```
 
 ---
 
@@ -264,6 +475,7 @@ bootstrap();
 | **Integration Tests (Watch)** | `npm run test:watch` | Runs Vitest in interactive watch mode |
 | **End-to-End Tests (Browser)** | `npm run test:e2e` | Starts the dev server and runs Playwright Chromium E2E tests (`tests/e2e/`) |
 | **Full Test Suite** | `npm run test:all` | Runs all integration tests followed by all Playwright E2E tests |
+| **Sync Tool View Templates** | `npm run sync:templates` | Synchronizes decentralized `.ejs` tool views into `toolViews.ts` and updates `src/template.ts` |
 | **Clean Build Artifacts** | `npm run clean` | Removes `dist/`, `dist-lib/`, and `release/` |
 
 ---

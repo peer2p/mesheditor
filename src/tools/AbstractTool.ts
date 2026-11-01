@@ -20,7 +20,38 @@ export abstract class AbstractTool implements ToolInterface {
   public readonly isExclusive3DTool?: boolean;
   public readonly defaultOpen?: boolean;
   public readonly order?: number;
+  public readonly viewTemplate?: string;
   public abstract readonly parameters: Record<string, any>;
+
+  /**
+   * Returns the HTML/EJS view template markup for this tool dialog.
+   */
+  public getViewTemplate(): string {
+    return this.viewTemplate || '';
+  }
+
+  /**
+   * Mounts or retrieves the tool's dialog DOM element.
+   * If the dialog element is not already present in the DOM, mounts it from `viewTemplate`.
+   */
+  public renderView(container?: HTMLElement): HTMLElement | null {
+    if (typeof document === 'undefined') return null;
+    if (this.dialogId) {
+      const existing = document.getElementById(this.dialogId);
+      if (existing) return existing;
+    }
+    const template = this.getViewTemplate();
+    if (!template) return null;
+    const target = container || document.getElementById('stackpanelRightSidebar') || document.body;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = template.trim();
+    const element = wrapper.firstElementChild as HTMLElement;
+    if (element && target) {
+      target.appendChild(element);
+      return element;
+    }
+    return null;
+  }
 
   /**
    * Generates standard OpenAI tool schema definition.

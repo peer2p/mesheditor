@@ -398,6 +398,12 @@ mesh-editor {
   align-items: center;
   justify-content: center;
   transition: all 0.15s ease;
+  outline: none;
+}
+
+.dialog-btn:focus,
+.dialog-btn:focus-visible {
+  outline: none !important;
 }
 
 .dialog-btn:hover {
@@ -508,33 +514,61 @@ body.layout-stackpanel .stackpanel-sidebar .floating-dialog,
   -webkit-backdrop-filter: blur(14px) !important;
   border: 1px solid var(--border-color) !important;
   border-radius: var(--radius-md) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  transition: background 0.15s ease !important;
+}
+
+body.layout-stackpanel .stackpanel-sidebar .floating-dialog.active-focus,
+#app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog.active-focus {
+  border-color: var(--border-color) !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 body.layout-stackpanel .stackpanel-sidebar .floating-dialog.minimized,
 #app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog.minimized {
-  background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border: none !important;
+  background: rgba(22, 27, 34, 0.65) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
   box-shadow: none !important;
+  outline: none !important;
+}
+
+body.layout-stackpanel .stackpanel-sidebar .floating-dialog.minimized:hover,
+#app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog.minimized:hover {
+  background: rgba(30, 37, 48, 0.85) !important;
+  border-color: var(--border-color) !important;
+}
+
+body.layout-stackpanel .stackpanel-sidebar .floating-dialog .dialog-header,
+#app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog .dialog-header {
+  border-radius: var(--radius-md) var(--radius-md) 0 0 !important;
+  border: none !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  cursor: pointer !important;
 }
 
 body.layout-stackpanel .stackpanel-sidebar .floating-dialog.minimized .dialog-header,
 #app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog.minimized .dialog-header {
   border-radius: var(--radius-md) !important;
-  background: rgba(22, 27, 34, 0.65) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  border: 1px solid var(--border-color) !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) !important;
-  transition: all 0.15s ease !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  transition: none !important;
 }
 
 body.layout-stackpanel .stackpanel-sidebar .floating-dialog.minimized:hover .dialog-header,
 #app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog.minimized:hover .dialog-header {
-  background: rgba(30, 37, 48, 0.85) !important;
-  border-color: rgba(255, 255, 255, 0.25) !important;
+  background: transparent !important;
+  border: none !important;
 }
 
 body.layout-stackpanel .floating-dialog .dialog-header,
@@ -551,6 +585,8 @@ body.layout-stackpanel #dialog-outliner,
   width: 350px !important;
   max-height: calc(100% - 108px) !important;
   transform: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 body.layout-stackpanel #dialog-outliner .dialog-body,

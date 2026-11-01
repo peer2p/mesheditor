@@ -1,10 +1,10 @@
-import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * Material & UV Mapping Tool.
  * Configure PBR material properties, colors, textures, roughness, metallic, and UV projections.
  */
-export class MaterialEditorTool implements ToolInterface {
+export class MaterialEditorTool extends AbstractEditorTool {
   public readonly name = 'material_uv';
   public readonly dialogId = 'dialog-material';
   public readonly triggerButtonId = 'btnToggleMaterialPanel';

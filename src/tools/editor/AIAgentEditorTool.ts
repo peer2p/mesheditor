@@ -1,10 +1,10 @@
-import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * AI Mesh Agent Tool.
  * Text-to-Mesh and Image-to-Mesh generator and conversational scene assistant.
  */
-export class AIAgentEditorTool implements ToolInterface {
+export class AIAgentEditorTool extends AbstractEditorTool {
   public readonly name = 'ai_agent';
   public readonly dialogId = 'dialog-ai-agent';
   public readonly triggerButtonId = 'btnToggleAIAgent';

@@ -1274,6 +1274,7 @@ export class MeshEditorApp {
 
     if (willBeMin) {
       dialog.classList.add('minimized');
+      dialog.classList.remove('active-focus');
       tool?.onMinimize?.(this);
     } else {
       dialog.classList.remove('minimized');
@@ -1287,6 +1288,7 @@ export class MeshEditorApp {
     if (btnMin) {
       btnMin.innerHTML = `<i class="app-icon" data-lucide="${willBeMin ? 'plus' : 'minus'}"></i>`;
       btnMin.title = willBeMin ? 'Expand' : 'Minimize';
+      btnMin.blur();
     }
     this.refreshIcons();
     this.updatePanelButtonStates();
@@ -1302,10 +1304,12 @@ export class MeshEditorApp {
       if (isSidebarPanel && other.closest('.stackpanel-sidebar') !== null) {
         if (!other.classList.contains('minimized')) {
           other.classList.add('minimized');
+          other.classList.remove('active-focus');
           const btnMin = other.querySelector('.btn-min') as HTMLElement | null;
           if (btnMin) {
             btnMin.innerHTML = '<i class="app-icon" data-lucide="plus"></i>';
             btnMin.title = 'Expand';
+            btnMin.blur();
           }
           const otherTool = this.getToolByDialogId(id);
           otherTool?.onMinimize?.(this);
@@ -1317,7 +1321,17 @@ export class MeshEditorApp {
   }
 
   public toggleDialog(id: string, forceOpen?: boolean): void {
-    const dialog = this.getElement(id);
+    let dialog = this.getElement(id);
+    if (!dialog) {
+      const tool = this.getToolByDialogId(id);
+      if (tool?.renderView) {
+        const container = this.getElement<HTMLElement>('stackpanelRightSidebar') || undefined;
+        dialog = tool.renderView(container);
+        if (dialog) {
+          this.setupFloatingDialog(dialog);
+        }
+      }
+    }
     if (!dialog) return;
 
     const isCurrentlyOpen =
@@ -2031,6 +2045,17 @@ export class MeshEditorApp {
 
   public bringDialogToFront(activeDialog: HTMLElement): void {
     const scope = this.rootContainer || document;
+    const isStack = this.layoutMode === 'stackpanel' || document.body.classList.contains('layout-stackpanel');
+
+    if (isStack && activeDialog.closest('.stackpanel-sidebar')) {
+      const sidebarDialogs = Array.from(scope.querySelectorAll('.stackpanel-sidebar .floating-dialog')) as HTMLElement[];
+      sidebarDialogs.forEach((d) => d.classList.remove('active-focus'));
+      if (!activeDialog.classList.contains('minimized')) {
+        activeDialog.classList.add('active-focus');
+      }
+      return;
+    }
+
     const allDialogs = Array.from(scope.querySelectorAll('.floating-dialog')) as HTMLElement[];
     // Sort other dialogs by their current z-index so relative stacking order is preserved
     const others = allDialogs

@@ -48,6 +48,22 @@ export interface ToolInterface {
   readonly menuLabel?: string;
 
   /**
+   * HTML/EJS view template markup for this tool's floating dialog or panel.
+   */
+  readonly viewTemplate?: string;
+
+  /**
+   * Returns the HTML/EJS view template markup for this tool.
+   */
+  getViewTemplate?(): string;
+
+  /**
+   * Mounts or retrieves the tool's dialog DOM element.
+   * If the dialog element is not already present in the DOM, mounts it from `viewTemplate`.
+   */
+  renderView?(container?: HTMLElement): HTMLElement | null;
+
+  /**
    * If true, this tool takes exclusive control of 3D scene pointer clicks (e.g. voxel painting or path curve editing).
    * Activating another exclusive tool automatically deactivates this one.
    */

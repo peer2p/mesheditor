@@ -1,10 +1,10 @@
-import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * Facet & Vertex Editor Tool.
  * Inspect, move, and edit mesh facet normals, vertex data, and wireframes.
  */
-export class FacetEditorTool implements ToolInterface {
+export class FacetEditorTool extends AbstractEditorTool {
   public readonly name = 'facet_editor';
   public readonly dialogId = 'dialog-facet';
   public readonly triggerButtonId = 'btnToggleFacetEditor';

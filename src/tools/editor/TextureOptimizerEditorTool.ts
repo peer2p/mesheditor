@@ -1,10 +1,10 @@
-import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * Texture Optimizer Tool.
  * Optimize, resize, convert textures to WebP, inspect texture memory, and embed texture assets.
  */
-export class TextureOptimizerEditorTool implements ToolInterface {
+export class TextureOptimizerEditorTool extends AbstractEditorTool {
   public readonly name = 'texture_optimizer';
   public readonly dialogId = 'dialog-textures';
   public readonly triggerButtonId = 'btnToggleTexturePanel';

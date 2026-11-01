@@ -277,4 +277,40 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     expect(exportModal.classList.contains('active')).toBe(false);
   });
+
+  it('manages stackpanel sidebar mode, accordion minimizing, and active-focus state cleanly', () => {
+    app = new MeshEditorApp({
+      container,
+      engine,
+    });
+
+    app.setLayoutMode('stackpanel', false);
+    expect(app.layoutMode).toBe('stackpanel');
+    expect(document.body.classList.contains('layout-stackpanel')).toBe(true);
+
+    const dialogMesh = container.querySelector('#dialog-mesh') as HTMLElement;
+    const dialogScene = container.querySelector('#dialog-scene') as HTMLElement;
+    expect(dialogMesh).not.toBeNull();
+    expect(dialogScene).not.toBeNull();
+
+    // Ensure dialogMesh is open
+    app.toggleDialog('dialog-mesh', true);
+    expect(dialogMesh.style.display).not.toBe('none');
+
+    // Minimizing dialogMesh in stackpanel mode removes active-focus
+    app.toggleDialogMinimize(dialogMesh, true);
+    expect(dialogMesh.classList.contains('minimized')).toBe(true);
+    expect(dialogMesh.classList.contains('active-focus')).toBe(false);
+
+    // Clicking/bringing a minimized dialog to front does not assign active-focus in stackpanel mode
+    app.bringDialogToFront(dialogMesh);
+    expect(dialogMesh.classList.contains('active-focus')).toBe(false);
+
+    // Expanding dialogScene minimizes others and clears active-focus from minimized ones
+    app.toggleDialog('dialog-scene', true);
+    app.toggleDialogMinimize(dialogScene, false);
+    expect(dialogScene.classList.contains('minimized')).toBe(false);
+    expect(dialogMesh.classList.contains('minimized')).toBe(true);
+    expect(dialogMesh.classList.contains('active-focus')).toBe(false);
+  });
 });

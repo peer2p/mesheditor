@@ -1,10 +1,10 @@
-import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * CSG Sculpting Tool.
  * Constructive Solid Geometry operations (Subtract, Union, Intersect) using selected meshes.
  */
-export class CSGEditorTool implements ToolInterface {
+export class CSGEditorTool extends AbstractEditorTool {
   public readonly name = 'csg_sculpting';
   public readonly dialogId = 'dialog-csg';
   public readonly triggerButtonId = 'btnToggleCSG';

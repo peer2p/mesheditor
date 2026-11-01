@@ -1,10 +1,10 @@
-import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * Create Mesh Primitive Generator Tool.
  * Interactive 3D primitive mesh generation with raycast pick-and-place.
  */
-export class CreatePrimitiveEditorTool implements ToolInterface {
+export class CreatePrimitiveEditorTool extends AbstractEditorTool {
   public readonly name = 'create_primitive';
   public readonly dialogId = 'dialog-create-primitive';
   public readonly triggerButtonId = 'btnCreatePrimitive';

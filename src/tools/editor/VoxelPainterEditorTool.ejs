@@ -1,0 +1,92 @@
+<div id="dialog-voxel-painter" class="floating-dialog" style="top: 100px; left: 348px; width: 340px; display: none">
+          <div class="dialog-header">
+            <span class="dialog-title"><i class="app-icon" data-lucide="brush"></i> Voxel Painter</span>
+            <div class="dialog-actions">
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+            </div>
+          </div>
+          <div class="dialog-body voxel-painter-body">
+            <!-- Mode Switcher -->
+            <div class="voxel-mode-group">
+              <button class="voxel-mode-btn active" id="btnVoxelModePaint" title="Paint block on surface">
+                <i class="app-icon" data-lucide="paintbrush"></i> Paint
+              </button>
+              <button class="voxel-mode-btn" id="btnVoxelModeErase" title="Erase block">
+                <i class="app-icon" data-lucide="eraser"></i> Erase
+              </button>
+              <button class="voxel-mode-btn" id="btnVoxelModePick" title="Eyedropper: pick block material">
+                <i class="app-icon" data-lucide="pipette"></i> Pick
+              </button>
+            </div>
+
+            <!-- Active Material Preview Card -->
+            <div class="voxel-active-preview-card" id="voxelActivePreviewCard">
+              <div class="voxel-active-thumb" id="voxelActiveThumb"></div>
+              <div class="voxel-active-meta">
+                <span class="voxel-active-title" id="voxelActiveTitle">Stone</span>
+                <span class="voxel-active-type" id="voxelActiveType">Atlas Tile</span>
+              </div>
+              <div class="voxel-active-actions">
+                <button class="tool-btn-xs" id="btnVoxelAddTexture" title="Add individual texture image from disk"><i class="app-icon" data-lucide="image"></i> Add Image</button>
+              </div>
+            </div>
+            <input type="file" id="voxelTextureFileInput" accept="image/*" style="display: none" />
+
+            <!-- Visual Texture Picker (Scene Textures & Atlases) -->
+            <div class="voxel-section">
+              <div class="voxel-section-header">
+                <span><i class="app-icon" data-lucide="image"></i> Visual Texture Picker</span>
+                <div class="voxel-section-actions">
+                  <button class="tool-btn-xs" id="btnVoxelLoadAtlas" title="Load Texture Atlas Image"><i class="app-icon" data-lucide="upload"></i> Atlas</button>
+                </div>
+              </div>
+              <div class="voxel-texture-gallery" id="voxelTextureGallery">
+                <!-- Dynamically populated visual texture cards -->
+              </div>
+              <select id="voxelAtlasSelect" class="form-select" style="margin-top: 2px">
+                <option value="">Default Terrain Atlas (16 Tiles)</option>
+              </select>
+            </div>
+
+            <!-- Palette Swatches Grid -->
+            <div class="voxel-section">
+              <div class="voxel-section-header">
+                <span><i class="app-icon" data-lucide="palette"></i> Palette Swatches</span>
+                <span id="voxelSelectedMaterialName" class="voxel-selected-label">Stone</span>
+              </div>
+              <div class="voxel-palette-grid" id="voxelPaletteGrid">
+                <!-- Dynamically populated swatches -->
+              </div>
+            </div>
+
+            <!-- Parameters -->
+            <div class="voxel-controls-row">
+              <label for="voxelSizeInput">Size:</label>
+              <input type="number" id="voxelSizeInput" class="form-input-sm" value="1.0" min="0.1" max="5.0" step="0.25" />
+              <label for="voxelIntervalInput">Speed:</label>
+              <input type="range" id="voxelIntervalInput" min="50" max="400" step="25" value="150" title="Continuous paint interval (ms)" />
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="voxel-actions-row">
+              <button class="btn btn-primary btn-sm" id="btnVoxelBake" title="Bake painted voxels into an editable 3D mesh in the scene">
+                <i class="app-icon" data-lucide="box"></i> Bake to 3D Mesh
+              </button>
+              <button class="btn btn-secondary btn-sm" id="btnVoxelClear" title="Clear all voxel blocks">
+                <i class="app-icon" data-lucide="trash-2"></i> Clear
+              </button>
+            </div>
+
+            <div class="voxel-io-row">
+              <button class="btn btn-outline btn-xs" id="btnVoxelImportJson" title="Import RLE Voxel Data JSON">
+                <i class="app-icon" data-lucide="upload"></i> Import JSON
+              </button>
+              <button class="btn btn-outline btn-xs" id="btnVoxelExportJson" title="Export RLE Voxel Data JSON">
+                <i class="app-icon" data-lucide="download"></i> Export JSON
+              </button>
+              <span class="voxel-blocks-badge" id="voxelBlocksCount">0 Blocks</span>
+            </div>
+          </div>
+        </div>

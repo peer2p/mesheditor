@@ -454,7 +454,42 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
         expect(t.dialogId).toBeTruthy();
         expect(t.helpText).toBeTruthy();
         expect(t.description).toBeTruthy();
+
+        // Verify each tool brings its own decentralized view template
+        const viewTemplate = t.getViewTemplate?.();
+        expect(viewTemplate).toBeTruthy();
+        expect(viewTemplate).toContain(`id="${t.dialogId}"`);
+        expect(viewTemplate).toContain('class="floating-dialog');
+        expect(viewTemplate).toContain('class="dialog-header"');
       }
+    });
+
+    it('mounts decentralized tool views dynamically into container when missing from DOM', () => {
+      const container = document.createElement('div');
+      container.id = 'customContainer';
+      document.body.appendChild(container);
+
+      const voxelTool = new VoxelPainterEditorTool();
+      expect(voxelTool.dialogId).toBe('dialog-voxel-painter');
+
+      // Clean up any lingering dialog from previous tests
+      document.getElementById('dialog-voxel-painter')?.remove();
+
+      // Ensure dialog is not yet in DOM
+      expect(document.getElementById('dialog-voxel-painter')).toBeNull();
+
+      // Render view dynamically
+      const renderedElement = voxelTool.renderView(container);
+      expect(renderedElement).not.toBeNull();
+      expect(renderedElement?.id).toBe('dialog-voxel-painter');
+      expect(container.contains(renderedElement!)).toBe(true);
+
+      // Subsequent call returns existing element without duplicating
+      const secondCall = voxelTool.renderView(container);
+      expect(secondCall).toBe(renderedElement);
+      expect(container.querySelectorAll('#dialog-voxel-painter').length).toBe(1);
+
+      container.remove();
     });
   });
 });

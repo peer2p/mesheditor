@@ -1,0 +1,49 @@
+<div id="dialog-path-extrusion" class="floating-dialog" style="top: 100px; left: 700px; width: 340px; display: none">
+          <div class="dialog-header">
+            <span class="dialog-title"><i class="app-icon" data-lucide="route"></i> Path Extrusion</span>
+            <div class="dialog-actions">
+              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+            </div>
+          </div>
+          <div class="dialog-body path-extrusion-body">
+            <!-- Active Path Extrusion Selector -->
+            <div class="path-extrusion-control-group">
+              <label class="path-extrusion-label" for="pathExtrusionSelect">Active Path Extrusion</label>
+              <div class="path-extrusion-row">
+                <select id="pathExtrusionSelect" class="path-extrusion-select"></select>
+                <button type="button" class="btn btn-secondary btn-action-sm" id="btnPathExtrusionNew" title="Create new path extrusion"><i class="app-icon" data-lucide="plus"></i></button>
+                <button type="button" class="btn btn-secondary btn-action-sm btn-danger" id="btnPathExtrusionDelete" title="Delete path extrusion"><i class="app-icon" data-lucide="trash-2"></i></button>
+              </div>
+            </div>
+
+            <!-- Open Path Extrusion Studio Button -->
+            <button type="button" class="btn btn-primary btn-block mb-3" id="btnOpenPathExtrusionStudio" title="Open Interactive 2D Cross-Section Canvas & Presets Studio" style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:8px 12px;margin-bottom:12px;font-weight:600;">
+              <i class="app-icon" data-lucide="palette"></i> Open Path Extrusion Studio
+            </button>
+
+            <!-- Help / Status info -->
+            <div class="path-extrusion-help-box">
+              <div class="path-extrusion-help-title"><i class="app-icon" data-lucide="info"></i> 3D Spline Sculpting</div>
+              <div class="path-extrusion-help-text">
+                • <strong>Shift + Click</strong> on ground/mesh to place or append points.<br />
+                • Click any point sphere to attach 3D Gizmo and drag in space.
+              </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="path-extrusion-actions">
+              <button type="button" class="btn btn-secondary btn-sm" id="btnPathExtrusionRemovePoint" title="Delete selected waypoint">
+                <i class="app-icon" data-lucide="minus"></i> Remove Point
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btnPathExtrusionClearPoints" title="Clear all waypoints for this path extrusion">
+                <i class="app-icon" data-lucide="rotate-cw"></i> Clear Points
+              </button>
+            </div>
+
+            <button type="button" class="btn-path-extrusion-bake" id="btnPathExtrusionBakeMesh">
+              <i class="app-icon" data-lucide="check"></i> Bake to Scene Mesh
+            </button>
+          </div>
+        </div>

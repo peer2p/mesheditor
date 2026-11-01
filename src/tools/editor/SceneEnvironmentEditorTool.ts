@@ -1,10 +1,10 @@
-import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * Scene & Environment Tool.
  * Adjust scene background color, ground grid, ambient lighting, sunlight intensity, and camera speed.
  */
-export class SceneEnvironmentEditorTool implements ToolInterface {
+export class SceneEnvironmentEditorTool extends AbstractEditorTool {
   public readonly name = 'scene_environment';
   public readonly dialogId = 'dialog-scene';
   public readonly triggerButtonId = 'btnToggleScenePanel';

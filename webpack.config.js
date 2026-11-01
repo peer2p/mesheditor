@@ -1,8 +1,10 @@
+const fs = require('fs');
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const { setupAntigravityBridgeRoutes } = require('./scripts/antigravity-bridge');
 require('./scripts/sync-skills');
+require('./scripts/sync-templates');
 
 module.exports = (env, argv) => {
   const isProduction = (argv && argv.mode === 'production') || process.env.NODE_ENV === 'production';
@@ -62,7 +64,22 @@ module.exports = (env, argv) => {
     },
     plugins: [
       new HtmlWebpackPlugin({
-        template: 'src/mesheditor.ejs',
+        templateContent: ({ compilation, htmlWebpackPlugin }) => {
+          const ejs = require('ejs');
+          const templatePath = path.resolve(__dirname, 'src/mesheditor.ejs');
+          compilation.fileDependencies.add(templatePath);
+          const editorToolsDir = path.resolve(__dirname, 'src/tools/editor');
+          if (fs.existsSync(editorToolsDir)) {
+            const editorFiles = fs.readdirSync(editorToolsDir);
+            for (const file of editorFiles) {
+              if (file.endsWith('.ejs')) {
+                compilation.fileDependencies.add(path.resolve(editorToolsDir, file));
+              }
+            }
+          }
+          const raw = fs.readFileSync(templatePath, 'utf8');
+          return ejs.render(raw, { htmlWebpackPlugin }, { filename: templatePath });
+        },
         filename: 'index.html',
         chunks: ['mesheditor'],
         title: 'Mesh Editor',

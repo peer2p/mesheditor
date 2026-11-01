@@ -1,11 +1,11 @@
 import { PathExtrusionStudio } from '../../pathExtrusion';
-import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * Path Extrusion Tool.
  * Create 3D extrusions along smooth Catmull-Rom spline curves with 2D cross-section shapes.
  */
-export class PathExtrusionEditorTool implements ToolInterface {
+export class PathExtrusionEditorTool extends AbstractEditorTool {
   public readonly name = 'path_extrusion';
   public readonly dialogId = 'dialog-path-extrusion';
   public readonly triggerButtonId = 'btnTogglePathExtrusion';

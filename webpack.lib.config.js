@@ -2,6 +2,8 @@ const path = require('path');
 const webpack = require('webpack');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 require('./scripts/sync-skills');
+require('./scripts/sync-styles');
+require('./scripts/sync-templates');
 
 /**
  * Dual Webpack configuration for building the NPM Library (`dist-lib/`):

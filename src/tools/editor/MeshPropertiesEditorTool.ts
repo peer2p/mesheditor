@@ -1,10 +1,10 @@
-import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * Mesh Properties Tool.
  * Inspect and modify transform (position, rotation, scale), pivots, bounding boxes, and hierarchy.
  */
-export class MeshPropertiesEditorTool implements ToolInterface {
+export class MeshPropertiesEditorTool extends AbstractEditorTool {
   public readonly name = 'mesh_properties';
   public readonly dialogId = 'dialog-mesh';
   public readonly triggerButtonId = 'btnToggleMeshPanel';

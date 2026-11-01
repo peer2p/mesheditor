@@ -1,10 +1,10 @@
-import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * Scene Objects Outliner Tool.
  * Hierarchical tree view of all scene meshes, submeshes, and parent-child transforms.
  */
-export class OutlinerEditorTool implements ToolInterface {
+export class OutlinerEditorTool extends AbstractEditorTool {
   public readonly name = 'scene_outliner';
   public readonly dialogId = 'dialog-outliner';
   public readonly triggerButtonId = 'btnToggleOutliner';

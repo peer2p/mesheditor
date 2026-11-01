@@ -1,10 +1,10 @@
-import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * Voxel Painter Tool.
  * 3D voxel painting and block placement on grid surfaces with textures and atlas palettes.
  */
-export class VoxelPainterEditorTool implements ToolInterface {
+export class VoxelPainterEditorTool extends AbstractEditorTool {
   public readonly name = 'voxel_painter';
   public readonly dialogId = 'dialog-voxel-painter';
   public readonly triggerButtonId = 'btnToggleVoxelPainter';

@@ -1,4 +1,5 @@
 import { ToolInterface } from '../ToolInterface';
+import { AbstractEditorTool } from './AbstractEditorTool';
 import { AIAgentEditorTool } from './AIAgentEditorTool';
 import { AnimationPlayerEditorTool } from './AnimationPlayerEditorTool';
 import { CreatePrimitiveEditorTool } from './CreatePrimitiveEditorTool';
@@ -11,8 +12,10 @@ import { PathExtrusionEditorTool } from './PathExtrusionEditorTool';
 import { SceneEnvironmentEditorTool } from './SceneEnvironmentEditorTool';
 import { TextureOptimizerEditorTool } from './TextureOptimizerEditorTool';
 import { VoxelPainterEditorTool } from './VoxelPainterEditorTool';
+import { TOOL_VIEWS, getToolViewTemplate } from './toolViews';
 
 export {
+  AbstractEditorTool,
   AIAgentEditorTool,
   AnimationPlayerEditorTool,
   CreatePrimitiveEditorTool,
@@ -25,6 +28,8 @@ export {
   SceneEnvironmentEditorTool,
   TextureOptimizerEditorTool,
   VoxelPainterEditorTool,
+  TOOL_VIEWS,
+  getToolViewTemplate,
 };
 
 /**
