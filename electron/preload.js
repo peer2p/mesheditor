@@ -22,8 +22,33 @@ contextBridge.exposeInMainWorld('meshEditorElectron', {
     };
   },
 
+  onFileOpenFromOS: (callback) => {
+    const listener = (_event, payloads) => {
+      callback(payloads);
+    };
+    ipcRenderer.on('file:open-from-os', listener);
+    return () => {
+      ipcRenderer.removeListener('file:open-from-os', listener);
+    };
+  },
+
+  notifyReady: () => {
+    ipcRenderer.send('app:ready');
+  },
+
+  previewFile: (filePath, displayName) => ipcRenderer.invoke('preview:file', { filePath, displayName }),
+
+  previewSnapshot: (base64Data, filename) => ipcRenderer.invoke('preview:snapshot', { base64Data, filename }),
+
   setWindowTitle: (title) => {
     ipcRenderer.send('window:setTitle', title);
   },
-});
 
+  setRepresentedFilename: (filePath) => {
+    ipcRenderer.send('window:setRepresentedFilename', filePath);
+  },
+
+  setDocumentEdited: (isEdited) => {
+    ipcRenderer.send('window:setDocumentEdited', isEdited);
+  },
+});

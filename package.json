@@ -37,6 +37,7 @@
     "build:lib:esm": "tsc -p tsconfig.lib.json",
     "build:lib:bundle": "webpack --config webpack.lib.config.js",
     "build:lib": "npm run build:lib:styles && npm run build:lib:skills && npm run build:lib:templates && npm run build:lib:esm && npm run build:lib:bundle",
+    "icons:generate": "node scripts/generate-icons.js",
     "desktop:dev": "electron electron/main.js --dev",
     "desktop:start": "npm run build && electron electron/main.js",
     "desktop:build:mac": "npm run build && electron-builder --mac --config electron-builder.yml",
@@ -65,16 +66,16 @@
   "author": "daniel.peer@gmx.net",
   "license": "ISC",
   "peerDependencies": {
-    "@babylonjs/core": ">=7.0.0",
-    "@babylonjs/loaders": ">=7.0.0",
-    "@babylonjs/materials": ">=7.0.0",
-    "@babylonjs/serializers": ">=7.0.0"
+    "@babylonjs/core": ">=9.29.0",
+    "@babylonjs/loaders": ">=9.29.0",
+    "@babylonjs/materials": ">=9.29.0",
+    "@babylonjs/serializers": ">=9.29.0"
   },
   "dependencies": {
-    "@babylonjs/core": ">=7.0.0",
-    "@babylonjs/loaders": ">=7.0.0",
-    "@babylonjs/materials": ">=7.0.0",
-    "@babylonjs/serializers": ">=7.0.0",
+    "@babylonjs/core": ">=9.29.0",
+    "@babylonjs/loaders": ">=9.29.0",
+    "@babylonjs/materials": ">=9.29.0",
+    "@babylonjs/serializers": ">=9.29.0",
     "dat.gui": "^0.7.9",
     "earcut": "2.2.4",
     "lucide": "^1.62.0",

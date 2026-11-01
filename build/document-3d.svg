@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="docShadow" x="120" y="80" width="784" height="884" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="24" stdDeviation="20" flood-color="#000000" flood-opacity="0.45" />
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000000" flood-opacity="0.25" />
+    </filter>
+    <linearGradient id="docBg" x1="512" y1="120" x2="512" y2="904" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#e2e8f0" />
+    </linearGradient>
+    <linearGradient id="foldGrad" x1="684" y1="120" x2="824" y2="260" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#cbd5e1" />
+      <stop offset="100%" stop-color="#94a3b8" />
+    </linearGradient>
+    <linearGradient id="badgeGrad" x1="300" y1="720" x2="724" y2="720" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#6366f1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Document Body: Folded corner at top right -->
+  <!-- Main Sheet with cut corner: (200, 120) -> (684, 120) -> (824, 260) -> (824, 904) -> (200, 904) -->
+  <path d="M 230 120 L 684 120 L 824 260 L 824 880 C 824 893 813 904 800 904 L 230 904 C 217 904 206 893 206 880 L 206 144 C 206 131 217 120 230 120 Z" fill="url(#docBg)" filter="url(#docShadow)" stroke="#cbd5e1" stroke-width="2" />
+
+  <!-- Folded Corner Triangle -->
+  <path d="M 684 120 L 684 240 C 684 251 693 260 704 260 L 824 260 Z" fill="url(#foldGrad)" />
+
+  <!-- 3D Mesh Symbol inside Document -->
+  <g transform="translate(102, 60) scale(0.8)">
+    <polygon points="512,320 690,410 512,500 334,410" fill="#38bdf8" fill-opacity="0.85" />
+    <polygon points="334,410 512,500 512,680 334,590" fill="#0284c7" fill-opacity="0.9" />
+    <polygon points="512,500 690,410 690,590 512,680" fill="#6366f1" fill-opacity="0.95" />
+
+    <g stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="512" y1="320" x2="690" y2="410" />
+      <line x1="690" y1="410" x2="690" y2="590" />
+      <line x1="690" y1="590" x2="512" y2="680" />
+      <line x1="512" y1="680" x2="334" y2="590" />
+      <line x1="334" y1="590" x2="334" y2="410" />
+      <line x1="334" y1="410" x2="512" y2="320" />
+      <line x1="512" y1="500" x2="334" y2="410" />
+      <line x1="512" y1="500" x2="690" y2="410" />
+      <line x1="512" y1="500" x2="512" y2="680" />
+    </g>
+
+    <!-- Vertex dots -->
+    <circle cx="512" cy="320" r="8" fill="#ffffff" />
+    <circle cx="512" cy="500" r="10" fill="#ffffff" />
+    <circle cx="512" cy="680" r="8" fill="#ffffff" />
+    <circle cx="334" cy="410" r="8" fill="#ffffff" />
+    <circle cx="690" cy="410" r="8" fill="#ffffff" />
+    <circle cx="334" cy="590" r="8" fill="#ffffff" />
+    <circle cx="690" cy="590" r="8" fill="#ffffff" />
+  </g>
+
+  <!-- 3D Format Badge at Bottom of Sheet -->
+  <rect x="332" y="730" width="360" height="96" rx="28" fill="url(#badgeGrad)" />
+  <text x="512" y="796" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="52" font-weight="800" fill="#ffffff" letter-spacing="4">3D MESH</text>
+</svg>

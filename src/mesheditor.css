@@ -83,6 +83,22 @@ mesh-editor {
   overflow: visible;
 }
 
+/* Electron macOS Native Inset Traffic Lights & Dragging Support */
+body.is-electron-mac #top-toolbar {
+  padding-left: 78px;
+  -webkit-app-region: drag;
+}
+
+body.is-electron-mac #top-toolbar button,
+body.is-electron-mac #top-toolbar a,
+body.is-electron-mac #top-toolbar input,
+body.is-electron-mac #top-toolbar select,
+body.is-electron-mac #top-toolbar .dropdown-wrapper,
+body.is-electron-mac #top-toolbar .dropdown-menu,
+body.is-electron-mac #top-toolbar .gizmo-btn-group {
+  -webkit-app-region: no-drag;
+}
+
 #top-toolbar::-webkit-scrollbar {
   height: 3px;
 }

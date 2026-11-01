@@ -1194,6 +1194,27 @@ export class MeshEditorApp {
   }
 
   /**
+   * Opens the main in-app help modal.
+   */
+  public openHelpModal(): void {
+    const helpModal = this.getElement('helpModal') || document.getElementById('helpModal');
+    if (helpModal) {
+      helpModal.classList.add('active');
+    }
+  }
+
+  /**
+   * Closes the main in-app help modal and refocuses the canvas.
+   */
+  public closeHelpModal(): void {
+    const helpModal = this.getElement('helpModal') || document.getElementById('helpModal');
+    if (helpModal) {
+      helpModal.classList.remove('active');
+      this.canvas?.focus();
+    }
+  }
+
+  /**
    * Opens the rich guide and help popup for any tool or floating dialog.
    */
   public showToolHelp(toolOrId: string | ToolInterface): void {

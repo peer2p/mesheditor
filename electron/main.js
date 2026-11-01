@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -8,6 +8,8 @@ app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 
 let mainWindow = null;
+let isRendererReady = false;
+const pendingFilesToOpen = [];
 
 const MIME_MAP = {
   '.glb': 'model/gltf-binary',
@@ -27,17 +29,120 @@ const MIME_MAP = {
   '.ktx2': 'image/ktx2',
 };
 
+const MODEL_EXTENSIONS = new Set(['.glb', '.gltf', '.obj', '.stl', '.ply', '.babylon']);
+
 function getMimeType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   return MIME_MAP[ext] || 'application/octet-stream';
 }
 
+/**
+ * Resolves a list of file paths into payloads (with companion buffers/textures for glTF).
+ */
+function resolveFilePayloads(filePaths) {
+  const loadedPaths = new Set();
+  const payloads = [];
+
+  const addFilePayload = (filePath, relativeName) => {
+    const normalized = path.resolve(filePath);
+    if (loadedPaths.has(normalized)) return;
+    if (!fs.existsSync(normalized) || !fs.statSync(normalized).isFile()) return;
+    loadedPaths.add(normalized);
+
+    const buffer = fs.readFileSync(normalized);
+    payloads.push({
+      name: relativeName || path.basename(normalized),
+      path: normalized,
+      data: new Uint8Array(buffer),
+      mimeType: getMimeType(normalized),
+    });
+  };
+
+  for (const filePath of filePaths) {
+    addFilePayload(filePath);
+
+    // If a .gltf file was selected, automatically include companion .bin and texture files from its directory
+    if (path.extname(filePath).toLowerCase() === '.gltf') {
+      try {
+        const baseDir = path.dirname(filePath);
+        const gltfJson = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        const uris = [];
+        if (Array.isArray(gltfJson.buffers)) {
+          gltfJson.buffers.forEach((b) => b.uri && uris.push(b.uri));
+        }
+        if (Array.isArray(gltfJson.images)) {
+          gltfJson.images.forEach((img) => img.uri && uris.push(img.uri));
+        }
+        for (const uri of uris) {
+          if (uri.startsWith('data:') || uri.startsWith('http://') || uri.startsWith('https://')) continue;
+          const decodedUri = decodeURIComponent(uri);
+          const companionPath = path.resolve(baseDir, decodedUri);
+          if (companionPath.startsWith(baseDir)) {
+            addFilePayload(companionPath, decodedUri.replace(/\\/g, '/'));
+          }
+        }
+      } catch (err) {
+        console.warn('[Electron] Could not auto-resolve companion files for .gltf:', err);
+      }
+    }
+  }
+
+  return payloads;
+}
+
+/**
+ * Dispatches files to the renderer or queues them until the window is ready.
+ */
+function dispatchFilesToRenderer(filePaths) {
+  if (!filePaths || filePaths.length === 0) return;
+
+  if (isRendererReady && mainWindow && !mainWindow.isDestroyed()) {
+    const payloads = resolveFilePayloads(filePaths);
+    if (payloads.length > 0) {
+      mainWindow.webContents.send('file:open-from-os', payloads);
+      // Track in recent documents
+      if (process.platform === 'darwin' && payloads[0]?.path) {
+        app.addRecentDocument(payloads[0].path);
+      }
+    }
+  } else {
+    pendingFilesToOpen.push(...filePaths);
+  }
+}
+
+// macOS "Open With" / Double-click in Finder / Drag & Drop to Dock handler
+app.on('open-file', (event, filePath) => {
+  event.preventDefault();
+  dispatchFilesToRenderer([filePath]);
+});
+
+// Process command-line file arguments (Windows / Linux / macOS CLI)
+function checkCommandLineFileArgs() {
+  const args = process.argv.slice(1);
+  const fileArgs = args.filter((arg) => {
+    if (arg.startsWith('-') || arg.startsWith('http:') || arg.startsWith('https:')) return false;
+    try {
+      if (fs.existsSync(arg) && fs.statSync(arg).isFile()) {
+        const ext = path.extname(arg).toLowerCase();
+        return MODEL_EXTENSIONS.has(ext);
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  });
+
+  if (fileArgs.length > 0) {
+    dispatchFilesToRenderer(fileArgs);
+  }
+}
+
 function createApplicationMenu() {
   const isMac = process.platform === 'darwin';
 
-  const sendMenuCommand = (cmd) => {
+  const sendMenuCommand = (cmd, payload) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('menu:command', cmd);
+      mainWindow.webContents.send('menu:command', cmd, payload);
     }
   };
 
@@ -73,6 +178,20 @@ function createApplicationMenu() {
           accelerator: 'CmdOrCtrl+Shift+O',
           click: () => sendMenuCommand('file:import'),
         },
+        ...(isMac
+          ? [
+              {
+                label: 'Open Recent',
+                role: 'recentdocuments',
+                submenu: [
+                  {
+                    label: 'Clear Recent',
+                    role: 'clearrecentdocuments',
+                  },
+                ],
+              },
+            ]
+          : []),
         { type: 'separator' },
         {
           label: 'Save / Export Model...',
@@ -80,6 +199,16 @@ function createApplicationMenu() {
           click: () => sendMenuCommand('file:save'),
         },
         { type: 'separator' },
+        ...(isMac
+          ? [
+              {
+                label: 'Quick Look Preview',
+                accelerator: 'Space',
+                click: () => sendMenuCommand('file:quicklook'),
+              },
+              { type: 'separator' },
+            ]
+          : []),
         isMac ? { role: 'close' } : { role: 'quit' },
       ],
     },
@@ -173,6 +302,21 @@ function createApplicationMenu() {
         ...(isMac ? [{ type: 'separator' }, { role: 'front' }] : [{ role: 'close' }]),
       ],
     },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Mesh Editor Guide & Documentation',
+          click: () => sendMenuCommand('help:documentation'),
+        },
+        {
+          label: 'GitHub Repository',
+          click: async () => {
+            await shell.openExternal('https://github.com/peer2p/mesheditor');
+          },
+        },
+      ],
+    },
   ];
 
   const menu = Menu.buildFromTemplate(template);
@@ -180,14 +324,24 @@ function createApplicationMenu() {
 }
 
 function createWindow() {
+  const isMac = process.platform === 'darwin';
+  const iconPath = path.join(__dirname, '..', 'build', isMac ? 'icon.icns' : 'icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1480,
     height: 920,
     minWidth: 960,
     minHeight: 640,
     title: 'Mesh Editor',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     backgroundColor: '#0f1218',
     show: false,
+    ...(isMac
+      ? {
+          titleBarStyle: 'hiddenInset',
+          trafficLightPosition: { x: 16, y: 14 },
+        }
+      : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -196,6 +350,15 @@ function createWindow() {
       webSecurity: true,
     },
   });
+
+  if (isMac && app.setAboutPanelOptions) {
+    app.setAboutPanelOptions({
+      applicationName: 'Mesh Editor',
+      applicationVersion: app.getVersion(),
+      copyright: 'Copyright © 2026 Daniel Peer',
+      credits: 'A modern 3D Mesh Editor and manipulation studio',
+    });
+  }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -211,10 +374,20 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    isRendererReady = false;
   });
 }
 
-// IPC Handlers for Native Desktop Adapter
+// IPC Handlers
+ipcMain.on('app:ready', () => {
+  isRendererReady = true;
+  if (pendingFilesToOpen.length > 0) {
+    const files = [...pendingFilesToOpen];
+    pendingFilesToOpen.length = 0;
+    dispatchFilesToRenderer(files);
+  }
+});
+
 ipcMain.handle('dialog:openFiles', async (_event, options = {}) => {
   if (!mainWindow) return null;
 
@@ -250,55 +423,7 @@ ipcMain.handle('dialog:openFiles', async (_event, options = {}) => {
     return null;
   }
 
-  const loadedPaths = new Set();
-  const payloads = [];
-
-  const addFilePayload = (filePath, relativeName) => {
-    const normalized = path.resolve(filePath);
-    if (loadedPaths.has(normalized)) return;
-    if (!fs.existsSync(normalized) || !fs.statSync(normalized).isFile()) return;
-    loadedPaths.add(normalized);
-
-    const buffer = fs.readFileSync(normalized);
-    payloads.push({
-      name: relativeName || path.basename(normalized),
-      path: normalized,
-      data: new Uint8Array(buffer),
-      mimeType: getMimeType(normalized),
-    });
-  };
-
-  for (const filePath of result.filePaths) {
-    addFilePayload(filePath);
-
-    // If a .gltf file was selected, automatically include companion .bin and texture files from its directory
-    if (path.extname(filePath).toLowerCase() === '.gltf') {
-      try {
-        const baseDir = path.dirname(filePath);
-        const gltfJson = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-        const uris = [];
-        if (Array.isArray(gltfJson.buffers)) {
-          gltfJson.buffers.forEach((b) => b.uri && uris.push(b.uri));
-        }
-        if (Array.isArray(gltfJson.images)) {
-          gltfJson.images.forEach((img) => img.uri && uris.push(img.uri));
-        }
-        for (const uri of uris) {
-          if (uri.startsWith('data:') || uri.startsWith('http://') || uri.startsWith('https://')) continue;
-          const decodedUri = decodeURIComponent(uri);
-          const companionPath = path.resolve(baseDir, decodedUri);
-          // Prevent path traversal outside baseDir
-          if (companionPath.startsWith(baseDir)) {
-            addFilePayload(companionPath, decodedUri.replace(/\\/g, '/'));
-          }
-        }
-      } catch (err) {
-        console.warn('[Electron] Could not auto-resolve companion files for .gltf:', err);
-      }
-    }
-  }
-
-  return payloads;
+  return resolveFilePayloads(result.filePaths);
 });
 
 ipcMain.handle('dialog:saveFile', async (_event, options = {}) => {
@@ -327,6 +452,11 @@ ipcMain.handle('dialog:saveFile', async (_event, options = {}) => {
   }
 
   fs.writeFileSync(result.filePath, Buffer.from(options.data));
+
+  if (process.platform === 'darwin') {
+    app.addRecentDocument(result.filePath);
+  }
+
   return { saved: true, filePath: result.filePath };
 });
 
@@ -336,9 +466,56 @@ ipcMain.on('window:setTitle', (_event, title) => {
   }
 });
 
+ipcMain.on('window:setRepresentedFilename', (_event, filePath) => {
+  if (process.platform === 'darwin' && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setRepresentedFilename(filePath || '');
+    if (filePath && fs.existsSync(filePath)) {
+      app.addRecentDocument(filePath);
+    }
+  }
+});
+
+ipcMain.on('window:setDocumentEdited', (_event, isEdited) => {
+  if (process.platform === 'darwin' && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setDocumentEdited(Boolean(isEdited));
+  }
+});
+
+// macOS Quick Look Preview Handlers
+ipcMain.handle('preview:file', async (_event, { filePath, displayName }) => {
+  if (process.platform === 'darwin' && mainWindow && !mainWindow.isDestroyed()) {
+    if (filePath && fs.existsSync(filePath)) {
+      mainWindow.previewFile(filePath, displayName || path.basename(filePath));
+      return { success: true };
+    }
+    return { success: false, error: 'File does not exist on disk' };
+  }
+  return { success: false, error: 'Quick Look is only supported on macOS' };
+});
+
+ipcMain.handle('preview:snapshot', async (_event, { base64Data, filename }) => {
+  if (process.platform === 'darwin' && mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      const cleanBase64 = (base64Data || '').replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(cleanBase64, 'base64');
+      const tempDir = app.getPath('temp');
+      const previewFileName = filename || `MeshEditor_Preview_${Date.now()}.png`;
+      const tempFilePath = path.join(tempDir, previewFileName);
+      fs.writeFileSync(tempFilePath, buffer);
+      mainWindow.previewFile(tempFilePath, 'Mesh Editor Quick Look Preview');
+      return { success: true, filePath: tempFilePath };
+    } catch (err) {
+      console.warn('[Electron] Could not show Quick Look preview snapshot:', err);
+      return { success: false, error: err.message };
+    }
+  }
+  return { success: false, error: 'Quick Look is only supported on macOS' };
+});
+
 app.whenReady().then(() => {
   createApplicationMenu();
   createWindow();
+  checkCommandLineFileArgs();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -352,4 +529,3 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
-

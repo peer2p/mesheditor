@@ -23,7 +23,13 @@ export interface ElectronBridgeAPI {
     format?: string;
   }): Promise<{ saved: boolean; filePath?: string }>;
   onMenuCommand(callback: (command: string, payload?: any) => void): () => void;
+  onFileOpenFromOS?(callback: (payloads: NativeFilePayload[]) => void): () => void;
+  notifyReady?(): void;
+  previewFile?(filePath: string, displayName?: string): Promise<{ success: boolean; error?: string }>;
+  previewSnapshot?(base64Data: string, filename?: string): Promise<{ success: boolean; filePath?: string; error?: string }>;
   setWindowTitle?(title: string): void;
+  setRepresentedFilename?(filePath: string): void;
+  setDocumentEdited?(isEdited: boolean): void;
 }
 
 declare global {

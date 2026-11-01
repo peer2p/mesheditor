@@ -12,13 +12,48 @@ directories:
 files:
   - dist/**/*
   - electron/**/*
+  - build/**/*
   - package.json
   - "!node_modules/**/*"
 
 artifactName: "MeshEditor-${version}-${os}-${arch}.${ext}"
 
+fileAssociations:
+  - ext: glb
+    name: Binary glTF 3D Model
+    description: 3D model in binary glTF format
+    role: Editor
+    icon: icons/document-3d.icns
+  - ext: gltf
+    name: glTF 2.0 3D Model
+    description: 3D model scene in glTF format
+    role: Editor
+    icon: icons/document-3d.icns
+  - ext: obj
+    name: Wavefront OBJ 3D Model
+    description: Wavefront OBJ 3D model geometry
+    role: Editor
+    icon: icons/document-3d.icns
+  - ext: stl
+    name: Stereolithography 3D Mesh
+    description: Stereolithography STL surface mesh for 3D modeling and printing
+    role: Editor
+    icon: icons/document-3d.icns
+  - ext: ply
+    name: Polygon 3D File
+    description: Polygon 3D File Format
+    role: Editor
+    icon: icons/document-3d.icns
+  - ext: babylon
+    name: Babylon.js 3D Scene
+    description: Babylon.js 3D Scene File
+    role: Editor
+    icon: icons/document-3d.icns
+
 mac:
   category: public.app-category.graphics-design
+  icon: build/icon.icns
+  darkModeSupport: true
   target:
     - target: dmg
       arch:
@@ -30,6 +65,7 @@ mac:
         - x64
 
 win:
+  icon: build/icon.ico
   target:
     - target: nsis
       arch:
@@ -41,6 +77,7 @@ win:
 
 linux:
   category: Graphics
+  icon: build/icon.png
   maintainer: daniel.peer@gmx.net
   target:
     - target: AppImage

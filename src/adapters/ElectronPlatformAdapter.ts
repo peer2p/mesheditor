@@ -5,7 +5,7 @@ import { ElectronBridgeAPI, MeshEditorPlatformAdapter, NativeFilePayload } from 
 /**
  * Desktop Platform Adapter for Electron (macOS, Windows, Linux).
  * Integrates native OS file open/save dialogs, native application menu bar commands,
- * and window title updates.
+ * macOS Quick Look (Vorschau), proxy icons, file associations, and window styling.
  */
 export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
   public readonly id = 'electron';
@@ -13,6 +13,8 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
 
   private bridge: ElectronBridgeAPI | undefined;
   private unsubscribeMenu?: () => void;
+  private unsubscribeOpenFile?: () => void;
+  private currentFilePath?: string;
 
   constructor(bridge?: ElectronBridgeAPI) {
     this.bridge = bridge || (typeof window !== 'undefined' ? window.meshEditorElectron : undefined);
@@ -25,6 +27,14 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
   public initialize(app: MeshEditorApp): void {
     if (!this.bridge) return;
 
+    // Apply platform-specific classes for native macOS styling
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.classList.add('is-electron');
+      if (this.bridge.platform === 'darwin') {
+        document.body.classList.add('is-electron-mac');
+      }
+    }
+
     // Register native "Save As..." in the File menu
     app.registerFileMenuItem({
       id: 'menuFileNativeSaveAs',
@@ -35,6 +45,32 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
         app.openExportDialog();
       },
     });
+
+    // Register native macOS Quick Look Preview in the File menu
+    if (this.bridge.platform === 'darwin') {
+      app.registerFileMenuItem({
+        id: 'menuFileNativeQuickLook',
+        label: 'Quick Look Preview',
+        icon: 'eye',
+        shortcut: 'Space',
+        onClick: async () => {
+          await this.triggerQuickLook(app);
+        },
+      });
+    }
+
+    // Hook scene modifications to update macOS native dirty indicator dot
+    const origSceneModified = app.service.events.onSceneModified;
+    app.service.events.onSceneModified = () => {
+      origSceneModified?.();
+      this.bridge?.setDocumentEdited?.(true);
+    };
+
+    const origHistoryChanged = app.service.events.onHistoryChanged;
+    app.service.events.onHistoryChanged = (canUndo, canRedo) => {
+      origHistoryChanged?.(canUndo, canRedo);
+      this.bridge?.setDocumentEdited?.(canUndo);
+    };
 
     // Listen to native OS Menu Bar commands (macOS / Windows / Linux)
     this.unsubscribeMenu = this.bridge.onMenuCommand(async (command: string) => {
@@ -48,6 +84,9 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
         case 'file:save':
         case 'file:export':
           app.openExportDialog();
+          break;
+        case 'file:quicklook':
+          await this.triggerQuickLook(app);
           break;
         case 'edit:undo':
           app.service.undo();
@@ -86,8 +125,34 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
         case 'view:layout-stack':
           app.setLayoutMode('stackpanel');
           break;
+        case 'help:documentation':
+          if (typeof app.openHelpModal === 'function') {
+            app.openHelpModal();
+          } else {
+            const btnHelp = document.getElementById('btnHelp');
+            btnHelp?.click();
+          }
+          break;
       }
     });
+
+    // Listen to files opened from OS (Finder double-click, drag & drop to Dock icon, or CLI arguments)
+    if (this.bridge.onFileOpenFromOS) {
+      this.unsubscribeOpenFile = this.bridge.onFileOpenFromOS(async (payloads) => {
+        if (payloads && payloads.length > 0) {
+          if (payloads[0].path) {
+            this.currentFilePath = payloads[0].path;
+            this.bridge?.setRepresentedFilename?.(payloads[0].path);
+            this.bridge?.setDocumentEdited?.(false);
+          }
+          const files = this.payloadsToFiles(payloads);
+          await app.service.loadFiles(files);
+        }
+      });
+    }
+
+    // Signal main process that renderer is ready to receive any queued launch files
+    this.bridge.notifyReady?.();
   }
 
   private payloadsToFiles(payloads: NativeFilePayload[]): File[] {
@@ -111,6 +176,11 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
     });
     if (!payloads) return true; // User cancelled native dialog
     if (payloads.length > 0) {
+      if (payloads[0].path) {
+        this.currentFilePath = payloads[0].path;
+        this.bridge.setRepresentedFilename?.(payloads[0].path);
+        this.bridge.setDocumentEdited?.(false);
+      }
       const files = this.payloadsToFiles(payloads);
       await app.service.loadFiles(files);
     }
@@ -167,6 +237,9 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
     });
 
     if (res.saved && res.filePath) {
+      this.currentFilePath = res.filePath;
+      this.bridge.setRepresentedFilename?.(res.filePath);
+      this.bridge.setDocumentEdited?.(false);
       app.showToast(`Saved to ${res.filePath}`, 'success');
     } else {
       app.setStatus('Export cancelled');
@@ -174,8 +247,42 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
     return true;
   }
 
+  /**
+   * Triggers native macOS Quick Look preview for the current model or a rendered viewport snapshot.
+   */
+  public async triggerQuickLook(app: MeshEditorApp): Promise<boolean> {
+    if (!this.bridge) return false;
+
+    // 1. If currently loaded file exists on disk, preview it directly via macOS Quick Look
+    if (this.currentFilePath && this.bridge.previewFile) {
+      const res = await this.bridge.previewFile(this.currentFilePath);
+      if (res?.success) return true;
+    }
+
+    // 2. Otherwise generate a viewport beauty snapshot and preview that via Quick Look
+    const snapshotDataUrl =
+      app.service.aiAgent?.captureViewportDataUrl() ||
+      (app.service.canvas && typeof app.service.canvas.toDataURL === 'function'
+        ? app.service.canvas.toDataURL('image/png')
+        : null);
+
+    if (snapshotDataUrl && this.bridge.previewSnapshot) {
+      const res = await this.bridge.previewSnapshot(
+        snapshotDataUrl,
+        `MeshEditor_Preview_${Date.now()}.png`
+      );
+      if (res?.success) {
+        return true;
+      }
+    }
+
+    app.showToast('Could not open macOS Quick Look preview.', 'warning');
+    return false;
+  }
+
   public onModelLoaded(filename: string, _app: MeshEditorApp): void {
     this.bridge?.setWindowTitle?.(`${filename} — Mesh Editor`);
+    this.bridge?.setDocumentEdited?.(false);
   }
 
   public dispose(): void {
@@ -183,6 +290,9 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
       this.unsubscribeMenu();
       this.unsubscribeMenu = undefined;
     }
+    if (this.unsubscribeOpenFile) {
+      this.unsubscribeOpenFile();
+      this.unsubscribeOpenFile = undefined;
+    }
   }
 }
-

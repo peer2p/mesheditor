@@ -5,6 +5,7 @@ node_modules/
 dist/
 dist-lib/
 release/
+build/*.iconset/
 test-results/
 playwright-report/
 *.tsbuildinfo
