@@ -14,6 +14,7 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
   private bridge: ElectronBridgeAPI | undefined;
   private unsubscribeMenu?: () => void;
   private unsubscribeOpenFile?: () => void;
+  private unsubscribeKeyDown?: () => void;
   private currentFilePath?: string;
 
   constructor(bridge?: ElectronBridgeAPI) {
@@ -57,6 +58,29 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
           await this.triggerQuickLook(app);
         },
       });
+
+      // Handle Spacebar shortcut for Quick Look (only when not editing text in inputs)
+      if (typeof window !== 'undefined') {
+        const handleKeyDown = (e: KeyboardEvent) => {
+          if (e.code === 'Space' && !e.repeat) {
+            const target = e.target as HTMLElement | null;
+            const isEditable =
+              target &&
+              (target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.isContentEditable ||
+                target.getAttribute('contenteditable') === 'true' ||
+                target.closest('input') ||
+                target.closest('textarea'));
+            if (!isEditable) {
+              e.preventDefault();
+              this.triggerQuickLook(app);
+            }
+          }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        this.unsubscribeKeyDown = () => window.removeEventListener('keydown', handleKeyDown);
+      }
     }
 
     // Hook scene modifications to update macOS native dirty indicator dot
@@ -253,24 +277,47 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
   public async triggerQuickLook(app: MeshEditorApp): Promise<boolean> {
     if (!this.bridge) return false;
 
-    // 1. If currently loaded file exists on disk, preview it directly via macOS Quick Look
-    if (this.currentFilePath && this.bridge.previewFile) {
+    // 1. If the current file is a format natively supported by macOS Quick Look (e.g. USDZ, images),
+    // preview the file on disk directly.
+    const ext = this.currentFilePath ? this.currentFilePath.split('.').pop()?.toLowerCase() : '';
+    const isDirectlySupported = ['usdz', 'reality', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tiff'].includes(
+      ext || ''
+    );
+
+    if (this.currentFilePath && isDirectlySupported && this.bridge.previewFile) {
       const res = await this.bridge.previewFile(this.currentFilePath);
       if (res?.success) return true;
     }
 
-    // 2. Otherwise generate a viewport beauty snapshot and preview that via Quick Look
-    const snapshotDataUrl =
-      app.service.aiAgent?.captureViewportDataUrl() ||
-      (app.service.canvas && typeof app.service.canvas.toDataURL === 'function'
-        ? app.service.canvas.toDataURL('image/png')
-        : null);
+    // 2. For 3D mesh formats (.glb, .gltf, .obj, .stl, .ply, .babylon) or unsaved scenes:
+    // macOS Quick Look does not have a native glTF/OBJ parser.
+    // Render a crisp beauty snapshot of the current 3D viewport canvas.
+    try {
+      app.service.scene?.render();
+    } catch {
+      // Ignore if headless or rendering not available
+    }
+
+    let snapshotDataUrl: string | null = null;
+    try {
+      if (app.service.canvas && typeof app.service.canvas.toDataURL === 'function') {
+        snapshotDataUrl = app.service.canvas.toDataURL('image/png');
+      }
+    } catch {
+      // Ignore
+    }
+
+    if (!snapshotDataUrl || !snapshotDataUrl.startsWith('data:image/')) {
+      snapshotDataUrl = app.service.aiAgent?.captureViewportDataUrl() || null;
+    }
 
     if (snapshotDataUrl && this.bridge.previewSnapshot) {
-      const res = await this.bridge.previewSnapshot(
-        snapshotDataUrl,
-        `MeshEditor_Preview_${Date.now()}.png`
-      );
+      const baseName = this.currentFilePath
+        ? this.currentFilePath.replace(/\\/g, '/').split('/').pop()?.replace(/\.[^/.]+$/, '')
+        : (app.service.exportParams?.filename || '3D_Model');
+      const filename = `${baseName}_Preview.png`;
+
+      const res = await this.bridge.previewSnapshot(snapshotDataUrl, filename, filename);
       if (res?.success) {
         return true;
       }
@@ -293,6 +340,10 @@ export class ElectronPlatformAdapter implements MeshEditorPlatformAdapter {
     if (this.unsubscribeOpenFile) {
       this.unsubscribeOpenFile();
       this.unsubscribeOpenFile = undefined;
+    }
+    if (this.unsubscribeKeyDown) {
+      this.unsubscribeKeyDown();
+      this.unsubscribeKeyDown = undefined;
     }
   }
 }

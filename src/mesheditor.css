@@ -3629,8 +3629,7 @@ progress.loading-spinner:indeterminate {
   border-radius: 4px !important;
   color: var(--text-primary, #f0f6fc) !important;
   font-size: 11px !important;
-  padding: 5px 26px 5px 8px !important;
-  height: 28px !important;
+  padding: 2px 26px 2px 8px !important;
   line-height: 1.4 !important;
   box-sizing: border-box !important;
   cursor: pointer !important;

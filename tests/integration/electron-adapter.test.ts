@@ -98,10 +98,11 @@ describe('ElectronPlatformAdapter Integration Tests', () => {
     expect(snapshotSuccess).toBe(true);
     expect(mockBridge.previewSnapshot).toHaveBeenCalledWith(
       'data:image/png;base64,mockImage',
-      expect.stringContaining('MeshEditor_Preview_')
+      '3D_Model_Preview.png',
+      expect.any(String)
     );
 
-    // 2. With loaded file on disk: triggers Quick Look on disk file path directly
+    // 2. With loaded .glb file on disk: triggers beauty preview snapshot because macOS cannot natively parse GLB
     mockBridge.openFilesDialog = vi.fn().mockResolvedValue([
       {
         name: 'model.glb',
@@ -115,9 +116,24 @@ describe('ElectronPlatformAdapter Integration Tests', () => {
     expect(mockBridge.setRepresentedFilename).toHaveBeenCalledWith('/Users/test/Documents/model.glb');
     expect(mockBridge.setDocumentEdited).toHaveBeenCalledWith(false);
 
-    const fileSuccess = await adapter.triggerQuickLook(mockApp as MeshEditorApp);
-    expect(fileSuccess).toBe(true);
-    expect(mockBridge.previewFile).toHaveBeenCalledWith('/Users/test/Documents/model.glb');
+    const glbSuccess = await adapter.triggerQuickLook(mockApp as MeshEditorApp);
+    expect(glbSuccess).toBe(true);
+    expect(mockBridge.previewSnapshot).toHaveBeenCalled();
+
+    // 3. With loaded .usdz file on disk: triggers native Quick Look file preview directly
+    mockBridge.openFilesDialog = vi.fn().mockResolvedValue([
+      {
+        name: 'model.usdz',
+        path: '/Users/test/Documents/model.usdz',
+        data: new Uint8Array([1, 2, 3]),
+        mimeType: 'model/vnd.usdz+zip',
+      },
+    ]);
+
+    await adapter.openModelDialog(mockApp as MeshEditorApp);
+    const usdzSuccess = await adapter.triggerQuickLook(mockApp as MeshEditorApp);
+    expect(usdzSuccess).toBe(true);
+    expect(mockBridge.previewFile).toHaveBeenCalledWith('/Users/test/Documents/model.usdz');
   });
 
   it('handles files opened from OS (Finder double-click / Dock drag & drop)', async () => {

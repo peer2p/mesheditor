@@ -203,7 +203,7 @@ function createApplicationMenu() {
           ? [
               {
                 label: 'Quick Look Preview',
-                accelerator: 'Space',
+                accelerator: 'CmdOrCtrl+Y',
                 click: () => sendMenuCommand('file:quicklook'),
               },
               { type: 'separator' },
@@ -485,6 +485,26 @@ ipcMain.on('window:setDocumentEdited', (_event, isEdited) => {
 ipcMain.handle('preview:file', async (_event, { filePath, displayName }) => {
   if (process.platform === 'darwin' && mainWindow && !mainWindow.isDestroyed()) {
     if (filePath && fs.existsSync(filePath)) {
+      const ext = path.extname(filePath).toLowerCase();
+      const nativeMacQuickLookExts = new Set([
+        '.usdz',
+        '.reality',
+        '.png',
+        '.jpg',
+        '.jpeg',
+        '.webp',
+        '.gif',
+        '.bmp',
+        '.tiff',
+        '.pdf',
+      ]);
+      if (!nativeMacQuickLookExts.has(ext)) {
+        return {
+          success: false,
+          error: 'Format not natively readable by macOS Quick Look',
+          fallbackToSnapshot: true,
+        };
+      }
       mainWindow.previewFile(filePath, displayName || path.basename(filePath));
       return { success: true };
     }
@@ -493,16 +513,23 @@ ipcMain.handle('preview:file', async (_event, { filePath, displayName }) => {
   return { success: false, error: 'Quick Look is only supported on macOS' };
 });
 
-ipcMain.handle('preview:snapshot', async (_event, { base64Data, filename }) => {
+ipcMain.handle('preview:snapshot', async (_event, { base64Data, filename, displayName }) => {
   if (process.platform === 'darwin' && mainWindow && !mainWindow.isDestroyed()) {
     try {
       const cleanBase64 = (base64Data || '').replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(cleanBase64, 'base64');
       const tempDir = app.getPath('temp');
-      const previewFileName = filename || `MeshEditor_Preview_${Date.now()}.png`;
+      const rawName = filename || `MeshEditor_Preview_${Date.now()}`;
+      const previewFileName = rawName.toLowerCase().endsWith('.png') ? rawName : `${rawName}.png`;
       const tempFilePath = path.join(tempDir, previewFileName);
       fs.writeFileSync(tempFilePath, buffer);
-      mainWindow.previewFile(tempFilePath, 'Mesh Editor Quick Look Preview');
+
+      let cleanDisplayName = displayName || previewFileName;
+      if (!cleanDisplayName.toLowerCase().endsWith('.png')) {
+        cleanDisplayName = `${cleanDisplayName}.png`;
+      }
+
+      mainWindow.previewFile(tempFilePath, cleanDisplayName);
       return { success: true, filePath: tempFilePath };
     } catch (err) {
       console.warn('[Electron] Could not show Quick Look preview snapshot:', err);

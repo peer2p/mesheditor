@@ -26,7 +26,11 @@ export interface ElectronBridgeAPI {
   onFileOpenFromOS?(callback: (payloads: NativeFilePayload[]) => void): () => void;
   notifyReady?(): void;
   previewFile?(filePath: string, displayName?: string): Promise<{ success: boolean; error?: string }>;
-  previewSnapshot?(base64Data: string, filename?: string): Promise<{ success: boolean; filePath?: string; error?: string }>;
+  previewSnapshot?(
+    base64Data: string,
+    filename?: string,
+    displayName?: string
+  ): Promise<{ success: boolean; filePath?: string; error?: string }>;
   setWindowTitle?(title: string): void;
   setRepresentedFilename?(filePath: string): void;
   setDocumentEdited?(isEdited: boolean): void;

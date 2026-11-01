@@ -177,7 +177,7 @@ const CSS = `
   color: #f1f5f9;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
-  padding: 5px 26px 5px 8px;
+  padding: 2px 26px 2px 8px;
   font-size: 12px;
   outline: none;
   box-sizing: border-box;

@@ -38,7 +38,8 @@ contextBridge.exposeInMainWorld('meshEditorElectron', {
 
   previewFile: (filePath, displayName) => ipcRenderer.invoke('preview:file', { filePath, displayName }),
 
-  previewSnapshot: (base64Data, filename) => ipcRenderer.invoke('preview:snapshot', { base64Data, filename }),
+  previewSnapshot: (base64Data, filename, displayName) =>
+    ipcRenderer.invoke('preview:snapshot', { base64Data, filename, displayName }),
 
   setWindowTitle: (title) => {
     ipcRenderer.send('window:setTitle', title);
