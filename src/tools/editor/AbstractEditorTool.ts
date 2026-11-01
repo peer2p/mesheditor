@@ -12,7 +12,6 @@ export abstract class AbstractEditorTool implements ToolInterface {
   public readonly icon?: string;
   public readonly dialogId?: string;
   public readonly triggerButtonId?: string;
-  public readonly toolbarButtonId?: string;
   public readonly menuId?: string;
   public readonly menuLabel?: string;
   public readonly isExclusive3DTool?: boolean;

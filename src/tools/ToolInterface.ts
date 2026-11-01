@@ -38,9 +38,6 @@ export interface ToolInterface {
   /** DOM element ID of the primary trigger button in menus (e.g. 'btnToggleVoxelPainter') */
   readonly triggerButtonId?: string;
 
-  /** Optional DOM element ID of a quick-access button in the top toolbar (e.g. 'btnToolbarVoxelPainter') */
-  readonly toolbarButtonId?: string;
-
   /** Menu identifier where this tool should appear (e.g. 'menuTools' or 'tools') */
   readonly menuId?: string;
 

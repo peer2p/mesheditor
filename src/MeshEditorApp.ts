@@ -900,37 +900,8 @@ export class MeshEditorApp {
       this.service.deleteSelected();
     });
 
-    // Tools Menu & Toolbar Buttons (Dynamically wired from ToolInterface instances)
-    for (const tool of this.editorTools) {
-      if (tool.triggerButtonId && tool.dialogId) {
-        const btn = this.getElement(tool.triggerButtonId) || document.getElementById(tool.triggerButtonId);
-        btn?.addEventListener('click', () => {
-          this.closeAllDropdowns();
-          this.toggleDialog(tool.dialogId!);
-          if (tool.dialogId === 'dialog-csg') {
-            this.updateCSGGUI();
-          }
-        });
-      }
-      if (tool.toolbarButtonId && tool.dialogId) {
-        const btnTb = this.getElement(tool.toolbarButtonId) || document.getElementById(tool.toolbarButtonId);
-        btnTb?.addEventListener('click', () => {
-          this.closeAllDropdowns();
-          if (tool.isExclusive3DTool) {
-            const isCurrentlyOpen = this.isDialogOpen(tool.dialogId!);
-            if (isCurrentlyOpen && !tool.isActive?.(this)) {
-              // Dialog is open but inactive: activate it and bring to front
-              const dlg = this.getElement(tool.dialogId!);
-              if (dlg) {
-                this.bringDialogToFront(dlg);
-                return;
-              }
-            }
-          }
-          this.toggleDialog(tool.dialogId!);
-        });
-      }
-    }
+    // Build and wire Tools dropdown menu dynamically from registered ToolInterface instances
+    this.renderToolsMenu();
 
     // Support legacy alias btnToggleMatPanel if present
     document.getElementById('btnToggleMatPanel')?.addEventListener('click', () => {
@@ -1680,6 +1651,75 @@ export class MeshEditorApp {
     }
   }
 
+  /**
+   * Dynamically renders the Tools dropdown menu (#menuTools) from registered ToolInterface instances.
+   */
+  public renderToolsMenu(): void {
+    const menu = this.getElement('menuTools') || document.getElementById('menuTools');
+    if (!menu) return;
+
+    const divider = menu.querySelector('#menuToolsPluginsDivider') || document.getElementById('menuToolsPluginsDivider');
+    const pluginsContainer = menu.querySelector('#menuToolsPlugins') || document.getElementById('menuToolsPlugins');
+
+    // Remove any previously rendered dynamic items
+    const existingItems = menu.querySelectorAll('.dropdown-item[data-tool-name]');
+    existingItems.forEach((el) => el.remove());
+
+    // Sort tools by their `order` property
+    const tools = [...this.editorTools].sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+
+    for (const tool of tools) {
+      if (tool.menuId && tool.menuId !== 'menuTools') continue;
+      if (!tool.triggerButtonId || !tool.menuLabel) continue;
+
+      const btn = document.createElement('button');
+      btn.className = 'dropdown-item';
+      btn.id = tool.triggerButtonId;
+      btn.setAttribute('data-tool-name', tool.name);
+      btn.title = tool.description || tool.menuLabel;
+
+      const iconName = tool.icon || 'wrench';
+      btn.innerHTML = `
+        <span class="btn-icon"><i class="app-icon" data-lucide="${iconName}"></i></span>
+        <span class="btn-label">${tool.menuLabel}</span>
+      `.trim();
+
+      btn.addEventListener('click', () => {
+        this.closeAllDropdowns();
+        if (tool.dialogId) {
+          this.toggleDialog(tool.dialogId);
+          if (tool.dialogId === 'dialog-csg') {
+            this.updateCSGGUI();
+          }
+        }
+      });
+
+      if (divider) {
+        menu.insertBefore(btn, divider);
+      } else if (pluginsContainer) {
+        menu.insertBefore(btn, pluginsContainer);
+      } else {
+        menu.appendChild(btn);
+      }
+    }
+
+    this.refreshIcons();
+    this.updatePanelButtonStates();
+  }
+
+  /**
+   * Registers a new editor tool dynamically and updates the Tools menu.
+   */
+  public registerEditorTool(tool: ToolInterface): void {
+    const existingIdx = this.editorTools.findIndex((t) => t.name === tool.name);
+    if (existingIdx !== -1) {
+      this.editorTools[existingIdx] = tool;
+    } else {
+      this.editorTools.push(tool);
+    }
+    this.renderToolsMenu();
+  }
+
   public updatePanelButtonStates(): void {
     for (const tool of this.editorTools) {
       if (tool.dialogId && tool.triggerButtonId) {
@@ -1690,17 +1730,6 @@ export class MeshEditorApp {
             dialog.style.display !== 'none' &&
             (dialog.style.display !== '' || window.getComputedStyle(dialog).display !== 'none');
           btn.classList.toggle('active', isOpen);
-        }
-      }
-      if (tool.toolbarButtonId) {
-        const btnToolbar = this.getElement(tool.toolbarButtonId) || document.getElementById(tool.toolbarButtonId);
-        if (btnToolbar) {
-          const isActive = tool.isActive
-            ? tool.isActive(this)
-            : tool.dialogId
-              ? this.isDialogOpen(tool.dialogId)
-              : false;
-          btnToolbar.classList.toggle('active', isActive);
         }
       }
     }

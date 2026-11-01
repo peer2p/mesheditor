@@ -500,6 +500,53 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
 
       container.remove();
     });
+
+    it('dynamically builds the Tools dropdown menu from ToolInterface instances without hardcoding in EJS', () => {
+      document.body.innerHTML = '';
+      const container = document.createElement('div');
+      container.id = 'app-test-container-dynamic-menu';
+      document.body.appendChild(container);
+
+      const app = new MeshEditorApp({
+        container,
+        engine,
+      });
+
+      const menuTools = container.querySelector('#menuTools');
+      expect(menuTools).not.toBeNull();
+
+      // Verify that all 12 editor tools have dynamically generated menu items
+      for (const tool of app.editorTools) {
+        if (!tool.triggerButtonId) continue;
+        const btn = menuTools!.querySelector(`#${tool.triggerButtonId}`) as HTMLButtonElement | null;
+        expect(btn, `Button #${tool.triggerButtonId} should be dynamically rendered`).not.toBeNull();
+        expect(btn?.getAttribute('data-tool-name')).toBe(tool.name);
+        expect(btn?.textContent).toContain(tool.menuLabel);
+      }
+
+      // Verify that NO quick-toggle buttons exist in the top toolbar
+      const quickToolbarToggles = container.querySelectorAll(
+        '#btnToolbarAIAgent, #btnToolbarVoxelPainter, #btnToolbarPathExtrusion, .ai-toolbar-group, .voxel-toolbar-group, .path-extrusion-toolbar-group'
+      );
+      expect(quickToolbarToggles.length).toBe(0);
+
+      // Verify registering a new tool dynamically appends it to #menuTools
+      const customTool = {
+        name: 'custom_procedural_tool',
+        menuLabel: 'Procedural Generator',
+        triggerButtonId: 'btnToggleCustomProceduralTool',
+        dialogId: 'dialog-custom-procedural',
+        icon: 'sparkles',
+        order: 99,
+        description: 'Dynamically registered procedural tool',
+      };
+
+      app.registerEditorTool(customTool as any);
+
+      const customBtn = menuTools!.querySelector('#btnToggleCustomProceduralTool') as HTMLButtonElement | null;
+      expect(customBtn).not.toBeNull();
+      expect(customBtn?.textContent).toContain('Procedural Generator');
+    });
   });
 });
 

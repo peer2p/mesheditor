@@ -22,11 +22,28 @@
 5. **Conversational Communication**:
    - Even if the user communicates in German, code changes, UI additions, and runtime artifacts must remain strictly English.
 
+## Top Toolbar Policy: No Quick-Toggle Buttons
+
+- **Do NOT add "Quick Toggle" buttons or quick-access tool buttons to the top toolbar (`#top-toolbar`).**
+- The top toolbar is strictly reserved for:
+  1. App brand & logo
+  2. Dropdown menu bar (File, Actions, Tools, View, Help)
+  3. Undo / Redo buttons
+  4. Standard 3D transform gizmo toggles (Move, Rotate, Scale, Bounds)
+  5. Help modal shortcut button
+- All 3D modeling and editor tools are accessed exclusively through the dynamically generated **Tools** dropdown menu (`#menuTools`). Never generate or restore `<!-- Quick Xy Toggle -->` buttons in the toolbar.
+
 ---
 
 # Tool Architecture & Authoring Guide
 
 The Mesh Editor employs a **Decentralized Modular Tools Architecture**. Every editor tool is completely self-contained with its TypeScript logic, metadata, in-app help guide, lifecycle hooks, and dedicated EJS view template.
+
+## Dynamic Tools Menu
+
+The **Tools** dropdown menu (`#menuTools`) is **built 100% dynamically** at runtime from registered `ToolInterface` instances via `MeshEditorApp.renderToolsMenu()`.
+- **Do NOT edit `#menuTools` in `src/mesheditor.ejs`** when adding or changing editor tools.
+- Simply register your tool class in `createBuiltinEditorTools()` in `src/tools/editor/index.ts`. The menu button, icon, label, ordering, and click toggling will be generated automatically.
 
 ## Tool Authoring Checklist
 
@@ -44,14 +61,14 @@ When adding or modifying an editor tool:
 3. **Required Tool Properties**:
    - `name`: Unique snake_case string identifier (e.g. `'my_tool'`).
    - `dialogId`: Element ID of the floating dialog (e.g. `'dialog-my-tool'`).
-   - `triggerButtonId`: Element ID of the trigger button in menus (e.g. `'btnToggleMyTool'`).
-   - `toolbarButtonId`: (Optional) Element ID of the quick-access top toolbar button.
+   - `triggerButtonId`: Element ID of the trigger button in the dynamic menu (e.g. `'btnToggleMyTool'`).
    - `menuId`: Menu identifier (typically `'menuTools'`).
    - `menuLabel`: Human-readable label (strictly English, e.g. `'My Tool'`).
    - `icon`: Lucide icon name (e.g. `'brush'`, `'wand-2'`, `'route'`, `'shapes'`).
-   - `description`: English summary of what the tool does.
+   - `order`: Numeric sort order within `#menuTools` (e.g. 1 to 20).
+   - `description`: English summary / tooltip of what the tool does.
    - `helpText`: HTML markup explaining overview, mouse/keyboard controls, and tips. Rendered inside the in-app help modal opened by the `?` header button.
-   - `isExclusive3DTool`: Set to `true` if this tool claims exclusive 3D viewport clicks (e.g. voxel drawing, curve editing). Activating any other tool or gizmo automatically closes/deactivates exclusive tools.
+   - `isExclusive3DTool`: Set to `true` if this tool claims exclusive 3D viewport clicks (e.g. voxel drawing, curve editing). Multiple tool dialogs can remain open at the same time, but only the active tool edits 3D viewport state. Activating one exclusive tool deactivates 3D editing on other exclusive tools without closing their dialogs.
 
 4. **Standard EJS View Structure**:
    - The `.ejs` template represents the floating dialog window:

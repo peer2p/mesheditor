@@ -8,7 +8,6 @@ export class VoxelPainterEditorTool extends AbstractEditorTool {
   public readonly name = 'voxel_painter';
   public readonly dialogId = 'dialog-voxel-painter';
   public readonly triggerButtonId = 'btnToggleVoxelPainter';
-  public readonly toolbarButtonId = 'btnToolbarVoxelPainter';
   public readonly menuId = 'menuTools';
   public readonly menuLabel = 'Voxel Painter';
   public readonly icon = 'brush';

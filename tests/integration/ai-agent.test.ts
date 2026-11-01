@@ -426,12 +426,12 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
         };
       });
 
-      // Open AI Agent dialog via toolbar button
-      const btnToolbarAI = container.querySelector('#btnToolbarAIAgent') as HTMLButtonElement | null;
+      // Open AI Agent dialog via dynamic Tools menu button
+      const btnToggleAI = container.querySelector('#btnToggleAIAgent') as HTMLButtonElement | null;
       const aiDialog = container.querySelector('#dialog-ai-agent') as HTMLElement | null;
-      expect(btnToolbarAI).not.toBeNull();
+      expect(btnToggleAI).not.toBeNull();
       expect(aiDialog).not.toBeNull();
-      btnToolbarAI?.click();
+      btnToggleAI?.click();
       expect(aiDialog?.style.display).toBe('flex');
 
       // Run Image-to-Mesh via service with a data URL image

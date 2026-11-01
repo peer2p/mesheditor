@@ -185,10 +185,10 @@ describe('Path Extrusion & Spline Extrusion Integration Tests', () => {
       expect(pathDialog).not.toBeNull();
       expect(pathDialog.style.display).toBe('none');
 
-      // Open Path Extrusion via top toolbar button
-      const btnToolbar = testContainer.querySelector('#btnToolbarPathExtrusion') as HTMLButtonElement;
-      expect(btnToolbar).not.toBeNull();
-      btnToolbar.click();
+      // Open Path Extrusion via dynamic Tools menu button
+      const btnMenu = testContainer.querySelector('#btnTogglePathExtrusion') as HTMLButtonElement;
+      expect(btnMenu).not.toBeNull();
+      btnMenu.click();
 
       expect(pathDialog.style.display).not.toBe('none');
       expect(app.service.pathExtrusion.isActive).toBe(true);

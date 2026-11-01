@@ -117,60 +117,7 @@
             <span class="dropdown-arrow"><i class="app-icon arrow-icon" data-lucide="chevron-down"></i></span>
           </button>
           <div class="dropdown-menu" id="menuTools">
-            
-            <button class="dropdown-item" id="btnToggleAIAgent" title="AI Mesh Agent (Text/Image to Mesh & Mesh Update)">
-              <span class="btn-icon"><i class="app-icon" data-lucide="bot"></i></span>
-              <span class="btn-label">AI Mesh Agent</span>
-            </button>
-            <button class="dropdown-item active" id="btnCreatePrimitive" title="Create Mesh (Box, Sphere, Cylinder, Polyhedron...)">
-              <span class="btn-icon"><i class="app-icon" data-lucide="plus-circle"></i></span>
-              <span class="btn-label">Create Mesh</span>
-            </button>
-            <button
-              class="dropdown-item active"
-              id="btnToggleCSG"
-              title="Sculpting with Constructive Solid Geometry (Subtract / Cut, Union, Intersect)"
-            >
-              <span class="btn-icon"><i class="app-icon" data-lucide="shapes"></i></span>
-              <span class="btn-label">Sculpting</span>
-            </button>
-            <button class="dropdown-item active" id="btnToggleFacetEditor" title="Facet & Vertex Editor">
-              <span class="btn-icon"><i class="app-icon" data-lucide="triangle"></i></span>
-              <span class="btn-label">Facet & Vertex Editor</span>
-            </button>
-            <button class="dropdown-item active" id="btnToggleTexturePanel" title="WebP Texture Optimizer">
-              <span class="btn-icon"><i class="app-icon" data-lucide="zap"></i></span>
-              <span class="btn-label">Texture Optimizer</span>
-            </button>
-            <button class="dropdown-item" id="btnToggleVoxelPainter" title="Voxel Painter (3D Grid & Texture Atlas Block Building)">
-              <span class="btn-icon"><i class="app-icon" data-lucide="brush"></i></span>
-              <span class="btn-label">Voxel Painter</span>
-            </button>
-            <button class="dropdown-item" id="btnTogglePathExtrusion" title="Path Extrusion (3D Splines, Curves & Profile Cross-Sections)">
-              <span class="btn-icon"><i class="app-icon" data-lucide="route"></i></span>
-              <span class="btn-label">Path Extrusion</span>
-            </button>
-            <button class="dropdown-item active" id="btnToggleOutliner" title="Scene Objects">
-              <span class="btn-icon"><i class="app-icon" data-lucide="list-tree"></i></span>
-              <span class="btn-label">Scene Objects</span>
-            </button>
-            <button class="dropdown-item active" id="btnToggleMeshPanel" title="Mesh Properties">
-              <span class="btn-icon"><i class="app-icon" data-lucide="box"></i></span>
-              <span class="btn-label">Mesh Properties</span>
-            </button>
-            <button class="dropdown-item active" id="btnToggleMaterialPanel" title="Material & UVs">
-              <span class="btn-icon"><i class="app-icon" data-lucide="palette"></i></span>
-              <span class="btn-label">Material & UV Mapping</span>
-            </button>
-            <button class="dropdown-item active" id="btnToggleScenePanel" title="Scene & Environment">
-              <span class="btn-icon"><i class="app-icon" data-lucide="sun-medium"></i></span>
-              <span class="btn-label">Scene & Environment</span>
-            </button>
-            <button class="dropdown-item active" id="btnToggleAnimPanel" title="Animation Player">
-              <span class="btn-icon"><i class="app-icon" data-lucide="film"></i></span>
-              <span class="btn-label">Animation Player</span>
-            </button>
-      
+            <!-- Dynamically populated from ToolInterface instances in MeshEditorApp.renderToolsMenu() -->
             <div class="dropdown-divider" id="menuToolsPluginsDivider" style="display: none"></div>
             <div id="menuToolsPlugins"></div>
           </div>
@@ -227,33 +174,6 @@
             <span class="btn-icon"><i class="app-icon" data-lucide="box-select"></i></span><span class="btn-badge">B</span>
           </button>
         </div>
-
-        <div class="toolbar-divider"></div>
-
-        <!-- Quick AI Agent Toggle -->
-        <div class="btn-group ai-toolbar-group">
-          <button class="tool-btn ai-toolbar-btn" id="btnToolbarAIAgent" title="Toggle AI Mesh Agent (Text/Image to Mesh & Mesh Update)">
-            <span class="btn-icon"><i class="app-icon" data-lucide="bot"></i></span>
-            <span class="btn-label">AI Agent</span>
-          </button>
-        </div>
-
-        <!-- Quick Voxel Painter Toggle -->
-        <div class="btn-group voxel-toolbar-group">
-          <button class="tool-btn" id="btnToolbarVoxelPainter" title="Toggle Voxel Painter (3D Grid & Texture Atlas Block Building)">
-            <span class="btn-icon"><i class="app-icon" data-lucide="brush"></i></span>
-            <span class="btn-label">Voxel Painter</span>
-          </button>
-        </div>
-
-        <!-- Quick Path Extrusion Toggle -->
-        <div class="btn-group path-extrusion-toolbar-group">
-          <button class="tool-btn" id="btnToolbarPathExtrusion" title="Toggle Path Extrusion (3D Splines, Curves & Profile Cross-Sections)">
-            <span class="btn-icon"><i class="app-icon" data-lucide="route"></i></span>
-            <span class="btn-label">Path Extrusion</span>
-          </button>
-        </div>
-
 
         <div class="toolbar-divider"></div>
 
