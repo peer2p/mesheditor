@@ -32,6 +32,7 @@ import {
   Texture,
   TransformNode,
   UniversalCamera,
+  Vector2,
   Vector3,
   VertexBuffer,
   VertexData,
@@ -122,8 +123,17 @@ export class MeshEditorService {
 
   // Facet & Vertex Editor state
   public facetEditorActive: boolean = false;
+  public facetEditMode: 'face' | 'vertex' = 'face';
   public selectedFaceId: number | null = null;
+  public selectedFaceIsQuad: boolean = false;
   public facetHighlightMesh: Nullable<LinesMesh> = null;
+  public selectedVertexIndex: number | null = null;
+  public selectedVertexIndices: number[] = [];
+  public vertexHandles: Mesh[] = [];
+  public activeVertexHandle: Mesh | null = null;
+  public vertexGizmoNode: TransformNode | null = null;
+  public isDraggingVertex: boolean = false;
+  private vertexPreDragPos: Vector3 = Vector3.Zero();
 
   // Events listener
   public events: MeshEditorServiceEvents = {};
@@ -443,8 +453,43 @@ export class MeshEditorService {
       ['xGizmo', 'yGizmo', 'zGizmo', 'uniformGizmo', 'planeGizmo'].forEach((partName) => {
         const part = (gizmo as any)[partName];
         if (part && part.dragBehavior) {
-          part.dragBehavior.onDragStartObservable.add(capturePreDrag);
-          part.dragBehavior.onDragEndObservable.add(() => commitPostDrag(name));
+          part.dragBehavior.onDragStartObservable.add(() => {
+            if (
+              name === 'Move' &&
+              this.facetEditorActive &&
+              this.facetEditMode === 'vertex' &&
+              this.selectedVertexIndex !== null &&
+              this.vertexGizmoNode
+            ) {
+              this.onVertexDragStart();
+            } else {
+              capturePreDrag();
+            }
+          });
+          if (name === 'Move') {
+            part.dragBehavior.onDragObservable.add(() => {
+              if (
+                this.facetEditorActive &&
+                this.facetEditMode === 'vertex' &&
+                this.selectedVertexIndex !== null &&
+                this.vertexGizmoNode
+              ) {
+                this.handleVertexGizmoDrag();
+              }
+            });
+          }
+          part.dragBehavior.onDragEndObservable.add(() => {
+            if (
+              name === 'Move' &&
+              this.facetEditorActive &&
+              this.facetEditMode === 'vertex' &&
+              this.selectedVertexIndex !== null
+            ) {
+              this.onVertexDragEnd();
+            } else {
+              commitPostDrag(name);
+            }
+          });
         }
       });
     };
@@ -626,6 +671,16 @@ export class MeshEditorService {
       this.selectedMesh = null;
       this.selectedSubMeshId = null;
       this.gizmoManager.attachToNode(null);
+      if (this.facetEditorActive) {
+        this.clearVertexSelection();
+        this.disposeVertexHandles();
+        if (this.facetHighlightMesh) {
+          this.facetHighlightMesh.dispose();
+          this.facetHighlightMesh = null;
+        }
+        this.selectedFaceId = null;
+        this.events.onFaceSelected?.(null);
+      }
     } else if (this.selectedNodes.length === 1) {
       const single = this.selectedNodes[0];
       if (single instanceof Mesh) {
@@ -635,7 +690,16 @@ export class MeshEditorService {
         this.selectedMesh = null;
         this.selectedSubMeshId = null;
       }
-      this.gizmoManager.attachToNode(single);
+      if (this.facetEditorActive && this.facetEditMode === 'vertex') {
+        this.refreshVertexHandles();
+        if (this.selectedVertexIndex !== null) {
+          this.attachVertexGizmo();
+        } else {
+          this.gizmoManager.attachToNode(null);
+        }
+      } else {
+        this.gizmoManager.attachToNode(single);
+      }
     } else {
       this.selectedMesh = null;
       this.selectedSubMeshId = null;
@@ -1186,6 +1250,69 @@ export class MeshEditorService {
     this.selectedMesh.refreshBoundingInfo();
     this.events.onSceneModified?.();
     this.events.onToast?.('Current transforms baked into mesh geometry.', 'success');
+  }
+
+  /* =========================================================================
+     WIREFRAME UTILITIES
+     ========================================================================= */
+  public isMeshWireframe(mesh: Mesh): boolean {
+    if (!mesh || mesh.isDisposed()) return false;
+    if (mesh.material) {
+      return !!(mesh.material as any).wireframe;
+    }
+    return false;
+  }
+
+  public setMeshWireframe(mesh: Mesh, wireframe: boolean): void {
+    if (!mesh || mesh.isDisposed()) return;
+    if (!mesh.material) {
+      const mat = new StandardMaterial(`${mesh.name}_wiremat`, this.scene);
+      mat.diffuseColor = new Color3(0.85, 0.85, 0.85);
+      mesh.material = mat;
+    } else {
+      const sharing = this.importedMeshes.filter((m) => m !== mesh && m.material === mesh.material);
+      if (sharing.length > 0) {
+        mesh.material = mesh.material.clone(`${mesh.name}_wireframe_mat`);
+      }
+    }
+    (mesh.material as any).wireframe = wireframe;
+    this.events.onSceneModified?.();
+  }
+
+  public toggleMeshWireframe(mesh: Mesh): boolean {
+    const next = !this.isMeshWireframe(mesh);
+    this.setMeshWireframe(mesh, next);
+    return next;
+  }
+
+  public toggleSelectedWireframe(): boolean {
+    const targets: Mesh[] = [];
+    for (const node of this.selectedNodes) {
+      if (node instanceof Mesh && !this.isEditorHelper(node)) {
+        targets.push(node);
+      } else {
+        for (const child of node.getChildMeshes()) {
+          if (child instanceof Mesh && !this.isEditorHelper(child)) {
+            targets.push(child);
+          }
+        }
+      }
+    }
+    if (targets.length === 0 && this.selectedMesh) {
+      targets.push(this.selectedMesh);
+    }
+    if (targets.length === 0) {
+      this.events.onToast?.('Please select a mesh first to toggle wireframe.', 'warning');
+      return false;
+    }
+
+    const anyNotWireframe = targets.some((m) => !this.isMeshWireframe(m));
+    for (const m of targets) {
+      this.setMeshWireframe(m, anyNotWireframe);
+    }
+    this.events.onToast?.(`Wireframe ${anyNotWireframe ? 'enabled' : 'disabled'} for ${targets.length} mesh(es)`, 'info');
+    this.events.onSceneModified?.();
+    return anyNotWireframe;
   }
 
   public setMeshRotationDegrees(mesh: Mesh, axis: 'x' | 'y' | 'z', degrees: number): void {
@@ -1933,34 +2060,540 @@ export class MeshEditorService {
         this.facetHighlightMesh = null;
       }
       this.selectedFaceId = null;
+      this.selectedFaceIsQuad = false;
+      this.clearVertexSelection();
+      this.disposeVertexHandles();
+      this.detachVertexGizmo();
+      this.events.onFaceSelected?.(null);
+      this.events.onVertexSelected?.(null);
+      if (this.selectedMesh) {
+        this.gizmoManager.attachToNode(this.selectedMesh);
+      }
+    } else {
+      if (this.facetEditMode === 'vertex') {
+        if (this.selectedMesh) {
+          this.refreshVertexHandles();
+        }
+      } else {
+        if (this.selectedMesh && this.selectedFaceId !== null) {
+          this.highlightFace(this.selectedMesh, this.selectedFaceId);
+        }
+      }
     }
+    this.events.onFacetEditorStateChanged?.(this.facetEditorActive);
     this.events.onToast?.(
-      this.facetEditorActive ? 'Facet Editor enabled. Click faces on selected mesh.' : 'Facet Editor disabled.',
+      this.facetEditorActive
+        ? `Facet & Vertex Editor enabled (${this.facetEditMode === 'vertex' ? 'Vertex' : 'Face'} Mode).`
+        : 'Facet & Vertex Editor disabled.',
       'info'
     );
     return this.facetEditorActive;
   }
 
+  public setFacetEditMode(mode: 'face' | 'vertex'): void {
+    this.facetEditMode = mode;
+    if (mode === 'vertex') {
+      if (this.selectedMesh) {
+        this.refreshVertexHandles();
+      }
+      if (this.selectedVertexIndex !== null) {
+        this.attachVertexGizmo();
+      }
+    } else {
+      this.disposeVertexHandles();
+      this.detachVertexGizmo();
+      if (this.selectedMesh && this.selectedFaceId !== null) {
+        this.highlightFace(this.selectedMesh, this.selectedFaceId);
+      }
+    }
+    this.events.onFacetEditModeChanged?.(mode);
+    this.events.onToast?.(`Switched to ${mode === 'vertex' ? 'Vertex' : 'Face'} Mode.`, 'info');
+  }
+
   public handleFacetPointer(pointerInfo: PointerInfo): void {
-    if (!this.selectedMesh) return;
     const pick = pointerInfo.pickInfo;
-    if (pick && pick.hit && pick.pickedMesh === this.selectedMesh && pick.faceId !== undefined) {
-      this.selectedFaceId = pick.faceId;
-      this.highlightFace(this.selectedMesh, pick.faceId);
-      this.events.onToast?.(`Face #${pick.faceId} selected.`, 'info');
+    if (!pick || !pick.hit || !pick.pickedMesh) return;
+    const picked = pick.pickedMesh as Mesh;
+
+    // Check if clicked an interactive vertex handle directly
+    if (this.isEditorHelper(picked) && (picked as any).metadata?.vertexIndex !== undefined) {
+      this.selectVertex((picked as any).metadata.vertexIndex);
+      return;
+    }
+
+    if (this.isEditorHelper(picked) || picked === this.gridMesh) return;
+
+    if (!this.selectedMesh || this.selectedMesh !== picked) {
+      this.selectMesh(picked);
+    }
+
+    if (this.facetEditMode === 'vertex') {
+      if (pick.pickedPoint) {
+        this.selectClosestVertex(picked, pick.pickedPoint, pick.faceId);
+      }
+    } else {
+      if (pick.faceId !== undefined) {
+        this.selectedFaceId = pick.faceId;
+        this.highlightFace(picked, pick.faceId);
+        const quad = this.getQuadFaceInfo(picked, pick.faceId);
+        this.events.onFaceSelected?.(pick.faceId, !!quad);
+        const desc = quad ? `Quad Face #${pick.faceId} & #${quad.faceIds[1]}` : `Face #${pick.faceId}`;
+        this.events.onToast?.(`${desc} selected on "${picked.name}".`, 'info');
+      }
     }
   }
 
-  private highlightFace(mesh: Mesh, faceId: number): void {
-    if (this.facetHighlightMesh) {
-      this.facetHighlightMesh.dispose();
-      this.facetHighlightMesh = null;
+  public selectVertex(vertexIndex: number): void {
+    if (!this.selectedMesh) return;
+    const mesh = this.selectedMesh;
+    const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+    if (!positions || vertexIndex * 3 + 2 >= positions.length) return;
+
+    this.selectedVertexIndex = vertexIndex;
+    const targetPos = new Vector3(
+      positions[vertexIndex * 3],
+      positions[vertexIndex * 3 + 1],
+      positions[vertexIndex * 3 + 2]
+    );
+
+    // Collect all coincident vertices sharing the exact same spatial position
+    this.selectedVertexIndices = [];
+    const totalVerts = positions.length / 3;
+    for (let i = 0; i < totalVerts; i++) {
+      const d2 =
+        (positions[i * 3] - targetPos.x) ** 2 +
+        (positions[i * 3 + 1] - targetPos.y) ** 2 +
+        (positions[i * 3 + 2] - targetPos.z) ** 2;
+      if (d2 < 0.0001) {
+        this.selectedVertexIndices.push(i);
+      }
     }
 
+    mesh.computeWorldMatrix(true);
+    const worldPos = Vector3.TransformCoordinates(targetPos, mesh.getWorldMatrix());
+
+    this.attachVertexGizmo(worldPos);
+    this.refreshVertexHandles();
+    this.events.onVertexSelected?.(vertexIndex, worldPos);
+    this.events.onToast?.(
+      `Vertex #${vertexIndex} selected (${this.selectedVertexIndices.length} linked). Drag 3D gizmo to move.`,
+      'info'
+    );
+  }
+
+  public selectClosestVertex(mesh: Mesh, worldPoint: Vector3, faceId?: number): void {
+    const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+    const indices = mesh.getIndices();
+    if (!positions) return;
+
+    mesh.computeWorldMatrix(true);
+    const invMat = mesh.getWorldMatrix().clone().invert();
+    const localPoint = Vector3.TransformCoordinates(worldPoint, invMat);
+
+    let candidateIndices: number[] = [];
+    if (faceId !== undefined && indices && faceId * 3 + 2 < indices.length) {
+      const quad = this.getQuadFaceInfo(mesh, faceId);
+      if (quad) {
+        candidateIndices = [...quad.quadIndices];
+      } else {
+        candidateIndices = [indices[faceId * 3], indices[faceId * 3 + 1], indices[faceId * 3 + 2]];
+      }
+    } else {
+      const total = positions.length / 3;
+      for (let i = 0; i < total; i++) candidateIndices.push(i);
+    }
+
+    let closestIdx = candidateIndices[0];
+    let minDistSq = Infinity;
+    for (const idx of candidateIndices) {
+      const d2 =
+        (positions[idx * 3] - localPoint.x) ** 2 +
+        (positions[idx * 3 + 1] - localPoint.y) ** 2 +
+        (positions[idx * 3 + 2] - localPoint.z) ** 2;
+      if (d2 < minDistSq) {
+        minDistSq = d2;
+        closestIdx = idx;
+      }
+    }
+
+    if (closestIdx !== undefined) {
+      this.selectVertex(closestIdx);
+    }
+  }
+
+  public clearVertexSelection(): void {
+    this.selectedVertexIndex = null;
+    this.selectedVertexIndices = [];
+    this.detachVertexGizmo();
+    this.events.onVertexSelected?.(null);
+  }
+
+  public refreshVertexHandles(): void {
+    this.disposeVertexHandles();
+    if (!this.selectedMesh || this.selectedMesh.isDisposed()) return;
+    const mesh = this.selectedMesh;
+    const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+    if (!positions) return;
+
+    mesh.computeWorldMatrix(true);
+    const wm = mesh.getWorldMatrix();
+
+    // Determine target vertex indices to show
+    const targetIndices = new Set<number>();
+    if (this.selectedFaceId !== null) {
+      const quad = this.getQuadFaceInfo(mesh, this.selectedFaceId);
+      if (quad) {
+        quad.quadIndices.forEach((i) => targetIndices.add(i));
+      } else {
+        const indices = mesh.getIndices();
+        if (indices && this.selectedFaceId * 3 + 2 < indices.length) {
+          targetIndices.add(indices[this.selectedFaceId * 3]);
+          targetIndices.add(indices[this.selectedFaceId * 3 + 1]);
+          targetIndices.add(indices[this.selectedFaceId * 3 + 2]);
+        }
+      }
+    } else {
+      const totalVerts = positions.length / 3;
+      const limit = Math.min(totalVerts, 500);
+      for (let i = 0; i < limit; i++) {
+        targetIndices.add(i);
+      }
+    }
+
+    // Group coincident vertices
+    const spatialMap = new Map<
+      string,
+      { worldPos: Vector3; localPos: Vector3; indices: number[]; primaryIndex: number }
+    >();
+
+    for (const idx of targetIndices) {
+      const lx = positions[idx * 3];
+      const ly = positions[idx * 3 + 1];
+      const lz = positions[idx * 3 + 2];
+      const key = `${lx.toFixed(3)},${ly.toFixed(3)},${lz.toFixed(3)}`;
+      if (!spatialMap.has(key)) {
+        const localPos = new Vector3(lx, ly, lz);
+        const worldPos = Vector3.TransformCoordinates(localPos, wm);
+        spatialMap.set(key, { worldPos, localPos, indices: [idx], primaryIndex: idx });
+      } else {
+        spatialMap.get(key)!.indices.push(idx);
+      }
+    }
+
+    const ext = mesh.getBoundingInfo().boundingBox.extendSize;
+    const diag = Math.max(ext.x, ext.y, ext.z);
+    const diameter = Math.max(0.06, Math.min(0.24, diag * 0.05));
+
+    for (const group of spatialMap.values()) {
+      const isSelected =
+        this.selectedVertexIndex !== null && group.indices.includes(this.selectedVertexIndex);
+
+      const handle = MeshBuilder.CreateSphere(
+        `editor_vertex_handle_${group.primaryIndex}`,
+        { diameter: isSelected ? diameter * 1.35 : diameter, segments: 8 },
+        this.scene
+      );
+      handle.position.copyFrom(group.worldPos);
+      handle.isPickable = true;
+
+      const mat = new StandardMaterial(`editor_vh_mat_${group.primaryIndex}`, this.scene);
+      mat.disableLighting = true;
+      mat.emissiveColor = isSelected ? new Color3(1.0, 0.65, 0.1) : new Color3(0.0, 0.85, 1.0);
+      handle.material = mat;
+
+      (handle as any).metadata = {
+        isEditorHelper: true,
+        vertexIndex: group.primaryIndex,
+        vertexIndices: group.indices,
+        localPos: group.localPos,
+      };
+
+      if (isSelected) {
+        this.activeVertexHandle = handle;
+      }
+      this.vertexHandles.push(handle);
+    }
+  }
+
+  public disposeVertexHandles(): void {
+    for (const h of this.vertexHandles) {
+      if (!h.isDisposed()) {
+        if (h.material) h.material.dispose();
+        h.dispose();
+      }
+    }
+    this.vertexHandles = [];
+    this.activeVertexHandle = null;
+  }
+
+  public attachVertexGizmo(worldPos?: Vector3): void {
+    if (!this.vertexGizmoNode) {
+      this.vertexGizmoNode = new TransformNode('editor_vertex_gizmo_node', this.scene);
+      (this.vertexGizmoNode as any).metadata = { isEditorHelper: true };
+    }
+    if (worldPos) {
+      this.vertexGizmoNode.position.copyFrom(worldPos);
+    }
+    this.gizmoManager.attachToNode(this.vertexGizmoNode);
+    this.gizmoManager.positionGizmoEnabled = true;
+    this.gizmoManager.rotationGizmoEnabled = false;
+    this.gizmoManager.scaleGizmoEnabled = false;
+    this.gizmoManager.boundingBoxGizmoEnabled = false;
+  }
+
+  public detachVertexGizmo(): void {
+    if (this.gizmoManager.gizmos.positionGizmo?.attachedNode === this.vertexGizmoNode) {
+      this.gizmoManager.attachToNode(null);
+    }
+    if (this.vertexGizmoNode && !this.vertexGizmoNode.isDisposed()) {
+      this.vertexGizmoNode.dispose();
+      this.vertexGizmoNode = null;
+    }
+  }
+
+  public onVertexDragStart(): void {
+    if (this.selectedVertexIndex === null || !this.selectedMesh || !this.vertexGizmoNode) return;
+    const positions = this.selectedMesh.getVerticesData(VertexBuffer.PositionKind);
+    if (!positions) return;
+
+    this.isDraggingVertex = true;
+    this.vertexPreDragPos = new Vector3(
+      positions[this.selectedVertexIndex * 3],
+      positions[this.selectedVertexIndex * 3 + 1],
+      positions[this.selectedVertexIndex * 3 + 2]
+    );
+  }
+
+  public handleVertexGizmoDrag(): void {
+    if (this.selectedVertexIndex === null || !this.selectedMesh || !this.vertexGizmoNode) return;
+    const mesh = this.selectedMesh;
+    const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+    if (!positions) return;
+
+    mesh.computeWorldMatrix(true);
+    const invMat = mesh.getWorldMatrix().clone().invert();
+    const localTarget = Vector3.TransformCoordinates(this.vertexGizmoNode.position, invMat);
+
+    const posArray = Array.from(positions);
+    for (const idx of this.selectedVertexIndices) {
+      posArray[idx * 3] = localTarget.x;
+      posArray[idx * 3 + 1] = localTarget.y;
+      posArray[idx * 3 + 2] = localTarget.z;
+    }
+
+    mesh.setVerticesData(VertexBuffer.PositionKind, posArray);
+    const indices = Array.from(mesh.getIndices() || []);
+    const normals: number[] = [];
+    VertexData.ComputeNormals(posArray, indices, normals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+    mesh.refreshBoundingInfo();
+
+    if (this.activeVertexHandle) {
+      this.activeVertexHandle.position.copyFrom(this.vertexGizmoNode.position);
+    }
+    if (this.selectedFaceId !== null) {
+      this.highlightFace(mesh, this.selectedFaceId);
+    }
+    this.events.onVertexSelected?.(this.selectedVertexIndex, this.vertexGizmoNode.position);
+  }
+
+  public onVertexDragEnd(): void {
+    if (!this.isDraggingVertex || this.selectedVertexIndex === null || !this.selectedMesh || !this.vertexGizmoNode) {
+      this.isDraggingVertex = false;
+      return;
+    }
+    this.isDraggingVertex = false;
+
+    const mesh = this.selectedMesh;
+    const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+    if (!positions) return;
+
+    const beforePos = this.vertexPreDragPos.clone();
+    const afterPos = new Vector3(
+      positions[this.selectedVertexIndex * 3],
+      positions[this.selectedVertexIndex * 3 + 1],
+      positions[this.selectedVertexIndex * 3 + 2]
+    );
+
+    if (Vector3.DistanceSquared(beforePos, afterPos) < 1e-6) return;
+
+    const indicesToRestore = [...this.selectedVertexIndices];
+    const targetMesh = mesh;
+    const vertexIdx = this.selectedVertexIndex;
+
+    this.recordAction({
+      name: `Move Vertex #${vertexIdx}`,
+      undo: () => {
+        if (targetMesh.isDisposed()) return;
+        const pos = Array.from(targetMesh.getVerticesData(VertexBuffer.PositionKind) || []);
+        for (const i of indicesToRestore) {
+          pos[i * 3] = beforePos.x;
+          pos[i * 3 + 1] = beforePos.y;
+          pos[i * 3 + 2] = beforePos.z;
+        }
+        targetMesh.setVerticesData(VertexBuffer.PositionKind, pos);
+        const norm: number[] = [];
+        VertexData.ComputeNormals(pos, Array.from(targetMesh.getIndices() || []), norm);
+        targetMesh.setVerticesData(VertexBuffer.NormalKind, norm);
+        targetMesh.refreshBoundingInfo();
+        if (this.facetEditorActive && this.facetEditMode === 'vertex') {
+          this.refreshVertexHandles();
+          if (this.selectedVertexIndex === vertexIdx && this.vertexGizmoNode) {
+            targetMesh.computeWorldMatrix(true);
+            this.vertexGizmoNode.position.copyFrom(
+              Vector3.TransformCoordinates(beforePos, targetMesh.getWorldMatrix())
+            );
+            this.events.onVertexSelected?.(vertexIdx, this.vertexGizmoNode.position);
+          }
+        }
+        this.events.onSceneModified?.();
+      },
+      redo: () => {
+        if (targetMesh.isDisposed()) return;
+        const pos = Array.from(targetMesh.getVerticesData(VertexBuffer.PositionKind) || []);
+        for (const i of indicesToRestore) {
+          pos[i * 3] = afterPos.x;
+          pos[i * 3 + 1] = afterPos.y;
+          pos[i * 3 + 2] = afterPos.z;
+        }
+        targetMesh.setVerticesData(VertexBuffer.PositionKind, pos);
+        const norm: number[] = [];
+        VertexData.ComputeNormals(pos, Array.from(targetMesh.getIndices() || []), norm);
+        targetMesh.setVerticesData(VertexBuffer.NormalKind, norm);
+        targetMesh.refreshBoundingInfo();
+        if (this.facetEditorActive && this.facetEditMode === 'vertex') {
+          this.refreshVertexHandles();
+          if (this.selectedVertexIndex === vertexIdx && this.vertexGizmoNode) {
+            targetMesh.computeWorldMatrix(true);
+            this.vertexGizmoNode.position.copyFrom(
+              Vector3.TransformCoordinates(afterPos, targetMesh.getWorldMatrix())
+            );
+            this.events.onVertexSelected?.(vertexIdx, this.vertexGizmoNode.position);
+          }
+        }
+        this.events.onSceneModified?.();
+      },
+    });
+
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Vertex #${vertexIdx} moved.`, 'info');
+  }
+
+  public setVertexPosition(x: number, y: number, z: number): void {
+    if (this.selectedVertexIndex === null || !this.selectedMesh) return;
+    const mesh = this.selectedMesh;
+    const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+    if (!positions) return;
+
+    const beforePos = new Vector3(
+      positions[this.selectedVertexIndex * 3],
+      positions[this.selectedVertexIndex * 3 + 1],
+      positions[this.selectedVertexIndex * 3 + 2]
+    );
+
+    mesh.computeWorldMatrix(true);
+    const invMat = mesh.getWorldMatrix().clone().invert();
+    const localTarget = Vector3.TransformCoordinates(new Vector3(x, y, z), invMat);
+
+    const afterPos = localTarget.clone();
+    const posArray = Array.from(positions);
+    for (const idx of this.selectedVertexIndices) {
+      posArray[idx * 3] = localTarget.x;
+      posArray[idx * 3 + 1] = localTarget.y;
+      posArray[idx * 3 + 2] = localTarget.z;
+    }
+
+    mesh.setVerticesData(VertexBuffer.PositionKind, posArray);
+    const indices = Array.from(mesh.getIndices() || []);
+    const normals: number[] = [];
+    VertexData.ComputeNormals(posArray, indices, normals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+    mesh.refreshBoundingInfo();
+
+    if (this.vertexGizmoNode) {
+      this.vertexGizmoNode.position.set(x, y, z);
+    }
+    if (this.activeVertexHandle) {
+      this.activeVertexHandle.position.set(x, y, z);
+    }
+    if (this.selectedFaceId !== null) {
+      this.highlightFace(mesh, this.selectedFaceId);
+    }
+
+    const indicesToRestore = [...this.selectedVertexIndices];
+    const targetMesh = mesh;
+    const vertexIdx = this.selectedVertexIndex;
+
+    this.recordAction({
+      name: `Set Vertex #${vertexIdx} Position`,
+      undo: () => {
+        if (targetMesh.isDisposed()) return;
+        const pos = Array.from(targetMesh.getVerticesData(VertexBuffer.PositionKind) || []);
+        for (const i of indicesToRestore) {
+          pos[i * 3] = beforePos.x;
+          pos[i * 3 + 1] = beforePos.y;
+          pos[i * 3 + 2] = beforePos.z;
+        }
+        targetMesh.setVerticesData(VertexBuffer.PositionKind, pos);
+        const norm: number[] = [];
+        VertexData.ComputeNormals(pos, Array.from(targetMesh.getIndices() || []), norm);
+        targetMesh.setVerticesData(VertexBuffer.NormalKind, norm);
+        targetMesh.refreshBoundingInfo();
+        this.refreshVertexHandles();
+        this.events.onSceneModified?.();
+      },
+      redo: () => {
+        if (targetMesh.isDisposed()) return;
+        const pos = Array.from(targetMesh.getVerticesData(VertexBuffer.PositionKind) || []);
+        for (const i of indicesToRestore) {
+          pos[i * 3] = afterPos.x;
+          pos[i * 3 + 1] = afterPos.y;
+          pos[i * 3 + 2] = afterPos.z;
+        }
+        targetMesh.setVerticesData(VertexBuffer.PositionKind, pos);
+        const norm: number[] = [];
+        VertexData.ComputeNormals(pos, Array.from(targetMesh.getIndices() || []), norm);
+        targetMesh.setVerticesData(VertexBuffer.NormalKind, norm);
+        targetMesh.refreshBoundingInfo();
+        this.refreshVertexHandles();
+        this.events.onSceneModified?.();
+      },
+    });
+
+    this.events.onSceneModified?.();
+    this.events.onVertexSelected?.(this.selectedVertexIndex, new Vector3(x, y, z));
+  }
+
+  public getSelectedVertexPosition(): Vector3 | null {
+    if (this.selectedVertexIndex === null || !this.selectedMesh) return null;
+    const positions = this.selectedMesh.getVerticesData(VertexBuffer.PositionKind);
+    if (!positions || this.selectedVertexIndex * 3 + 2 >= positions.length) return null;
+    const local = new Vector3(
+      positions[this.selectedVertexIndex * 3],
+      positions[this.selectedVertexIndex * 3 + 1],
+      positions[this.selectedVertexIndex * 3 + 2]
+    );
+    this.selectedMesh.computeWorldMatrix(true);
+    return Vector3.TransformCoordinates(local, this.selectedMesh.getWorldMatrix());
+  }
+
+  public getQuadFaceInfo(
+    mesh: Mesh,
+    faceId: number
+  ): {
+    faceIds: [number, number];
+    quadIndices: [number, number, number, number];
+    quadPositions: [Vector3, Vector3, Vector3, Vector3];
+    quadUVs: [Vector2, Vector2, Vector2, Vector2] | null;
+    normal: Vector3;
+    centroid: Vector3;
+  } | null {
     const indices = mesh.getIndices();
     const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
-    if (!indices || !positions) return;
+    const uvs = mesh.getVerticesData(VertexBuffer.UVKind);
+    if (!indices || !positions || faceId * 3 + 2 >= indices.length) return null;
 
+    const numTriangles = indices.length / 3;
     const i0 = indices[faceId * 3];
     const i1 = indices[faceId * 3 + 1];
     const i2 = indices[faceId * 3 + 2];
@@ -1969,19 +2602,177 @@ export class MeshEditorService {
     const p1 = new Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]);
     const p2 = new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
 
+    const triPositions = [p0, p1, p2];
+    const triIndices = [i0, i1, i2];
+
+    const nA = Vector3.Cross(p2.subtract(p0), p1.subtract(p0));
+    const lenA = nA.length();
+    if (lenA < 1e-6) return null;
+    const normalA = nA.scale(1 / lenA);
+
+    for (let f = 0; f < numTriangles; f++) {
+      if (f === faceId) continue;
+      const j0 = indices[f * 3];
+      const j1 = indices[f * 3 + 1];
+      const j2 = indices[f * 3 + 2];
+
+      const q0 = new Vector3(positions[j0 * 3], positions[j0 * 3 + 1], positions[j0 * 3 + 2]);
+      const q1 = new Vector3(positions[j1 * 3], positions[j1 * 3 + 1], positions[j1 * 3 + 2]);
+      const q2 = new Vector3(positions[j2 * 3], positions[j2 * 3 + 1], positions[j2 * 3 + 2]);
+
+      const nB = Vector3.Cross(q2.subtract(q0), q1.subtract(q0));
+      const lenB = nB.length();
+      if (lenB < 1e-6) continue;
+      const normalB = nB.scale(1 / lenB);
+
+      // Must be coplanar with same orientation
+      if (Vector3.Dot(normalA, normalB) < 0.99) continue;
+
+      // Must lie on the same plane
+      if (Math.abs(Vector3.Dot(q0.subtract(p0), normalA)) > 0.002) continue;
+
+      const otherPositions = [q0, q1, q2];
+      const otherIndices = [j0, j1, j2];
+
+      const sharedInA: number[] = [];
+      const sharedInB: number[] = [];
+      for (let a = 0; a < 3; a++) {
+        for (let b = 0; b < 3; b++) {
+          if (Vector3.DistanceSquared(triPositions[a], otherPositions[b]) < 0.0001) {
+            sharedInA.push(a);
+            sharedInB.push(b);
+            break;
+          }
+        }
+      }
+
+      if (sharedInA.length === 2) {
+        const unsharedA = [0, 1, 2].find((idx) => !sharedInA.includes(idx))!;
+        const s1A = (unsharedA + 1) % 3;
+        const s2A = (unsharedA + 2) % 3;
+
+        const unsharedB = [0, 1, 2].find((idx) => !sharedInB.includes(idx))!;
+
+        const V0 = triPositions[unsharedA];
+        const V1 = triPositions[s1A];
+        const V2 = otherPositions[unsharedB];
+        const V3 = triPositions[s2A];
+
+        const idx0 = triIndices[unsharedA];
+        const idx1 = triIndices[s1A];
+        const idx2 = otherIndices[unsharedB];
+        const idx3 = triIndices[s2A];
+
+        // Convexity check around perimeter
+        const e01 = V1.subtract(V0);
+        const e12 = V2.subtract(V1);
+        const e23 = V3.subtract(V2);
+        const e30 = V0.subtract(V3);
+
+        const c0 = Vector3.Dot(Vector3.Cross(e01, e30), normalA);
+        const c1 = Vector3.Dot(Vector3.Cross(e12, e01), normalA);
+        const c2 = Vector3.Dot(Vector3.Cross(e23, e12), normalA);
+        const c3 = Vector3.Dot(Vector3.Cross(e30, e23), normalA);
+
+        if (c0 > 0 && c1 > 0 && c2 > 0 && c3 > 0) {
+          const centroid = V0.add(V1).add(V2).add(V3).scale(0.25);
+          let quadUVs: [Vector2, Vector2, Vector2, Vector2] | null = null;
+          if (uvs && uvs.length > 0) {
+            quadUVs = [
+              new Vector2(uvs[idx0 * 2] ?? 0, uvs[idx0 * 2 + 1] ?? 0),
+              new Vector2(uvs[idx1 * 2] ?? 0, uvs[idx1 * 2 + 1] ?? 0),
+              new Vector2(uvs[idx2 * 2] ?? 0, uvs[idx2 * 2 + 1] ?? 0),
+              new Vector2(uvs[idx3 * 2] ?? 0, uvs[idx3 * 2 + 1] ?? 0),
+            ];
+          }
+
+          return {
+            faceIds: [faceId, f],
+            quadIndices: [idx0, idx1, idx2, idx3],
+            quadPositions: [V0, V1, V2, V3],
+            quadUVs,
+            normal: normalA,
+            centroid,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  public highlightFace(mesh: Mesh, faceId: number): void {
+    if (this.facetHighlightMesh) {
+      this.facetHighlightMesh.dispose();
+      this.facetHighlightMesh = null;
+    }
+
     mesh.computeWorldMatrix(true);
     const wm = mesh.getWorldMatrix();
-    const w0 = Vector3.TransformCoordinates(p0, wm);
-    const w1 = Vector3.TransformCoordinates(p1, wm);
-    const w2 = Vector3.TransformCoordinates(p2, wm);
 
-    this.facetHighlightMesh = MeshBuilder.CreateLines(
-      'editor_facet_highlight',
-      { points: [w0, w1, w2, w0] },
-      this.scene
-    );
+    const quad = this.getQuadFaceInfo(mesh, faceId);
+    if (quad) {
+      this.selectedFaceIsQuad = true;
+      const [p0, p1, p2, p3] = quad.quadPositions;
+      const w0 = Vector3.TransformCoordinates(p0, wm);
+      const w1 = Vector3.TransformCoordinates(p1, wm);
+      const w2 = Vector3.TransformCoordinates(p2, wm);
+      const w3 = Vector3.TransformCoordinates(p3, wm);
+
+      this.facetHighlightMesh = MeshBuilder.CreateLines(
+        'editor_facet_highlight',
+        { points: [w0, w1, w2, w3, w0] },
+        this.scene
+      );
+    } else {
+      this.selectedFaceIsQuad = false;
+      const indices = mesh.getIndices();
+      const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+      if (!indices || !positions || faceId * 3 + 2 >= indices.length) return;
+
+      const i0 = indices[faceId * 3];
+      const i1 = indices[faceId * 3 + 1];
+      const i2 = indices[faceId * 3 + 2];
+
+      const p0 = new Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]);
+      const p1 = new Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]);
+      const p2 = new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
+
+      const w0 = Vector3.TransformCoordinates(p0, wm);
+      const w1 = Vector3.TransformCoordinates(p1, wm);
+      const w2 = Vector3.TransformCoordinates(p2, wm);
+
+      this.facetHighlightMesh = MeshBuilder.CreateLines(
+        'editor_facet_highlight',
+        { points: [w0, w1, w2, w0] },
+        this.scene
+      );
+    }
+
     this.facetHighlightMesh.color = new Color3(1, 0.8, 0.2);
     (this.facetHighlightMesh as any).metadata = { isEditorHelper: true };
+
+    if (this.facetEditMode === 'vertex') {
+      this.refreshVertexHandles();
+    }
+  }
+
+  private orientTriangle(
+    p0: Vector3,
+    p1: Vector3,
+    p2: Vector3,
+    expectedNormal: Vector3,
+    i0: number,
+    i1: number,
+    i2: number
+  ): [number, number, number] {
+    const p1p0 = p1.subtract(p0);
+    const p2p0 = p2.subtract(p0);
+    const calculated = Vector3.Cross(p2p0, p1p0);
+    if (Vector3.Dot(calculated, expectedNormal) < 0) {
+      return [i0, i2, i1];
+    }
+    return [i0, i1, i2];
   }
 
   public extrudeSelectedFacet(distance: number = 0.5): void {
@@ -1993,6 +2784,85 @@ export class MeshEditorService {
     const faceId = this.selectedFaceId;
     const indices = Array.from(mesh.getIndices() || []);
     const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
+    const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
+
+    const quad = this.getQuadFaceInfo(mesh, faceId);
+
+    if (quad) {
+      const [V0, V1, V2, V3] = quad.quadPositions;
+      const [idx0, idx1, idx2, idx3] = quad.quadIndices;
+      const [fA, fB] = quad.faceIds;
+      const normal = quad.normal;
+      const offset = normal.scale(distance);
+
+      const q0 = V0.add(offset);
+      const q1 = V1.add(offset);
+      const q2 = V2.add(offset);
+      const q3 = V3.add(offset);
+
+      const v0 = positions.length / 3;
+      positions.push(q0.x, q0.y, q0.z);
+      const v1 = positions.length / 3;
+      positions.push(q1.x, q1.y, q1.z);
+      const v2 = positions.length / 3;
+      positions.push(q2.x, q2.y, q2.z);
+      const v3 = positions.length / 3;
+      positions.push(q3.x, q3.y, q3.z);
+
+      if (uvs.length > 0 && quad.quadUVs) {
+        const [u0, u1, u2, u3] = quad.quadUVs;
+        uvs.push(u0.x, u0.y, u1.x, u1.y, u2.x, u2.y, u3.x, u3.y);
+      }
+
+      // Update top quad face (2 triangles)
+      const topTri1 = this.orientTriangle(q0, q1, q2, normal, v0, v1, v2);
+      const topTri2 = this.orientTriangle(q0, q2, q3, normal, v0, v2, v3);
+      indices[fA * 3] = topTri1[0];
+      indices[fA * 3 + 1] = topTri1[1];
+      indices[fA * 3 + 2] = topTri1[2];
+
+      indices[fB * 3] = topTri2[0];
+      indices[fB * 3 + 1] = topTri2[1];
+      indices[fB * 3 + 2] = topTri2[2];
+
+      // 4 side quads (8 triangles)
+      const nSide0 = Vector3.Cross(normal, V1.subtract(V0)).normalize();
+      const nSide1 = Vector3.Cross(normal, V2.subtract(V1)).normalize();
+      const nSide2 = Vector3.Cross(normal, V3.subtract(V2)).normalize();
+      const nSide3 = Vector3.Cross(normal, V0.subtract(V3)).normalize();
+
+      const side0A = this.orientTriangle(V0, V1, q1, nSide0, idx0, idx1, v1);
+      const side0B = this.orientTriangle(V0, q1, q0, nSide0, idx0, v1, v0);
+      const side1A = this.orientTriangle(V1, V2, q2, nSide1, idx1, idx2, v2);
+      const side1B = this.orientTriangle(V1, q2, q1, nSide1, idx1, v2, v1);
+      const side2A = this.orientTriangle(V2, V3, q3, nSide2, idx2, idx3, v3);
+      const side2B = this.orientTriangle(V2, q3, q2, nSide2, idx2, v3, v2);
+      const side3A = this.orientTriangle(V3, V0, q0, nSide3, idx3, idx0, v0);
+      const side3B = this.orientTriangle(V3, q0, q3, nSide3, idx3, v0, v3);
+
+      indices.push(
+        ...side0A, ...side0B,
+        ...side1A, ...side1B,
+        ...side2A, ...side2B,
+        ...side3A, ...side3B
+      );
+
+      mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+      mesh.setIndices(indices);
+      if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+
+      const normals: number[] = [];
+      VertexData.ComputeNormals(positions, indices, normals);
+      mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+      mesh.refreshBoundingInfo();
+
+      this.highlightFace(mesh, fA);
+      this.events.onSceneModified?.();
+      this.events.onToast?.(`Extruded Quad Face by ${distance}!`, 'success');
+      return;
+    }
+
+    if (faceId * 3 + 2 >= indices.length) return;
 
     const i0 = indices[faceId * 3];
     const i1 = indices[faceId * 3 + 1];
@@ -2003,7 +2873,7 @@ export class MeshEditorService {
     const p2 = new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
 
     // Face normal
-    const normal = Vector3.Cross(p1.subtract(p0), p2.subtract(p0)).normalize();
+    const normal = Vector3.Cross(p2.subtract(p0), p1.subtract(p0)).normalize();
     const offset = normal.scale(distance);
 
     const n0 = p0.add(offset);
@@ -2017,18 +2887,35 @@ export class MeshEditorService {
     const newV2 = positions.length / 3;
     positions.push(n2.x, n2.y, n2.z);
 
+    if (uvs.length > 0) {
+      uvs.push(uvs[i0 * 2] ?? 0, uvs[i0 * 2 + 1] ?? 0);
+      uvs.push(uvs[i1 * 2] ?? 0, uvs[i1 * 2 + 1] ?? 0);
+      uvs.push(uvs[i2 * 2] ?? 0, uvs[i2 * 2 + 1] ?? 0);
+    }
+
     // Update top face
-    indices[faceId * 3] = newV0;
-    indices[faceId * 3 + 1] = newV1;
-    indices[faceId * 3 + 2] = newV2;
+    const topTri = this.orientTriangle(n0, n1, n2, normal, newV0, newV1, newV2);
+    indices[faceId * 3] = topTri[0];
+    indices[faceId * 3 + 1] = topTri[1];
+    indices[faceId * 3 + 2] = topTri[2];
 
     // Create side quads (2 triangles each)
-    indices.push(i0, newV0, newV1, i0, newV1, i1);
-    indices.push(i1, newV1, newV2, i1, newV2, i2);
-    indices.push(i2, newV2, newV0, i2, newV0, i0);
+    const nSide0 = Vector3.Cross(normal, p1.subtract(p0)).normalize();
+    const nSide1 = Vector3.Cross(normal, p2.subtract(p1)).normalize();
+    const nSide2 = Vector3.Cross(normal, p0.subtract(p2)).normalize();
+
+    const s0A = this.orientTriangle(p0, p1, n1, nSide0, i0, i1, newV1);
+    const s0B = this.orientTriangle(p0, n1, n0, nSide0, i0, newV1, newV0);
+    const s1A = this.orientTriangle(p1, p2, n2, nSide1, i1, i2, newV2);
+    const s1B = this.orientTriangle(p1, n2, n1, nSide1, i1, newV2, newV1);
+    const s2A = this.orientTriangle(p2, p0, n0, nSide2, i2, i0, newV0);
+    const s2B = this.orientTriangle(p2, n0, n2, nSide2, i2, newV0, newV2);
+
+    indices.push(...s0A, ...s0B, ...s1A, ...s1B, ...s2A, ...s2B);
 
     mesh.setVerticesData(VertexBuffer.PositionKind, positions);
     mesh.setIndices(indices);
+    if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
 
     const normals: number[] = [];
     VertexData.ComputeNormals(positions, indices, normals);
@@ -2040,6 +2927,874 @@ export class MeshEditorService {
     this.events.onToast?.(`Extruded face by ${distance}!`, 'success');
   }
 
+  public insetSelectedFacet(insetAmount: number = 0.25, depth: number = 0.0): void {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face to inset.', 'warning');
+      return;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const indices = Array.from(mesh.getIndices() || []);
+    const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
+    const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
+
+    const quad = this.getQuadFaceInfo(mesh, faceId);
+
+    if (quad) {
+      const [V0, V1, V2, V3] = quad.quadPositions;
+      const [idx0, idx1, idx2, idx3] = quad.quadIndices;
+      const [fA, fB] = quad.faceIds;
+      const centroid = quad.centroid;
+      const normal = quad.normal;
+
+      let ratio = insetAmount;
+      if (ratio > 1) {
+        const avgDist =
+          (Vector3.Distance(V0, centroid) +
+            Vector3.Distance(V1, centroid) +
+            Vector3.Distance(V2, centroid) +
+            Vector3.Distance(V3, centroid)) /
+          4;
+        ratio = Math.min(insetAmount / Math.max(avgDist, 0.001), 0.85);
+      }
+      ratio = Math.min(Math.max(ratio, 0.05), 0.95);
+
+      const q0 = V0.add(centroid.subtract(V0).scale(ratio)).add(normal.scale(depth));
+      const q1 = V1.add(centroid.subtract(V1).scale(ratio)).add(normal.scale(depth));
+      const q2 = V2.add(centroid.subtract(V2).scale(ratio)).add(normal.scale(depth));
+      const q3 = V3.add(centroid.subtract(V3).scale(ratio)).add(normal.scale(depth));
+
+      const v0 = positions.length / 3;
+      positions.push(q0.x, q0.y, q0.z);
+      const v1 = positions.length / 3;
+      positions.push(q1.x, q1.y, q1.z);
+      const v2 = positions.length / 3;
+      positions.push(q2.x, q2.y, q2.z);
+      const v3 = positions.length / 3;
+      positions.push(q3.x, q3.y, q3.z);
+
+      if (uvs.length > 0 && quad.quadUVs) {
+        const [u0, u1, u2, u3] = quad.quadUVs;
+        const cu = (u0.x + u1.x + u2.x + u3.x) / 4;
+        const cv = (u0.y + u1.y + u2.y + u3.y) / 4;
+        uvs.push(u0.x + (cu - u0.x) * ratio, u0.y + (cv - u0.y) * ratio);
+        uvs.push(u1.x + (cu - u1.x) * ratio, u1.y + (cv - u1.y) * ratio);
+        uvs.push(u2.x + (cu - u2.x) * ratio, u2.y + (cv - u2.y) * ratio);
+        uvs.push(u3.x + (cu - u3.x) * ratio, u3.y + (cv - u3.y) * ratio);
+      }
+
+      // Replace original 2 triangles with inner quad (2 triangles)
+      const inTri1 = this.orientTriangle(q0, q1, q2, normal, v0, v1, v2);
+      const inTri2 = this.orientTriangle(q0, q2, q3, normal, v0, v2, v3);
+      indices[fA * 3] = inTri1[0];
+      indices[fA * 3 + 1] = inTri1[1];
+      indices[fA * 3 + 2] = inTri1[2];
+
+      indices[fB * 3] = inTri2[0];
+      indices[fB * 3 + 1] = inTri2[1];
+      indices[fB * 3 + 2] = inTri2[2];
+
+      // Add 4 quad skirts around perimeter (8 triangles)
+      const skirt0A = this.orientTriangle(V0, q0, q1, normal, idx0, v0, v1);
+      const skirt0B = this.orientTriangle(V0, q1, V1, normal, idx0, v1, idx1);
+      const skirt1A = this.orientTriangle(V1, q1, q2, normal, idx1, v1, v2);
+      const skirt1B = this.orientTriangle(V1, q2, V2, normal, idx1, v2, idx2);
+      const skirt2A = this.orientTriangle(V2, q2, q3, normal, idx2, v2, v3);
+      const skirt2B = this.orientTriangle(V2, q3, V3, normal, idx2, v3, idx3);
+      const skirt3A = this.orientTriangle(V3, q3, q0, normal, idx3, v3, v0);
+      const skirt3B = this.orientTriangle(V3, q0, V0, normal, idx3, v0, idx0);
+
+      indices.push(
+        ...skirt0A, ...skirt0B,
+        ...skirt1A, ...skirt1B,
+        ...skirt2A, ...skirt2B,
+        ...skirt3A, ...skirt3B
+      );
+
+      mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+      mesh.setIndices(indices);
+      if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+
+      const normals: number[] = [];
+      VertexData.ComputeNormals(positions, indices, normals);
+      mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+      mesh.refreshBoundingInfo();
+
+      this.highlightFace(mesh, fA);
+      this.events.onSceneModified?.();
+      this.events.onToast?.(`Inset Quad Face #${fA} & #${fB} (factor ${ratio.toFixed(2)})!`, 'success');
+      return;
+    }
+
+    if (faceId * 3 + 2 >= indices.length) return;
+
+    const i0 = indices[faceId * 3];
+    const i1 = indices[faceId * 3 + 1];
+    const i2 = indices[faceId * 3 + 2];
+
+    const p0 = new Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]);
+    const p1 = new Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]);
+    const p2 = new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
+
+    const centroid = p0.add(p1).add(p2).scale(1 / 3);
+    const normal = Vector3.Cross(p2.subtract(p0), p1.subtract(p0)).normalize();
+
+    let ratio = insetAmount;
+    if (ratio > 1) {
+      const avgDist =
+        (Vector3.Distance(p0, centroid) + Vector3.Distance(p1, centroid) + Vector3.Distance(p2, centroid)) / 3;
+      ratio = Math.min(insetAmount / Math.max(avgDist, 0.001), 0.85);
+    }
+    ratio = Math.min(Math.max(ratio, 0.05), 0.95);
+
+    const q0 = p0.add(centroid.subtract(p0).scale(ratio)).add(normal.scale(depth));
+    const q1 = p1.add(centroid.subtract(p1).scale(ratio)).add(normal.scale(depth));
+    const q2 = p2.add(centroid.subtract(p2).scale(ratio)).add(normal.scale(depth));
+
+    const v0 = positions.length / 3;
+    positions.push(q0.x, q0.y, q0.z);
+    const v1 = positions.length / 3;
+    positions.push(q1.x, q1.y, q1.z);
+    const v2 = positions.length / 3;
+    positions.push(q2.x, q2.y, q2.z);
+
+    if (uvs.length > 0) {
+      const u0 = uvs[i0 * 2] ?? 0;
+      const v_0 = uvs[i0 * 2 + 1] ?? 0;
+      const u1 = uvs[i1 * 2] ?? 0;
+      const v_1 = uvs[i1 * 2 + 1] ?? 0;
+      const u2 = uvs[i2 * 2] ?? 0;
+      const v_2 = uvs[i2 * 2 + 1] ?? 0;
+      const cu = (u0 + u1 + u2) / 3;
+      const cv = (v_0 + v_1 + v_2) / 3;
+      uvs.push(u0 + (cu - u0) * ratio, v_0 + (cv - v_0) * ratio);
+      uvs.push(u1 + (cu - u1) * ratio, v_1 + (cv - v_1) * ratio);
+      uvs.push(u2 + (cu - u2) * ratio, v_2 + (cv - v_2) * ratio);
+    }
+
+    // Replace original face with inset face
+    const inTri = this.orientTriangle(q0, q1, q2, normal, v0, v1, v2);
+    indices[faceId * 3] = inTri[0];
+    indices[faceId * 3 + 1] = inTri[1];
+    indices[faceId * 3 + 2] = inTri[2];
+
+    // Perimeter connecting quads
+    const s0A = this.orientTriangle(p0, q0, q1, normal, i0, v0, v1);
+    const s0B = this.orientTriangle(p0, q1, p1, normal, i0, v1, i1);
+    const s1A = this.orientTriangle(p1, q1, q2, normal, i1, v1, v2);
+    const s1B = this.orientTriangle(p1, q2, p2, normal, i1, v2, i2);
+    const s2A = this.orientTriangle(p2, q2, q0, normal, i2, v2, v0);
+    const s2B = this.orientTriangle(p2, q0, p0, normal, i2, v0, i0);
+
+    indices.push(...s0A, ...s0B, ...s1A, ...s1B, ...s2A, ...s2B);
+
+    mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+    mesh.setIndices(indices);
+    if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+
+    const normals: number[] = [];
+    VertexData.ComputeNormals(positions, indices, normals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+    mesh.refreshBoundingInfo();
+
+    this.highlightFace(mesh, faceId);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Inset face #${faceId} (factor ${ratio.toFixed(2)})!`, 'success');
+  }
+
+  public subdivideSelectedFacet(): void {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      if (this.selectedMesh) {
+        this.subdivideMesh(this.selectedMesh);
+        return;
+      }
+      this.events.onToast?.('Please pick a face or select a mesh to subdivide.', 'warning');
+      return;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const indices = Array.from(mesh.getIndices() || []);
+    const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
+    const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
+
+    if (faceId * 3 + 2 >= indices.length) return;
+
+    const i0 = indices[faceId * 3];
+    const i1 = indices[faceId * 3 + 1];
+    const i2 = indices[faceId * 3 + 2];
+
+    const p0 = new Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]);
+    const p1 = new Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]);
+    const p2 = new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
+
+    const m01 = p0.add(p1).scale(0.5);
+    const m12 = p1.add(p2).scale(0.5);
+    const m20 = p2.add(p0).scale(0.5);
+
+    const v01 = positions.length / 3;
+    positions.push(m01.x, m01.y, m01.z);
+    const v12 = positions.length / 3;
+    positions.push(m12.x, m12.y, m12.z);
+    const v20 = positions.length / 3;
+    positions.push(m20.x, m20.y, m20.z);
+
+    if (uvs.length > 0) {
+      const u0 = uvs[i0 * 2] ?? 0;
+      const v_0 = uvs[i0 * 2 + 1] ?? 0;
+      const u1 = uvs[i1 * 2] ?? 0;
+      const v_1 = uvs[i1 * 2 + 1] ?? 0;
+      const u2 = uvs[i2 * 2] ?? 0;
+      const v_2 = uvs[i2 * 2 + 1] ?? 0;
+      uvs.push((u0 + u1) * 0.5, (v_0 + v_1) * 0.5);
+      uvs.push((u1 + u2) * 0.5, (v_1 + v_2) * 0.5);
+      uvs.push((u2 + u0) * 0.5, (v_2 + v_0) * 0.5);
+    }
+
+    // Replace original face with corner triangle
+    indices[faceId * 3] = i0;
+    indices[faceId * 3 + 1] = v01;
+    indices[faceId * 3 + 2] = v20;
+
+    // Remaining 3 subtriangles
+    indices.push(v01, i1, v12);
+    indices.push(v20, v12, i2);
+    indices.push(v01, v12, v20);
+
+    mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+    mesh.setIndices(indices);
+    if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+
+    const normals: number[] = [];
+    VertexData.ComputeNormals(positions, indices, normals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+    mesh.refreshBoundingInfo();
+
+    this.highlightFace(mesh, faceId);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Subdivided face #${faceId} into 4 facets!`, 'success');
+  }
+
+  public subdivideMesh(targetMesh?: Mesh): void {
+    const mesh = targetMesh || this.selectedMesh;
+    if (!mesh) {
+      this.events.onToast?.('Please select a mesh to subdivide.', 'warning');
+      return;
+    }
+    const indices = Array.from(mesh.getIndices() || []);
+    const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
+    const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
+
+    const edgeMap = new Map<string, number>();
+    const getOrAddMidpoint = (a: number, b: number): number => {
+      const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+      if (edgeMap.has(key)) return edgeMap.get(key)!;
+      const midIdx = positions.length / 3;
+      const mx = (positions[a * 3] + positions[b * 3]) * 0.5;
+      const my = (positions[a * 3 + 1] + positions[b * 3 + 1]) * 0.5;
+      const mz = (positions[a * 3 + 2] + positions[b * 3 + 2]) * 0.5;
+      positions.push(mx, my, mz);
+      if (uvs.length > 0) {
+        uvs.push(
+          ((uvs[a * 2] ?? 0) + (uvs[b * 2] ?? 0)) * 0.5,
+          ((uvs[a * 2 + 1] ?? 0) + (uvs[b * 2 + 1] ?? 0)) * 0.5
+        );
+      }
+      edgeMap.set(key, midIdx);
+      return midIdx;
+    };
+
+    const newIndices: number[] = [];
+    const triCount = Math.floor(indices.length / 3);
+    for (let t = 0; t < triCount; t++) {
+      const i0 = indices[t * 3];
+      const i1 = indices[t * 3 + 1];
+      const i2 = indices[t * 3 + 2];
+
+      const m01 = getOrAddMidpoint(i0, i1);
+      const m12 = getOrAddMidpoint(i1, i2);
+      const m20 = getOrAddMidpoint(i2, i0);
+
+      newIndices.push(i0, m01, m20);
+      newIndices.push(m01, i1, m12);
+      newIndices.push(m20, m12, i2);
+      newIndices.push(m01, m12, m20);
+    }
+
+    mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+    mesh.setIndices(newIndices);
+    if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+
+    const normals: number[] = [];
+    VertexData.ComputeNormals(positions, newIndices, normals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+    mesh.refreshBoundingInfo();
+
+    if (this.selectedFaceId !== null) {
+      this.selectedFaceId = null;
+      if (this.facetHighlightMesh) {
+        this.facetHighlightMesh.dispose();
+        this.facetHighlightMesh = null;
+      }
+      this.events.onFaceSelected?.(null);
+    }
+
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Subdivided "${mesh.name}" (${triCount * 4} triangles)!`, 'success');
+  }
+
+  public subDSmoothMeshOrFacet(iterations: number = 1): void {
+    const mesh = this.selectedMesh;
+    if (!mesh) {
+      this.events.onToast?.('Please select a mesh to apply Sub-D smoothing.', 'warning');
+      return;
+    }
+    // Subdivide first
+    this.subdivideMesh(mesh);
+
+    // Laplacian vertex relaxation
+    const indices = Array.from(mesh.getIndices() || []);
+    const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
+    const vertCount = positions.length / 3;
+
+    // Build adjacency graph
+    const adjacency: Set<number>[] = Array.from({ length: vertCount }, () => new Set<number>());
+    for (let i = 0; i < indices.length; i += 3) {
+      const a = indices[i];
+      const b = indices[i + 1];
+      const c = indices[i + 2];
+      adjacency[a].add(b);
+      adjacency[a].add(c);
+      adjacency[b].add(a);
+      adjacency[b].add(c);
+      adjacency[c].add(a);
+      adjacency[c].add(b);
+    }
+
+    for (let iter = 0; iter < Math.min(iterations, 3); iter++) {
+      const smoothed = [...positions];
+      for (let v = 0; v < vertCount; v++) {
+        const neighbors = Array.from(adjacency[v]);
+        if (neighbors.length === 0) continue;
+        let avgX = 0;
+        let avgY = 0;
+        let avgZ = 0;
+        for (const n of neighbors) {
+          avgX += positions[n * 3];
+          avgY += positions[n * 3 + 1];
+          avgZ += positions[n * 3 + 2];
+        }
+        avgX /= neighbors.length;
+        avgY /= neighbors.length;
+        avgZ /= neighbors.length;
+
+        const factor = 0.4;
+        smoothed[v * 3] = positions[v * 3] * (1 - factor) + avgX * factor;
+        smoothed[v * 3 + 1] = positions[v * 3 + 1] * (1 - factor) + avgY * factor;
+        smoothed[v * 3 + 2] = positions[v * 3 + 2] * (1 - factor) + avgZ * factor;
+      }
+      for (let i = 0; i < positions.length; i++) positions[i] = smoothed[i];
+    }
+
+    mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+    const normals: number[] = [];
+    VertexData.ComputeNormals(positions, indices, normals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+    mesh.refreshBoundingInfo();
+
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Applied Sub-D smooth subdivision to "${mesh.name}"!`, 'success');
+  }
+
+  public solidifyMeshOrFacet(thickness: number = 0.2, selectedOnly: boolean = false): void {
+    if (!this.selectedMesh) {
+      this.events.onToast?.('Please select a mesh to solidify.', 'warning');
+      return;
+    }
+    const mesh = this.selectedMesh;
+    const indices = Array.from(mesh.getIndices() || []);
+    const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
+    const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
+
+    // If selected face only
+    if (selectedOnly && this.selectedFaceId !== null && this.selectedFaceId * 3 + 2 < indices.length) {
+      const faceId = this.selectedFaceId;
+      const i0 = indices[faceId * 3];
+      const i1 = indices[faceId * 3 + 1];
+      const i2 = indices[faceId * 3 + 2];
+
+      const p0 = new Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]);
+      const p1 = new Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]);
+      const p2 = new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
+
+      const normal = Vector3.Cross(p2.subtract(p0), p1.subtract(p0)).normalize();
+      const offset = normal.scale(-thickness);
+
+      const q0 = p0.add(offset);
+      const q1 = p1.add(offset);
+      const q2 = p2.add(offset);
+
+      const v0 = positions.length / 3;
+      positions.push(q0.x, q0.y, q0.z);
+      const v1 = positions.length / 3;
+      positions.push(q1.x, q1.y, q1.z);
+      const v2 = positions.length / 3;
+      positions.push(q2.x, q2.y, q2.z);
+
+      if (uvs.length > 0) {
+        uvs.push(uvs[i0 * 2] ?? 0, uvs[i0 * 2 + 1] ?? 0);
+        uvs.push(uvs[i1 * 2] ?? 0, uvs[i1 * 2 + 1] ?? 0);
+        uvs.push(uvs[i2 * 2] ?? 0, uvs[i2 * 2 + 1] ?? 0);
+      }
+
+      // Back face (reverse winding)
+      indices.push(v0, v2, v1);
+
+      // Side quads
+      indices.push(i0, i1, v1, i0, v1, v0);
+      indices.push(i1, i2, v2, i1, v2, v1);
+      indices.push(i2, i0, v0, i2, v0, v2);
+
+      mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+      mesh.setIndices(indices);
+      if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+
+      const normals: number[] = [];
+      VertexData.ComputeNormals(positions, indices, normals);
+      mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+      mesh.refreshBoundingInfo();
+
+      this.highlightFace(mesh, faceId);
+      this.events.onSceneModified?.();
+      this.events.onToast?.(`Solidified face #${faceId} (thickness: ${thickness})!`, 'success');
+      return;
+    }
+
+    // Solidify entire mesh
+    const origVertCount = positions.length / 3;
+    const normalsOrig: number[] = [];
+    VertexData.ComputeNormals(positions, indices, normalsOrig);
+
+    for (let v = 0; v < origVertCount; v++) {
+      const nx = normalsOrig[v * 3] || 0;
+      const ny = normalsOrig[v * 3 + 1] || 0;
+      const nz = normalsOrig[v * 3 + 2] || 0;
+      positions.push(
+        positions[v * 3] - nx * thickness,
+        positions[v * 3 + 1] - ny * thickness,
+        positions[v * 3 + 2] - nz * thickness
+      );
+      if (uvs.length > 0) {
+        uvs.push(uvs[v * 2] ?? 0, uvs[v * 2 + 1] ?? 0);
+      }
+    }
+
+    const origTriCount = Math.floor(indices.length / 3);
+    for (let t = 0; t < origTriCount; t++) {
+      const i0 = indices[t * 3];
+      const i1 = indices[t * 3 + 1];
+      const i2 = indices[t * 3 + 2];
+      indices.push(i0 + origVertCount, i2 + origVertCount, i1 + origVertCount);
+    }
+
+    const edgeCounts = new Map<string, { count: number; a: number; b: number }>();
+    for (let t = 0; t < origTriCount; t++) {
+      const tri = [indices[t * 3], indices[t * 3 + 1], indices[t * 3 + 2]];
+      for (let e = 0; e < 3; e++) {
+        const a = tri[e];
+        const b = tri[(e + 1) % 3];
+        const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+        const cur = edgeCounts.get(key);
+        if (cur) cur.count++;
+        else edgeCounts.set(key, { count: 1, a, b });
+      }
+    }
+
+    for (const [, val] of edgeCounts) {
+      if (val.count === 1) {
+        const a = val.a;
+        const b = val.b;
+        const aInner = a + origVertCount;
+        const bInner = b + origVertCount;
+        indices.push(a, b, bInner, a, bInner, aInner);
+      }
+    }
+
+    mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+    mesh.setIndices(indices);
+    if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+
+    const newNormals: number[] = [];
+    VertexData.ComputeNormals(positions, indices, newNormals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, newNormals);
+    mesh.refreshBoundingInfo();
+
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Solidified "${mesh.name}" with thickness ${thickness}!`, 'success');
+  }
+
+  public bevelSelectedFacet(width: number = 0.15): void {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face to bevel.', 'warning');
+      return;
+    }
+    this.insetSelectedFacet(width, width * 0.4);
+    this.events.onToast?.(`Beveled face #${this.selectedFaceId}!`, 'success');
+  }
+
+  public arcSelectedFacet(segments: number = 4, height: number = 0.5): void {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face to arc.', 'warning');
+      return;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const indices = Array.from(mesh.getIndices() || []);
+    const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
+    const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
+
+    if (faceId * 3 + 2 >= indices.length) return;
+
+    const prevI0 = indices[faceId * 3];
+    const prevI1 = indices[faceId * 3 + 1];
+    const prevI2 = indices[faceId * 3 + 2];
+
+    const p0 = new Vector3(positions[prevI0 * 3], positions[prevI0 * 3 + 1], positions[prevI0 * 3 + 2]);
+    const p1 = new Vector3(positions[prevI1 * 3], positions[prevI1 * 3 + 1], positions[prevI1 * 3 + 2]);
+    const p2 = new Vector3(positions[prevI2 * 3], positions[prevI2 * 3 + 1], positions[prevI2 * 3 + 2]);
+
+    const normal = Vector3.Cross(p2.subtract(p0), p1.subtract(p0)).normalize();
+    const tangent = p1.subtract(p0).normalize();
+
+    const segs = Math.max(2, Math.min(segments, 16));
+    let lastV0 = prevI0;
+    let lastV1 = prevI1;
+    let lastV2 = prevI2;
+
+    for (let s = 1; s <= segs; s++) {
+      const t = s / segs;
+      const angle = t * Math.PI;
+      const arcH = Math.sin(angle) * height;
+      const arcAdvance = (1 - Math.cos(angle)) * height * 0.75;
+      const offset = normal.scale(arcH).add(tangent.scale(arcAdvance));
+
+      const q0 = p0.add(offset);
+      const q1 = p1.add(offset);
+      const q2 = p2.add(offset);
+
+      const v0 = positions.length / 3;
+      positions.push(q0.x, q0.y, q0.z);
+      const v1 = positions.length / 3;
+      positions.push(q1.x, q1.y, q1.z);
+      const v2 = positions.length / 3;
+      positions.push(q2.x, q2.y, q2.z);
+
+      if (uvs.length > 0) {
+        uvs.push(uvs[prevI0 * 2] ?? 0, uvs[prevI0 * 2 + 1] ?? 0);
+        uvs.push(uvs[prevI1 * 2] ?? 0, uvs[prevI1 * 2 + 1] ?? 0);
+        uvs.push(uvs[prevI2 * 2] ?? 0, uvs[prevI2 * 2 + 1] ?? 0);
+      }
+
+      // Connecting side quads
+      indices.push(lastV0, v0, v1, lastV0, v1, lastV1);
+      indices.push(lastV1, v1, v2, lastV1, v2, lastV2);
+      indices.push(lastV2, v2, v0, lastV2, v0, lastV0);
+
+      lastV0 = v0;
+      lastV1 = v1;
+      lastV2 = v2;
+    }
+
+    // Replace original cap with end cap
+    indices[faceId * 3] = lastV0;
+    indices[faceId * 3 + 1] = lastV1;
+    indices[faceId * 3 + 2] = lastV2;
+
+    mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+    mesh.setIndices(indices);
+    if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+
+    const normals: number[] = [];
+    VertexData.ComputeNormals(positions, indices, normals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+    mesh.refreshBoundingInfo();
+
+    this.highlightFace(mesh, faceId);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Created segmented arch (${segs} segments)!`, 'success');
+  }
+
+  public knifeSplitFacet(): void {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face to knife split.', 'warning');
+      return;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const indices = Array.from(mesh.getIndices() || []);
+    const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
+    const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
+
+    if (faceId * 3 + 2 >= indices.length) return;
+
+    const i0 = indices[faceId * 3];
+    const i1 = indices[faceId * 3 + 1];
+    const i2 = indices[faceId * 3 + 2];
+
+    const p0 = new Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]);
+    const p1 = new Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]);
+    const p2 = new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
+
+    const d01 = Vector3.Distance(p0, p1);
+    const d12 = Vector3.Distance(p1, p2);
+    const d20 = Vector3.Distance(p2, p0);
+
+    let m: Vector3;
+    const mIdx = positions.length / 3;
+    let triA: [number, number, number];
+    let triB: [number, number, number];
+
+    if (d01 >= d12 && d01 >= d20) {
+      m = p0.add(p1).scale(0.5);
+      triA = [i0, mIdx, i2];
+      triB = [mIdx, i1, i2];
+    } else if (d12 >= d01 && d12 >= d20) {
+      m = p1.add(p2).scale(0.5);
+      triA = [i0, i1, mIdx];
+      triB = [i0, mIdx, i2];
+    } else {
+      m = p2.add(p0).scale(0.5);
+      triA = [i0, i1, mIdx];
+      triB = [mIdx, i1, i2];
+    }
+
+    positions.push(m.x, m.y, m.z);
+    if (uvs.length > 0) {
+      uvs.push(((uvs[i0 * 2] ?? 0) + (uvs[i1 * 2] ?? 0)) * 0.5, ((uvs[i0 * 2 + 1] ?? 0) + (uvs[i1 * 2 + 1] ?? 0)) * 0.5);
+    }
+
+    indices[faceId * 3] = triA[0];
+    indices[faceId * 3 + 1] = triA[1];
+    indices[faceId * 3 + 2] = triA[2];
+    indices.push(triB[0], triB[1], triB[2]);
+
+    mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+    mesh.setIndices(indices);
+    if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+
+    const normals: number[] = [];
+    VertexData.ComputeNormals(positions, indices, normals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+    mesh.refreshBoundingInfo();
+
+    this.highlightFace(mesh, faceId);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Knife cut face #${faceId} in two!`, 'success');
+  }
+
+  public loopCutSelectedFacet(): void {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face for loop cut.', 'warning');
+      return;
+    }
+    this.knifeSplitFacet();
+    this.events.onToast?.(`Loop cut executed on face #${this.selectedFaceId}!`, 'success');
+  }
+
+  public cutThroughSelectedFacet(depth: number = 1.0): void {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face to cut through.', 'warning');
+      return;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const indices = Array.from(mesh.getIndices() || []);
+    const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
+    const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
+
+    if (faceId * 3 + 2 >= indices.length) return;
+
+    const i0 = indices[faceId * 3];
+    const i1 = indices[faceId * 3 + 1];
+    const i2 = indices[faceId * 3 + 2];
+
+    const p0 = new Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]);
+    const p1 = new Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]);
+    const p2 = new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
+
+    const normal = Vector3.Cross(p2.subtract(p0), p1.subtract(p0)).normalize();
+    const offset = normal.scale(-depth);
+
+    const q0 = p0.add(offset);
+    const q1 = p1.add(offset);
+    const q2 = p2.add(offset);
+
+    const v0 = positions.length / 3;
+    positions.push(q0.x, q0.y, q0.z);
+    const v1 = positions.length / 3;
+    positions.push(q1.x, q1.y, q1.z);
+    const v2 = positions.length / 3;
+    positions.push(q2.x, q2.y, q2.z);
+
+    if (uvs.length > 0) {
+      uvs.push(uvs[i0 * 2] ?? 0, uvs[i0 * 2 + 1] ?? 0);
+      uvs.push(uvs[i1 * 2] ?? 0, uvs[i1 * 2 + 1] ?? 0);
+      uvs.push(uvs[i2 * 2] ?? 0, uvs[i2 * 2 + 1] ?? 0);
+    }
+
+    // Tunnel inner walls (normals pointing inward)
+    indices[faceId * 3] = i0;
+    indices[faceId * 3 + 1] = v1;
+    indices[faceId * 3 + 2] = i1;
+
+    indices.push(i0, v0, v1);
+    indices.push(i1, v2, i2);
+    indices.push(i1, v1, v2);
+    indices.push(i2, v0, i0);
+    indices.push(i2, v2, v0);
+
+    // End cap
+    indices.push(v0, v1, v2);
+
+    mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+    mesh.setIndices(indices);
+    if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+
+    const normals: number[] = [];
+    VertexData.ComputeNormals(positions, indices, normals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+    mesh.refreshBoundingInfo();
+
+    this.highlightFace(mesh, faceId);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Cut through face #${faceId} (opening created)!`, 'success');
+  }
+
+  public relaxSelectedFacet(): void {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face to relax.', 'warning');
+      return;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const indices = Array.from(mesh.getIndices() || []);
+    const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
+
+    if (faceId * 3 + 2 >= indices.length) return;
+
+    const targetVerts = [indices[faceId * 3], indices[faceId * 3 + 1], indices[faceId * 3 + 2]];
+
+    for (const v of targetVerts) {
+      const neighborIndices = new Set<number>();
+      for (let t = 0; t < indices.length; t += 3) {
+        if (indices[t] === v || indices[t + 1] === v || indices[t + 2] === v) {
+          neighborIndices.add(indices[t]);
+          neighborIndices.add(indices[t + 1]);
+          neighborIndices.add(indices[t + 2]);
+        }
+      }
+      neighborIndices.delete(v);
+      if (neighborIndices.size === 0) continue;
+
+      let avgX = 0;
+      let avgY = 0;
+      let avgZ = 0;
+      for (const n of neighborIndices) {
+        avgX += positions[n * 3];
+        avgY += positions[n * 3 + 1];
+        avgZ += positions[n * 3 + 2];
+      }
+      avgX /= neighborIndices.size;
+      avgY /= neighborIndices.size;
+      avgZ /= neighborIndices.size;
+
+      positions[v * 3] = positions[v * 3] * 0.6 + avgX * 0.4;
+      positions[v * 3 + 1] = positions[v * 3 + 1] * 0.6 + avgY * 0.4;
+      positions[v * 3 + 2] = positions[v * 3 + 2] * 0.6 + avgZ * 0.4;
+    }
+
+    mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+    const normals: number[] = [];
+    VertexData.ComputeNormals(positions, indices, normals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+    mesh.refreshBoundingInfo();
+
+    this.highlightFace(mesh, faceId);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Relaxed vertices on face #${faceId}!`, 'success');
+  }
+
+  public arraySelectedFacetOrMesh(
+    count: number = 3,
+    offsetX: number = 1.0,
+    offsetY: number = 0.0,
+    offsetZ: number = 0.0
+  ): void {
+    if (!this.selectedMesh) {
+      this.events.onToast?.('Please select a mesh to create an array.', 'warning');
+      return;
+    }
+    const mesh = this.selectedMesh;
+    const indices = Array.from(mesh.getIndices() || []);
+    const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
+    const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
+
+    const numCopies = Math.max(1, Math.min(count, 10));
+
+    if (this.selectedFaceId !== null && this.selectedFaceId * 3 + 2 < indices.length) {
+      const faceId = this.selectedFaceId;
+      const i0 = indices[faceId * 3];
+      const i1 = indices[faceId * 3 + 1];
+      const i2 = indices[faceId * 3 + 2];
+
+      const p0 = new Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]);
+      const p1 = new Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]);
+      const p2 = new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
+
+      for (let c = 1; c <= numCopies; c++) {
+        const off = new Vector3(offsetX * c, offsetY * c, offsetZ * c);
+        const q0 = p0.add(off);
+        const q1 = p1.add(off);
+        const q2 = p2.add(off);
+
+        const v0 = positions.length / 3;
+        positions.push(q0.x, q0.y, q0.z);
+        const v1 = positions.length / 3;
+        positions.push(q1.x, q1.y, q1.z);
+        const v2 = positions.length / 3;
+        positions.push(q2.x, q2.y, q2.z);
+
+        if (uvs.length > 0) {
+          uvs.push(uvs[i0 * 2] ?? 0, uvs[i0 * 2 + 1] ?? 0);
+          uvs.push(uvs[i1 * 2] ?? 0, uvs[i1 * 2 + 1] ?? 0);
+          uvs.push(uvs[i2 * 2] ?? 0, uvs[i2 * 2 + 1] ?? 0);
+        }
+
+        indices.push(v0, v1, v2);
+      }
+
+      mesh.setVerticesData(VertexBuffer.PositionKind, positions);
+      mesh.setIndices(indices);
+      if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+
+      const normals: number[] = [];
+      VertexData.ComputeNormals(positions, indices, normals);
+      mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+      mesh.refreshBoundingInfo();
+
+      this.events.onSceneModified?.();
+      this.events.onToast?.(`Created array of ${numCopies} faces!`, 'success');
+      return;
+    }
+
+    for (let c = 1; c <= numCopies; c++) {
+      const clone = mesh.clone(`${mesh.name}_array_${c}`);
+      clone.position.addInPlace(new Vector3(offsetX * c, offsetY * c, offsetZ * c));
+      this.importedMeshes.push(clone);
+    }
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Created array of ${numCopies} copies of "${mesh.name}"!`, 'success');
+  }
+
   public deleteSelectedFacet(): void {
     if (!this.selectedMesh || this.selectedFaceId === null) {
       this.events.onToast?.('Please pick a face to delete.', 'warning');
@@ -2049,8 +3804,26 @@ export class MeshEditorService {
     const faceId = this.selectedFaceId;
     const indices = Array.from(mesh.getIndices() || []);
 
-    indices.splice(faceId * 3, 3);
-    mesh.setIndices(indices);
+    const quad = this.getQuadFaceInfo(mesh, faceId);
+    if (quad) {
+      const facesToDelete = new Set(quad.faceIds);
+      const newIndices: number[] = [];
+      const numTriangles = indices.length / 3;
+      for (let f = 0; f < numTriangles; f++) {
+        if (!facesToDelete.has(f)) {
+          newIndices.push(indices[f * 3], indices[f * 3 + 1], indices[f * 3 + 2]);
+        }
+      }
+      mesh.setIndices(newIndices);
+    } else {
+      indices.splice(faceId * 3, 3);
+      mesh.setIndices(indices);
+    }
+
+    const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
+    const normals: number[] = [];
+    VertexData.ComputeNormals(positions, Array.from(mesh.getIndices() || []), normals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, normals);
     mesh.refreshBoundingInfo();
 
     if (this.facetHighlightMesh) {
@@ -2058,8 +3831,9 @@ export class MeshEditorService {
       this.facetHighlightMesh = null;
     }
     this.selectedFaceId = null;
+    this.events.onFaceSelected?.(null);
     this.events.onSceneModified?.();
-    this.events.onToast?.('Face deleted.', 'success');
+    this.events.onToast?.(quad ? 'Quad face deleted.' : 'Face deleted.', 'success');
   }
 
   public flipSelectedFacetNormal(): void {
@@ -2071,10 +3845,19 @@ export class MeshEditorService {
     const faceId = this.selectedFaceId;
     const indices = Array.from(mesh.getIndices() || []);
 
-    // Swap 2 vertices to invert triangle winding
-    const temp = indices[faceId * 3 + 1];
-    indices[faceId * 3 + 1] = indices[faceId * 3 + 2];
-    indices[faceId * 3 + 2] = temp;
+    const quad = this.getQuadFaceInfo(mesh, faceId);
+    if (quad) {
+      for (const f of quad.faceIds) {
+        const temp = indices[f * 3 + 1];
+        indices[f * 3 + 1] = indices[f * 3 + 2];
+        indices[f * 3 + 2] = temp;
+      }
+    } else {
+      // Swap 2 vertices to invert triangle winding
+      const temp = indices[faceId * 3 + 1];
+      indices[faceId * 3 + 1] = indices[faceId * 3 + 2];
+      indices[faceId * 3 + 2] = temp;
+    }
 
     mesh.setIndices(indices);
     const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
@@ -2084,8 +3867,9 @@ export class MeshEditorService {
       mesh.setVerticesData(VertexBuffer.NormalKind, normals);
     }
     mesh.refreshBoundingInfo();
+    this.highlightFace(mesh, faceId);
     this.events.onSceneModified?.();
-    this.events.onToast?.('Face normal inverted!', 'success');
+    this.events.onToast?.(quad ? 'Quad face normal inverted!' : 'Face normal inverted!', 'success');
   }
 
   /* =========================================================================
@@ -2142,14 +3926,127 @@ export class MeshEditorService {
     }
     const tex = new Texture(url, this.scene, false, false, Texture.NEAREST_SAMPLINGMODE);
     if (name) tex.name = name;
+
+    const lowerName = (name || url).toLowerCase();
+    const isPotentiallyTransparent =
+      lowerName.endsWith('.png') ||
+      lowerName.endsWith('.webp') ||
+      lowerName.endsWith('.gif') ||
+      lowerName.endsWith('.svg') ||
+      url.startsWith('data:image/png') ||
+      url.startsWith('data:image/webp');
+
+    if (isPotentiallyTransparent) {
+      tex.hasAlpha = true;
+    }
+
     if (selMat instanceof PBRMaterial) {
       selMat.albedoTexture = tex;
+      if (isPotentiallyTransparent) {
+        selMat.useAlphaFromAlbedoTexture = true;
+        if (
+          selMat.transparencyMode === PBRMaterial.PBRMATERIAL_OPAQUE ||
+          selMat.transparencyMode === undefined ||
+          selMat.transparencyMode === null
+        ) {
+          selMat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATESTANDBLEND;
+        }
+        selMat.backFaceCulling = false;
+      }
     } else if (selMat instanceof StandardMaterial) {
       selMat.diffuseTexture = tex;
+      if (isPotentiallyTransparent) {
+        selMat.useAlphaFromDiffuseTexture = true;
+        selMat.backFaceCulling = false;
+      }
     }
     this.events.onSceneModified?.();
     this.events.onToast?.(`Applied texture to material "${selMat.name}"`, 'success');
     return true;
+  }
+
+  public setTextureAlpha(enabled: boolean): void {
+    const mat = this.getSelectedMaterial();
+    if (!mat) return;
+    const tex = this.getActiveMaterialTexture();
+    if (tex) {
+      tex.hasAlpha = enabled;
+    }
+    if (mat instanceof PBRMaterial) {
+      mat.useAlphaFromAlbedoTexture = enabled;
+      if (
+        enabled &&
+        (mat.transparencyMode === PBRMaterial.PBRMATERIAL_OPAQUE ||
+          mat.transparencyMode === undefined ||
+          mat.transparencyMode === null)
+      ) {
+        mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATESTANDBLEND;
+      } else if (!enabled) {
+        mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
+      }
+      mat.backFaceCulling = !enabled;
+    } else if (mat instanceof StandardMaterial) {
+      mat.useAlphaFromDiffuseTexture = enabled;
+      mat.backFaceCulling = !enabled;
+    }
+    this.events.onSceneModified?.();
+  }
+
+  public setMaterialTransparencyMode(mode: number): void {
+    const mat = this.getSelectedMaterial();
+    if (!mat) return;
+    if (mat instanceof PBRMaterial) {
+      mat.transparencyMode = mode;
+      mat.useAlphaFromAlbedoTexture = mode !== PBRMaterial.PBRMATERIAL_OPAQUE;
+      if (mode !== PBRMaterial.PBRMATERIAL_OPAQUE) mat.backFaceCulling = false;
+    } else if (mat instanceof StandardMaterial) {
+      mat.transparencyMode = mode;
+      mat.useAlphaFromDiffuseTexture = mode !== 0;
+      if (mode !== 0) mat.backFaceCulling = false;
+    }
+    const tex = this.getActiveMaterialTexture();
+    if (tex && mode !== 0) {
+      tex.hasAlpha = true;
+    }
+    this.events.onSceneModified?.();
+  }
+
+  public setMaterialTwoSided(twoSided: boolean): void {
+    const mat = this.getSelectedMaterial();
+    if (!mat) return;
+    mat.backFaceCulling = !twoSided;
+    this.events.onSceneModified?.();
+  }
+
+  public setMaterialAlphaCutOff(cutoff: number): void {
+    const mat = this.getSelectedMaterial();
+    if (!mat) return;
+    if (mat instanceof PBRMaterial) {
+      mat.alphaCutOff = cutoff;
+    }
+    this.events.onSceneModified?.();
+  }
+
+  public getMaterialTransparencyInfo(): {
+    hasAlpha: boolean;
+    mode: number;
+    twoSided: boolean;
+    alphaCutOff: number;
+  } {
+    const mat = this.getSelectedMaterial();
+    if (!mat) return { hasAlpha: false, mode: 0, twoSided: true, alphaCutOff: 0.5 };
+    const tex = this.getActiveMaterialTexture();
+    const hasAlpha = tex ? !!tex.hasAlpha : false;
+    let mode = 0;
+    let alphaCutOff = 0.5;
+    if (mat instanceof PBRMaterial) {
+      mode = mat.transparencyMode ?? (hasAlpha ? PBRMaterial.PBRMATERIAL_ALPHATESTANDBLEND : 0);
+      alphaCutOff = mat.alphaCutOff ?? 0.5;
+    } else if (mat instanceof StandardMaterial) {
+      mode = (mat as any).transparencyMode ?? (hasAlpha ? 2 : 0);
+    }
+    const twoSided = mat.backFaceCulling === false;
+    return { hasAlpha, mode, twoSided, alphaCutOff };
   }
 
   public applyTriplanarUVs(scale: number = 1.0): void {
@@ -2262,6 +4159,16 @@ export class MeshEditorService {
       const lowerFileName = file.name.toLowerCase();
       const baseNameWithoutExt = lowerFileName.substring(0, lowerFileName.lastIndexOf('.')) || lowerFileName;
 
+      const isPotentiallyTransparent =
+        lowerFileName.endsWith('.png') ||
+        lowerFileName.endsWith('.webp') ||
+        lowerFileName.endsWith('.gif') ||
+        lowerFileName.endsWith('.svg');
+
+      if (isPotentiallyTransparent) {
+        tex.hasAlpha = true;
+      }
+
       let fileAppliedCount = 0;
 
       // 1. Match scene materials by material name or current texture name
@@ -2293,9 +4200,24 @@ export class MeshEditorService {
         if (matches) {
           if (mat instanceof PBRMaterial) {
             mat.albedoTexture = tex;
+            if (isPotentiallyTransparent) {
+              mat.useAlphaFromAlbedoTexture = true;
+              if (
+                mat.transparencyMode === PBRMaterial.PBRMATERIAL_OPAQUE ||
+                mat.transparencyMode === undefined ||
+                mat.transparencyMode === null
+              ) {
+                mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATESTANDBLEND;
+              }
+              mat.backFaceCulling = false;
+            }
             fileAppliedCount++;
           } else if (mat instanceof StandardMaterial) {
             mat.diffuseTexture = tex;
+            if (isPotentiallyTransparent) {
+              mat.useAlphaFromDiffuseTexture = true;
+              mat.backFaceCulling = false;
+            }
             fileAppliedCount++;
           }
         }
@@ -2306,9 +4228,24 @@ export class MeshEditorService {
         const selMat = this.getSelectedMaterial();
         if (selMat instanceof PBRMaterial) {
           selMat.albedoTexture = tex;
+          if (isPotentiallyTransparent) {
+            selMat.useAlphaFromAlbedoTexture = true;
+            if (
+              selMat.transparencyMode === PBRMaterial.PBRMATERIAL_OPAQUE ||
+              selMat.transparencyMode === undefined ||
+              selMat.transparencyMode === null
+            ) {
+              selMat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATESTANDBLEND;
+            }
+            selMat.backFaceCulling = false;
+          }
           fileAppliedCount++;
         } else if (selMat instanceof StandardMaterial) {
           selMat.diffuseTexture = tex;
+          if (isPotentiallyTransparent) {
+            selMat.useAlphaFromDiffuseTexture = true;
+            selMat.backFaceCulling = false;
+          }
           fileAppliedCount++;
         }
       }
@@ -2320,9 +4257,24 @@ export class MeshEditorService {
           if (!mat || mat.name === 'gridMat' || mat.name.startsWith('editor_')) continue;
           if (mat instanceof PBRMaterial) {
             mat.albedoTexture = tex;
+            if (isPotentiallyTransparent) {
+              mat.useAlphaFromAlbedoTexture = true;
+              if (
+                mat.transparencyMode === PBRMaterial.PBRMATERIAL_OPAQUE ||
+                mat.transparencyMode === undefined ||
+                mat.transparencyMode === null
+              ) {
+                mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATESTANDBLEND;
+              }
+              mat.backFaceCulling = false;
+            }
             fileAppliedCount++;
           } else if (mat instanceof StandardMaterial) {
             mat.diffuseTexture = tex;
+            if (isPotentiallyTransparent) {
+              mat.useAlphaFromDiffuseTexture = true;
+              mat.backFaceCulling = false;
+            }
             fileAppliedCount++;
           }
         }

@@ -1,4 +1,4 @@
-import { NullEngine, Vector3 } from '@babylonjs/core';
+import { NullEngine, Vector3, VertexBuffer } from '@babylonjs/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MeshEditorService } from '../../src/MeshEditorService';
 import { PrimitiveConfig } from '../../src/types';
@@ -308,6 +308,50 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
       service.selectedFaceId = 0;
       service.flipSelectedFacetNormal();
 
+      // Inset face
+      const vBeforeInset = box.getTotalVertices();
+      service.selectedFaceId = 0;
+      service.insetSelectedFacet(0.2);
+      expect(box.getTotalVertices()).toBeGreaterThan(vBeforeInset);
+
+      // Subdivide face
+      const vBeforeSubdiv = box.getTotalVertices();
+      service.selectedFaceId = 0;
+      service.subdivideSelectedFacet();
+      expect(box.getTotalVertices()).toBeGreaterThan(vBeforeSubdiv);
+
+      // Solidify face
+      const vBeforeSolidify = box.getTotalVertices();
+      service.selectedFaceId = 0;
+      service.solidifyMeshOrFacet(0.2, true);
+      expect(box.getTotalVertices()).toBeGreaterThan(vBeforeSolidify);
+
+      // Bevel face
+      service.selectedFaceId = 0;
+      service.bevelSelectedFacet(0.1);
+
+      // Arc face
+      const vBeforeArc = box.getTotalVertices();
+      service.selectedFaceId = 0;
+      service.arcSelectedFacet(3, 0.5);
+      expect(box.getTotalVertices()).toBeGreaterThan(vBeforeArc);
+
+      // Knife split face
+      const vBeforeKnife = box.getTotalVertices();
+      service.selectedFaceId = 0;
+      service.knifeSplitFacet();
+      expect(box.getTotalVertices()).toBeGreaterThan(vBeforeKnife);
+
+      // Relax face
+      service.selectedFaceId = 0;
+      service.relaxSelectedFacet();
+
+      // Array duplicate face
+      const vBeforeArray = box.getTotalVertices();
+      service.selectedFaceId = 0;
+      service.arraySelectedFacetOrMesh(2, 0.5, 0, 0);
+      expect(box.getTotalVertices()).toBeGreaterThan(vBeforeArray);
+
       // Delete face 0
       const indicesBeforeDelete = box.getTotalIndices();
       service.selectedFaceId = 0;
@@ -316,6 +360,109 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
 
       service.toggleFacetEditor(false);
       expect(service.facetEditorActive).toBe(false);
+    });
+
+    it('detects quad faces on cubes and supports quad inset and vertex translation with undo', () => {
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box', width: 2, height: 2, depth: 2 }));
+      service.selectMesh(box);
+      service.toggleFacetEditor(true);
+
+      // Verify quad detection on face 0
+      const quad = service.getQuadFaceInfo(box, 0);
+      expect(quad).not.toBeNull();
+      expect(quad!.quadPositions.length).toBe(4);
+      expect(quad!.faceIds.length).toBe(2);
+
+      // Inset the quad face of the cube
+      const initialVertices = box.getTotalVertices();
+      const initialIndices = box.getTotalIndices();
+      service.selectedFaceId = 0;
+      service.insetSelectedFacet(0.25);
+
+      // Insetting a quad adds 4 inner vertices and 8 quad skirt triangles (24 indices)
+      expect(box.getTotalVertices()).toBe(initialVertices + 4);
+      expect(box.getTotalIndices()).toBe(initialIndices + 24);
+
+      // Verify all newly generated face triangles maintain correct outward normal winding
+      const positions = box.getVerticesData(VertexBuffer.PositionKind)!;
+      const indices = box.getIndices()!;
+      // Check the triangles of the inner quad and skirt quads on the +Z face
+      for (let t = 0; t < 10; t++) {
+        const triFaceId = t === 0 ? 0 : (t === 1 ? quad!.faceIds[1] : Math.floor((initialIndices + (t - 2) * 3) / 3));
+        const i0 = indices[triFaceId * 3];
+        const i1 = indices[triFaceId * 3 + 1];
+        const i2 = indices[triFaceId * 3 + 2];
+        const p0 = new Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]);
+        const p1 = new Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]);
+        const p2 = new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
+        const normal = Vector3.Cross(p2.subtract(p0), p1.subtract(p0)).normalize();
+        // Since all triangles are on the +Z face (z ~ 0.5), normal.z must be positive (~ 1.0)
+        expect(normal.z).toBeGreaterThan(0.9);
+      }
+
+      // Switch to Vertex Mode
+      service.setFacetEditMode('vertex');
+      expect(service.facetEditMode).toBe('vertex');
+
+      // Select vertex and move it
+      service.selectVertex(0);
+      expect(service.selectedVertexIndex).toBe(0);
+      expect(service.selectedVertexIndices.length).toBeGreaterThan(0);
+
+      const oldPos = service.getSelectedVertexPosition()!;
+      expect(oldPos).toBeDefined();
+
+      service.setVertexPosition(5.0, 5.0, 5.0);
+      const newPos = service.getSelectedVertexPosition()!;
+      expect(newPos.x).toBeCloseTo(5.0);
+      expect(newPos.y).toBeCloseTo(5.0);
+      expect(newPos.z).toBeCloseTo(5.0);
+
+      // Undo vertex position change
+      expect(service.canUndo()).toBe(true);
+      service.undo();
+      const restoredPos = service.getSelectedVertexPosition()!;
+      expect(restoredPos.x).toBeCloseTo(oldPos.x);
+
+      // Redo vertex position change
+      service.redo();
+      const redonePos = service.getSelectedVertexPosition()!;
+      expect(redonePos.x).toBeCloseTo(5.0);
+
+      service.toggleFacetEditor(false);
+      expect(service.facetEditorActive).toBe(false);
+    });
+
+    it('subdivides entire mesh and applies Sub-D smoothing and mesh solidification', () => {
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box' }));
+      service.selectMesh(box);
+      const initialIndices = box.getTotalIndices();
+
+      service.subdivideMesh(box);
+      expect(box.getTotalIndices()).toBe(initialIndices * 4);
+
+      service.subDSmoothMeshOrFacet(1);
+      expect(box.getTotalIndices()).toBeGreaterThan(initialIndices * 4);
+
+      const beforeSolidify = box.getTotalVertices();
+      service.solidifyMeshOrFacet(0.1, false);
+      expect(box.getTotalVertices()).toBeGreaterThan(beforeSolidify);
+    });
+
+    it('toggles mesh wireframe and manages material isolation', () => {
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box' }));
+      service.selectMesh(box);
+
+      expect(service.isMeshWireframe(box)).toBe(false);
+      service.setMeshWireframe(box, true);
+      expect(service.isMeshWireframe(box)).toBe(true);
+
+      service.toggleMeshWireframe(box);
+      expect(service.isMeshWireframe(box)).toBe(false);
+
+      const toggled = service.toggleSelectedWireframe();
+      expect(toggled).toBe(true);
+      expect(service.isMeshWireframe(box)).toBe(true);
     });
   });
 
@@ -336,6 +483,22 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
       const uvs = box.getVerticesData('uv');
       expect(uvs).toBeDefined();
       expect(uvs!.length).toBeGreaterThan(0);
+    });
+
+    it('supports materials with transparent textures and configurable alpha settings', () => {
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box' }));
+      service.selectMesh(box);
+      service.createNewMaterialForSelected('TranslucentMat');
+
+      service.setTextureAlpha(true);
+      service.setMaterialTransparencyMode(3);
+      service.setMaterialTwoSided(true);
+      service.setMaterialAlphaCutOff(0.4);
+
+      const info = service.getMaterialTransparencyInfo();
+      expect(info.twoSided).toBe(true);
+      expect(info.mode).toBe(3);
+      expect(info.alphaCutOff).toBe(0.4);
     });
   });
 

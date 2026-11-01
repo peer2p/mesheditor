@@ -67,6 +67,10 @@ export interface MeshEditorServiceEvents {
   onToast?: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
   onModelLoaded?: (filename: string) => void;
   onStatsUpdated?: (meshCount: number, polyCount: number) => void;
+  onFaceSelected?: (faceId: number | null, isQuad?: boolean) => void;
+  onVertexSelected?: (vertexIndex: number | null, position?: Vector3) => void;
+  onFacetEditModeChanged?: (mode: 'face' | 'vertex') => void;
+  onFacetEditorStateChanged?: (active: boolean) => void;
   onAnimationsLoaded?: (names: string[], currentGroup: AnimationGroup | null) => void;
   onAnimProgress?: (currentFrame: number) => void;
   onExportModel?: (blob: Blob, filename: string, format: ExportOptions['format']) => Promise<boolean> | boolean;

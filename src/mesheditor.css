@@ -1117,6 +1117,31 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
   background: rgba(255, 255, 255, 0.15);
 }
 
+.outliner-header-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  padding: 5px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.outliner-header-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.outliner-btn.active {
+  color: var(--accent-color);
+  opacity: 1;
+  background: rgba(88, 166, 255, 0.2);
+}
+
 /* Bottom Status Bar */
 #bottom-bar {
   position: absolute;
@@ -4072,4 +4097,293 @@ progress.loading-spinner:indeterminate {
 .btn-path-extrusion-bake:hover,
 .btn-pathway-bake:hover {
   background: #1d4ed8;
+}
+
+/* =========================================================================
+   Facet & Vertex Editor - Professional Mesh Modeling Layout
+   ========================================================================= */
+.facet-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid var(--border-color);
+  gap: 8px;
+}
+
+.facet-mode-switcher {
+  display: flex;
+  background: #161b22;
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--border-color);
+}
+
+.facet-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.facet-mode-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.facet-mode-btn.active {
+  background: #238636;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.facet-badge-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.facet-vertex-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(0, 180, 255, 0.08);
+  border-bottom: 1px solid rgba(0, 180, 255, 0.25);
+}
+
+.facet-coord-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #79c0ff;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.facet-coord-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.facet-coord-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.facet-coord-input {
+  width: 54px;
+  padding: 2px 4px;
+  font-size: 11px;
+  font-family: monospace;
+  text-align: right;
+}
+
+.facet-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #21262d;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.facet-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.facet-toggle-btn.active {
+  background: rgba(35, 134, 54, 0.35);
+  color: #3fb950;
+  border-color: rgba(63, 185, 80, 0.5);
+}
+
+.facet-badge {
+  font-size: 10px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.facet-badge.active {
+  background: rgba(88, 166, 255, 0.2);
+  color: #79c0ff;
+  border: 1px solid rgba(88, 166, 255, 0.4);
+}
+
+.facet-params-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.facet-param-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.facet-param-label {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.facet-num-input {
+  width: 100%;
+  padding: 3px 6px;
+  font-size: 11px;
+  background: #161b22;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: #ffffff;
+}
+
+.facet-num-input:focus {
+  border-color: var(--accent-color);
+  outline: none;
+}
+
+.facet-tool-body {
+  padding: 6px 8px 12px 8px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.mesh-edit-section-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 2px 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.mesh-edit-section-chevron {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}
+
+.mesh-edit-section-name {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.mesh-edit-subtitle {
+  padding: 0 6px 6px 6px;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.mesh-edit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mesh-edit-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+
+.mesh-edit-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(1px);
+}
+
+.mesh-edit-item:active {
+  background: rgba(88, 166, 255, 0.15);
+  border-color: rgba(88, 166, 255, 0.35);
+}
+
+.mesh-edit-item-danger:hover {
+  background: rgba(248, 81, 73, 0.12);
+  border-color: rgba(248, 81, 73, 0.3);
+}
+
+.mesh-edit-icon-wrap {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.mesh-edit-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mesh-edit-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f0f6fc;
+}
+
+.mesh-edit-desc {
+  font-size: 10px;
+  color: #8b949e;
+  line-height: 1.25;
+  white-space: normal;
+}
+
+.mesh-edit-key {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+  font-family: monospace;
 }

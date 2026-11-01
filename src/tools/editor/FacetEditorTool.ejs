@@ -1,26 +1,216 @@
-<div id="dialog-facet" class="floating-dialog" style="top: 360px; right: 16px; width: 310px">
-          <div class="dialog-header">
-            <span class="dialog-title"><i class="app-icon" data-lucide="triangle"></i> Facet & Vertex Editor</span>
-            <div class="dialog-actions">
-              <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
-            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
-              <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
-            </div>
-          </div>
-          <div
-            style="
-              padding: 6px 12px;
-              background: rgba(88, 166, 255, 0.12);
-              border-bottom: 1px solid var(--border-color);
-              font-size: 11px;
-              color: var(--accent-color);
-              display: flex;
-              align-items: center;
-              gap: 6px;
-            "
-          >
-            <i class="app-icon" data-lucide="lightbulb" style="color: var(--accent-color)"></i>
-            <span>Click on any triangle on the selected mesh to edit!</span>
-          </div>
-          <div class="dialog-body" id="gui-facet-container"></div>
+<div id="dialog-facet" class="floating-dialog" style="top: 320px; right: 16px; width: 340px">
+  <div class="dialog-header">
+    <span class="dialog-title"><i class="app-icon" data-lucide="triangle"></i> Facet &amp; Vertex Editor</span>
+    <div class="dialog-actions">
+      <button class="dialog-btn btn-help" title="Help &amp; Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+      <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+      <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+    </div>
+  </div>
+
+  <div class="facet-status-bar">
+    <div class="facet-mode-switcher">
+      <button id="btnFacetModeFace" class="facet-mode-btn active" title="Face Selection Mode (Quads &amp; Triangles)">
+        <i class="app-icon" data-lucide="box-select"></i> Face
+      </button>
+      <button id="btnFacetModeVertex" class="facet-mode-btn" title="Vertex Selection &amp; Translation Mode">
+        <i class="app-icon" data-lucide="circle-dot"></i> Vertex
+      </button>
+    </div>
+    <button id="btnFacetPickToggle" class="facet-toggle-btn active" title="Toggle 3D mesh picking">
+      <i class="app-icon" data-lucide="mouse-pointer"></i>
+      <span id="lblFacetPickState">Pick: ON</span>
+    </button>
+  </div>
+
+  <div class="facet-badge-bar">
+    <div id="facetSelectedBadge" class="facet-badge">No face picked</div>
+  </div>
+
+  <div id="facetVertexCoordsStrip" class="facet-vertex-strip" style="display: none;">
+    <span class="facet-coord-title"><i class="app-icon" data-lucide="move"></i> Position</span>
+    <div class="facet-coord-field">
+      <label class="facet-coord-label" for="facetVertexX">X</label>
+      <input type="number" id="facetVertexX" class="tool-input facet-coord-input" step="0.05" />
+    </div>
+    <div class="facet-coord-field">
+      <label class="facet-coord-label" for="facetVertexY">Y</label>
+      <input type="number" id="facetVertexY" class="tool-input facet-coord-input" step="0.05" />
+    </div>
+    <div class="facet-coord-field">
+      <label class="facet-coord-label" for="facetVertexZ">Z</label>
+      <input type="number" id="facetVertexZ" class="tool-input facet-coord-input" step="0.05" />
+    </div>
+  </div>
+
+  <div class="facet-params-strip">
+    <div class="facet-param-field">
+      <label class="facet-param-label" for="facetInputDistance">Distance</label>
+      <input type="number" id="facetInputDistance" class="tool-input facet-num-input" value="0.5" step="0.1" min="-10" max="20" />
+    </div>
+    <div class="facet-param-field">
+      <label class="facet-param-label" for="facetInputInset">Inset</label>
+      <input type="number" id="facetInputInset" class="tool-input facet-num-input" value="0.25" step="0.05" min="0.05" max="0.95" />
+    </div>
+    <div class="facet-param-field">
+      <label class="facet-param-label" for="facetInputThickness">Thickness</label>
+      <input type="number" id="facetInputThickness" class="tool-input facet-num-input" value="0.2" step="0.05" min="0.01" max="5" />
+    </div>
+    <div class="facet-param-field">
+      <label class="facet-param-label" for="facetInputSegments">Segments</label>
+      <input type="number" id="facetInputSegments" class="tool-input facet-num-input" value="4" step="1" min="2" max="16" />
+    </div>
+  </div>
+
+  <div class="dialog-body facet-tool-body">
+    <div class="mesh-edit-section-header">
+      <span class="mesh-edit-section-chevron"><i class="app-icon" data-lucide="chevron-down"></i></span>
+      <span class="mesh-edit-section-name">Detail</span>
+    </div>
+    <div class="mesh-edit-subtitle">Mesh Edit</div>
+
+    <div class="mesh-edit-list">
+      <!-- Extrude -->
+      <div class="mesh-edit-item" id="btnFacetExtrude" title="Extrude selected face along normal">
+        <div class="mesh-edit-icon-wrap" style="color: #58a6ff"><i class="app-icon" data-lucide="box-select"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Extrude</div>
+          <div class="mesh-edit-desc">Pull new shape from selected faces or edges.</div>
         </div>
+        <div class="mesh-edit-key">X</div>
+      </div>
+
+      <!-- Inset -->
+      <div class="mesh-edit-item" id="btnFacetInset" title="Create inset region on selected face">
+        <div class="mesh-edit-icon-wrap" style="color: #3fb950"><i class="app-icon" data-lucide="maximize-2"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Inset</div>
+          <div class="mesh-edit-desc">Create an inset region on selected faces.</div>
+        </div>
+        <div class="mesh-edit-key">I</div>
+      </div>
+
+      <!-- Arc -->
+      <div class="mesh-edit-item" id="btnFacetArc" title="Round selected face into segmented arch">
+        <div class="mesh-edit-icon-wrap" style="color: #bc8cff"><i class="app-icon" data-lucide="circle-dot"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Arc</div>
+          <div class="mesh-edit-desc">Round a selected face into a segmented arch.</div>
+        </div>
+        <div class="mesh-edit-key">Shift+A</div>
+      </div>
+
+      <!-- Knife -->
+      <div class="mesh-edit-item" id="btnFacetKnife" title="Place and adjust knife points on selected face">
+        <div class="mesh-edit-icon-wrap" style="color: #f0883e"><i class="app-icon" data-lucide="scissors"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Knife</div>
+          <div class="mesh-edit-desc">Place and adjust knife points on the selected face.</div>
+        </div>
+        <div class="mesh-edit-key">C</div>
+      </div>
+
+      <!-- Loop Cut -->
+      <div class="mesh-edit-item" id="btnFacetLoopCut" title="Cut a quad strip through adjacent faces">
+        <div class="mesh-edit-icon-wrap" style="color: #39c5bb"><i class="app-icon" data-lucide="hash"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Loop Cut</div>
+          <div class="mesh-edit-desc">Cut a quad strip through selected edges or adjacent faces.</div>
+        </div>
+        <div class="mesh-edit-key">Shift+E</div>
+      </div>
+
+      <!-- Bevel -->
+      <div class="mesh-edit-item" id="btnFacetBevel" title="Chamfer selected objects, edges, or faces">
+        <div class="mesh-edit-icon-wrap" style="color: #d29922"><i class="app-icon" data-lucide="layers"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Bevel</div>
+          <div class="mesh-edit-desc">Chamfer selected objects, edges, or faces.</div>
+        </div>
+        <div class="mesh-edit-key">-</div>
+      </div>
+
+      <!-- Solidify -->
+      <div class="mesh-edit-item" id="btnFacetSolidify" title="Add thickness to selected faces or mesh">
+        <div class="mesh-edit-icon-wrap" style="color: #58a6ff"><i class="app-icon" data-lucide="shield"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Solidify</div>
+          <div class="mesh-edit-desc">Add thickness to selected faces.</div>
+        </div>
+        <div class="mesh-edit-key">H</div>
+      </div>
+
+      <!-- Array -->
+      <div class="mesh-edit-item" id="btnFacetArray" title="Create offset copies of selected objects or faces">
+        <div class="mesh-edit-icon-wrap" style="color: #79c0ff"><i class="app-icon" data-lucide="grid-3x3"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Array</div>
+          <div class="mesh-edit-desc">Create offset or radial copies of selected objects or faces.</div>
+        </div>
+        <div class="mesh-edit-key"></div>
+      </div>
+
+      <!-- Cut Through -->
+      <div class="mesh-edit-item" id="btnFacetCutThrough" title="Turn selected cut face into through-opening">
+        <div class="mesh-edit-icon-wrap" style="color: #e3b341"><i class="app-icon" data-lucide="square-dashed"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Cut Through</div>
+          <div class="mesh-edit-desc">Turn the selected cut face into a through-opening.</div>
+        </div>
+        <div class="mesh-edit-key">T</div>
+      </div>
+
+      <!-- Relax -->
+      <div class="mesh-edit-item" id="btnFacetRelax" title="Evenly relax selected vertices while preserving boundary">
+        <div class="mesh-edit-icon-wrap" style="color: #56d364"><i class="app-icon" data-lucide="waves"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Relax</div>
+          <div class="mesh-edit-desc">Evenly relax selected vertices while preserving the outer boundary.</div>
+        </div>
+        <div class="mesh-edit-key">V</div>
+      </div>
+
+      <!-- Subdivide -->
+      <div class="mesh-edit-item" id="btnFacetSubdivide" title="Split selected objects or faces into smaller editable faces">
+        <div class="mesh-edit-icon-wrap" style="color: #38bdf8"><i class="app-icon" data-lucide="grid-2x2"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Subdivide</div>
+          <div class="mesh-edit-desc">Split selected objects or faces into smaller editable faces.</div>
+        </div>
+        <div class="mesh-edit-key">K</div>
+      </div>
+
+      <!-- Sub-D -->
+      <div class="mesh-edit-item" id="btnFacetSubD" title="Choose smooth subdivision preview levels">
+        <div class="mesh-edit-icon-wrap" style="color: #22d3ee"><i class="app-icon" data-lucide="sparkles"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Sub-D</div>
+          <div class="mesh-edit-desc">Choose smooth subdivision preview levels.</div>
+        </div>
+        <div class="mesh-edit-key">Shift+S</div>
+      </div>
+
+      <!-- Invert Normal -->
+      <div class="mesh-edit-item" id="btnFacetFlipNormal" title="Reverse polygon winding order">
+        <div class="mesh-edit-icon-wrap" style="color: #a371f7"><i class="app-icon" data-lucide="refresh-cw"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Invert Normal</div>
+          <div class="mesh-edit-desc">Reverse polygon winding order.</div>
+        </div>
+        <div class="mesh-edit-key">N</div>
+      </div>
+
+      <!-- Delete Face -->
+      <div class="mesh-edit-item mesh-edit-item-danger" id="btnFacetDelete" title="Delete selected face geometry">
+        <div class="mesh-edit-icon-wrap" style="color: #f85149"><i class="app-icon" data-lucide="trash-2"></i></div>
+        <div class="mesh-edit-info">
+          <div class="mesh-edit-name">Delete Face</div>
+          <div class="mesh-edit-desc">Delete selected face geometry.</div>
+        </div>
+        <div class="mesh-edit-key">Del</div>
+      </div>
+    </div>
+
+    <div id="gui-facet-container" style="display: none"></div>
+  </div>
+</div>

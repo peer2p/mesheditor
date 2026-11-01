@@ -1,4 +1,4 @@
-import { Color3, Engine, Mesh, PBRMaterial, StandardMaterial, Texture } from '@babylonjs/core';
+import { Color3, Engine, Mesh, PBRMaterial, StandardMaterial, Texture, Vector3 } from '@babylonjs/core';
 import * as dat from 'dat.gui';
 import { marked } from 'marked';
 import { createDefaultPlatformAdapter, MeshEditorPlatformAdapter } from './adapters';
@@ -62,6 +62,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  CircleDot,
   Code,
   createIcons,
   Crosshair,
@@ -76,11 +77,14 @@ import {
   FolderMinus,
   FolderOpen,
   FolderPlus,
+  Grid2x2,
   Grid3x3,
+  Hash,
   HelpCircle,
   Image,
   Info,
   Keyboard,
+  Layers,
   Library,
   Lightbulb,
   ListTree,
@@ -90,6 +94,7 @@ import {
   MicOff,
   Minus,
   Mouse,
+  MousePointer,
   Move,
   Palette,
   Paintbrush,
@@ -102,13 +107,16 @@ import {
   RotateCw,
   Route,
   Save,
+  Scan,
   Scissors,
   Search,
   Send,
   Settings,
   Shapes,
+  Shield,
   Sparkles,
   Square,
+  SquareDashed,
   Sun,
   SunMedium,
   Target,
@@ -117,6 +125,7 @@ import {
   Undo2,
   Upload,
   UploadCloud,
+  Waves,
   Wrench,
   X,
   Zap,
@@ -137,6 +146,7 @@ export const editorIcons = {
   Check,
   CheckCircle2,
   ChevronDown,
+  CircleDot,
   Code,
   Crosshair,
   Download,
@@ -150,11 +160,14 @@ export const editorIcons = {
   FolderMinus,
   FolderOpen,
   FolderPlus,
+  Grid2x2,
   Grid3x3,
+  Hash,
   HelpCircle,
   Image,
   Info,
   Keyboard,
+  Layers,
   Library,
   Lightbulb,
   ListTree,
@@ -164,6 +177,7 @@ export const editorIcons = {
   MicOff,
   Minus,
   Mouse,
+  MousePointer,
   Move,
   Palette,
   Paintbrush,
@@ -176,13 +190,16 @@ export const editorIcons = {
   RotateCw,
   Route,
   Save,
+  Scan,
   Scissors,
   Search,
   Send,
   Settings,
   Shapes,
+  Shield,
   Sparkles,
   Square,
+  SquareDashed,
   Sun,
   SunMedium,
   Target,
@@ -191,6 +208,7 @@ export const editorIcons = {
   Undo2,
   Upload,
   UploadCloud,
+  Waves,
   Wrench,
   X,
   Zap,
@@ -343,6 +361,10 @@ export class MeshEditorApp {
     alpha: 1.0,
     wireframe: false,
     backFaceCulling: false,
+    textureAlpha: true,
+    transparencyMode: 'Alpha Test & Blend',
+    twoSided: true,
+    alphaCutOff: 0.5,
     replaceTexture: () => this.triggerReplaceTexture(),
     newMaterial: () => this.service.createNewMaterialForSelected(),
   };
@@ -397,7 +419,22 @@ export class MeshEditorApp {
   private facetParams = {
     active: false,
     extrudeDist: 0.5,
+    insetAmount: 0.25,
+    thickness: 0.2,
+    segments: 4,
+    count: 3,
     extrudeNow: () => this.service.extrudeSelectedFacet(this.facetParams.extrudeDist),
+    insetNow: () => this.service.insetSelectedFacet(this.facetParams.insetAmount),
+    arcNow: () => this.service.arcSelectedFacet(this.facetParams.segments, this.facetParams.extrudeDist),
+    knifeNow: () => this.service.knifeSplitFacet(),
+    loopCutNow: () => this.service.loopCutSelectedFacet(),
+    bevelNow: () => this.service.bevelSelectedFacet(this.facetParams.insetAmount),
+    solidifyNow: () => this.service.solidifyMeshOrFacet(this.facetParams.thickness, true),
+    arrayNow: () => this.service.arraySelectedFacetOrMesh(this.facetParams.count, this.facetParams.extrudeDist, 0, 0),
+    cutThroughNow: () => this.service.cutThroughSelectedFacet(this.facetParams.extrudeDist),
+    relaxNow: () => this.service.relaxSelectedFacet(),
+    subdivideNow: () => this.service.subdivideSelectedFacet(),
+    subDNow: () => this.service.subDSmoothMeshOrFacet(),
     deleteFacet: () => this.service.deleteSelectedFacet(),
     flipNormal: () => this.service.flipSelectedFacetNormal(),
   };
@@ -1030,6 +1067,16 @@ export class MeshEditorApp {
     // Export Modal Dialog
     this.initExportDialog();
 
+    // Outliner wireframe toggle button
+    const btnOutlinerWireframe = this.getElement<HTMLButtonElement>('btnOutlinerWireframe');
+    btnOutlinerWireframe?.addEventListener('click', () => {
+      this.service.toggleSelectedWireframe();
+      this.updateOutliner();
+    });
+
+    // Initialize Facet Modeling UI
+    this.initFacetToolUI();
+
     // Search filter in Outliner
     this.outlinerSearchInput?.addEventListener('input', (e) => {
       this.searchFilter = (e.target as HTMLInputElement).value;
@@ -1550,6 +1597,141 @@ export class MeshEditorApp {
     await this.service.exportCurrentModel({ filename, format, selectedOnly });
   }
 
+  private initFacetToolUI(): void {
+    const btnPickToggle = this.getElement<HTMLButtonElement>('btnFacetPickToggle');
+    const lblPickState = this.getElement<HTMLElement>('lblFacetPickState');
+    const badge = this.getElement<HTMLElement>('facetSelectedBadge');
+    const btnModeFace = this.getElement<HTMLButtonElement>('btnFacetModeFace');
+    const btnModeVertex = this.getElement<HTMLButtonElement>('btnFacetModeVertex');
+    const coordsStrip = this.getElement<HTMLElement>('facetVertexCoordsStrip');
+    const inputX = this.getElement<HTMLInputElement>('facetVertexX');
+    const inputY = this.getElement<HTMLInputElement>('facetVertexY');
+    const inputZ = this.getElement<HTMLInputElement>('facetVertexZ');
+
+    const updatePickUI = () => {
+      const active = this.service.facetEditorActive;
+      btnPickToggle?.classList.toggle('active', active);
+      if (lblPickState) lblPickState.textContent = active ? 'Pick: ON' : 'Pick: OFF';
+    };
+
+    const updateModeUI = (mode: 'face' | 'vertex') => {
+      btnModeFace?.classList.toggle('active', mode === 'face');
+      btnModeVertex?.classList.toggle('active', mode === 'vertex');
+      if (mode === 'vertex') {
+        if (coordsStrip && this.service.selectedVertexIndex !== null) {
+          coordsStrip.style.display = 'flex';
+        }
+      } else {
+        if (coordsStrip) coordsStrip.style.display = 'none';
+      }
+    };
+
+    btnModeFace?.addEventListener('click', () => {
+      this.service.setFacetEditMode('face');
+      updateModeUI('face');
+    });
+
+    btnModeVertex?.addEventListener('click', () => {
+      this.service.setFacetEditMode('vertex');
+      updateModeUI('vertex');
+    });
+
+    btnPickToggle?.addEventListener('click', () => {
+      this.service.toggleFacetEditor();
+      updatePickUI();
+      this.updatePanelButtonStates();
+    });
+
+    this.service.events.onFacetEditorStateChanged = (active: boolean) => {
+      updatePickUI();
+      this.updatePanelButtonStates();
+    };
+
+    this.service.events.onFacetEditModeChanged = (mode: 'face' | 'vertex') => {
+      updateModeUI(mode);
+    };
+
+    this.service.events.onFaceSelected = (faceId: number | null, isQuad?: boolean) => {
+      if (!badge) return;
+      if (faceId !== null) {
+        badge.textContent = isQuad ? `Quad #${faceId} selected` : `Face #${faceId} selected`;
+        badge.classList.add('active');
+      } else {
+        badge.textContent = this.service.facetEditMode === 'vertex' ? 'No vertex picked' : 'No face picked';
+        badge.classList.remove('active');
+      }
+    };
+
+    this.service.events.onVertexSelected = (vertexIndex: number | null, pos?: Vector3) => {
+      if (vertexIndex !== null && pos) {
+        if (badge) {
+          badge.textContent = `Vertex #${vertexIndex} selected`;
+          badge.classList.add('active');
+        }
+        if (coordsStrip) coordsStrip.style.display = 'flex';
+        if (inputX && document.activeElement !== inputX) inputX.value = pos.x.toFixed(2);
+        if (inputY && document.activeElement !== inputY) inputY.value = pos.y.toFixed(2);
+        if (inputZ && document.activeElement !== inputZ) inputZ.value = pos.z.toFixed(2);
+      } else {
+        if (coordsStrip) coordsStrip.style.display = 'none';
+        if (this.service.facetEditMode === 'vertex' && badge) {
+          badge.textContent = 'No vertex picked';
+          badge.classList.remove('active');
+        }
+      }
+    };
+
+    const applyVertexCoords = () => {
+      if (this.service.selectedVertexIndex === null) return;
+      const x = parseFloat(inputX?.value || '0');
+      const y = parseFloat(inputY?.value || '0');
+      const z = parseFloat(inputZ?.value || '0');
+      this.service.setVertexPosition(x, y, z);
+    };
+    inputX?.addEventListener('change', applyVertexCoords);
+    inputY?.addEventListener('change', applyVertexCoords);
+    inputZ?.addEventListener('change', applyVertexCoords);
+
+    // Initial sync
+    updatePickUI();
+    updateModeUI(this.service.facetEditMode);
+
+    const inputDist = this.getElement<HTMLInputElement>('facetInputDistance');
+    inputDist?.addEventListener('input', () => {
+      this.facetParams.extrudeDist = parseFloat(inputDist.value) || 0.5;
+    });
+
+    const inputInset = this.getElement<HTMLInputElement>('facetInputInset');
+    inputInset?.addEventListener('input', () => {
+      this.facetParams.insetAmount = parseFloat(inputInset.value) || 0.25;
+    });
+
+    const inputThickness = this.getElement<HTMLInputElement>('facetInputThickness');
+    inputThickness?.addEventListener('input', () => {
+      this.facetParams.thickness = parseFloat(inputThickness.value) || 0.2;
+    });
+
+    const inputSegments = this.getElement<HTMLInputElement>('facetInputSegments');
+    inputSegments?.addEventListener('input', () => {
+      this.facetParams.segments = parseInt(inputSegments.value, 10) || 4;
+    });
+
+    this.getElement('btnFacetExtrude')?.addEventListener('click', () => this.facetParams.extrudeNow());
+    this.getElement('btnFacetInset')?.addEventListener('click', () => this.facetParams.insetNow());
+    this.getElement('btnFacetArc')?.addEventListener('click', () => this.facetParams.arcNow());
+    this.getElement('btnFacetKnife')?.addEventListener('click', () => this.facetParams.knifeNow());
+    this.getElement('btnFacetLoopCut')?.addEventListener('click', () => this.facetParams.loopCutNow());
+    this.getElement('btnFacetBevel')?.addEventListener('click', () => this.facetParams.bevelNow());
+    this.getElement('btnFacetSolidify')?.addEventListener('click', () => this.facetParams.solidifyNow());
+    this.getElement('btnFacetArray')?.addEventListener('click', () => this.facetParams.arrayNow());
+    this.getElement('btnFacetCutThrough')?.addEventListener('click', () => this.facetParams.cutThroughNow());
+    this.getElement('btnFacetRelax')?.addEventListener('click', () => this.facetParams.relaxNow());
+    this.getElement('btnFacetSubdivide')?.addEventListener('click', () => this.facetParams.subdivideNow());
+    this.getElement('btnFacetSubD')?.addEventListener('click', () => this.facetParams.subDNow());
+    this.getElement('btnFacetFlipNormal')?.addEventListener('click', () => this.facetParams.flipNormal());
+    this.getElement('btnFacetDelete')?.addEventListener('click', () => this.facetParams.deleteFacet());
+  }
+
   private saveDialogLayout(): void {
     try {
       const layout: Record<string, { left: string; top: string; display: string; open: boolean; minimized: boolean }> = {};
@@ -1919,6 +2101,41 @@ export class MeshEditorApp {
       .onChange((v) => {
         const mat = this.service.getSelectedMaterial();
         if (mat) mat.wireframe = v;
+      });
+    this.materialControllers['textureAlpha'] = this.guiMaterial
+      .add(this.materialParams, 'textureAlpha')
+      .name('Texture Alpha')
+      .onChange((v: boolean) => {
+        this.service.setTextureAlpha(v);
+      });
+    this.materialControllers['transparencyMode'] = this.guiMaterial
+      .add(this.materialParams, 'transparencyMode', [
+        'Opaque',
+        'Alpha Test (Cutout)',
+        'Alpha Blend',
+        'Alpha Test & Blend',
+      ])
+      .name('Transparency Mode')
+      .onChange((modeStr: string) => {
+        const map: Record<string, number> = {
+          Opaque: 0,
+          'Alpha Test (Cutout)': 1,
+          'Alpha Blend': 2,
+          'Alpha Test & Blend': 3,
+        };
+        this.service.setMaterialTransparencyMode(map[modeStr] ?? 3);
+      });
+    this.materialControllers['twoSided'] = this.guiMaterial
+      .add(this.materialParams, 'twoSided')
+      .name('Double Sided')
+      .onChange((v: boolean) => {
+        this.service.setMaterialTwoSided(v);
+      });
+    this.materialControllers['alphaCutOff'] = this.guiMaterial
+      .add(this.materialParams, 'alphaCutOff', 0.0, 1.0, 0.05)
+      .name('Alpha Cutoff')
+      .onChange((v: number) => {
+        this.service.setMaterialAlphaCutOff(v);
       });
     this.guiMaterial.add(this.materialParams, 'replaceTexture').name('Replace Texture...');
     this.guiMaterial.add(this.materialParams, 'newMaterial').name('New PBR Material');
@@ -2377,6 +2594,13 @@ export class MeshEditorApp {
         this.materialParams.alpha = mat.alpha !== undefined ? mat.alpha : 1.0;
         this.materialParams.wireframe = mat.wireframe || false;
       }
+
+      const trans = this.service.getMaterialTransparencyInfo();
+      this.materialParams.textureAlpha = trans.hasAlpha;
+      const modeNames = ['Opaque', 'Alpha Test (Cutout)', 'Alpha Blend', 'Alpha Test & Blend'];
+      this.materialParams.transparencyMode = modeNames[trans.mode] ?? 'Alpha Test & Blend';
+      this.materialParams.twoSided = trans.twoSided;
+      this.materialParams.alphaCutOff = trans.alphaCutOff;
     } else {
       this.materialParams.materialName = 'No material';
     }
@@ -2464,6 +2688,34 @@ export class MeshEditorApp {
         this.refreshIcons();
       });
       actions.appendChild(btnVis);
+
+      const btnGroupCenter = document.createElement('button');
+      btnGroupCenter.className = 'outliner-btn';
+      btnGroupCenter.innerHTML = '<i class="app-icon" data-lucide="target"></i>';
+      btnGroupCenter.title = 'Center selection';
+      btnGroupCenter.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.service.selectNodes([group]);
+        this.service.focusOnTarget(group);
+        this.showToast(`Centered on "${group.name}"`, 'success');
+      });
+      actions.appendChild(btnGroupCenter);
+
+      const isGroupWire = children.length > 0 && children.every((c) => this.service.isMeshWireframe(c));
+      const btnGroupWire = document.createElement('button');
+      btnGroupWire.className = `outliner-btn ${isGroupWire ? 'active' : ''}`;
+      btnGroupWire.innerHTML = '<i class="app-icon" data-lucide="scan"></i>';
+      btnGroupWire.title = 'Toggle wireframe for group';
+      btnGroupWire.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const nextState = !children.every((c) => this.service.isMeshWireframe(c));
+        for (const c of children) {
+          this.service.setMeshWireframe(c, nextState);
+        }
+        this.showToast(`Wireframe ${nextState ? 'enabled' : 'disabled'} for group "${group.name}"`, 'info');
+        this.updateOutliner();
+      });
+      actions.appendChild(btnGroupWire);
 
       const btnUngroup = document.createElement('button');
       btnUngroup.className = 'outliner-btn';
@@ -2553,14 +2805,28 @@ export class MeshEditorApp {
 
         const btnCCenter = document.createElement('button');
         btnCCenter.className = 'outliner-btn';
-        btnCCenter.innerHTML = '<i class="app-icon" data-lucide="crosshair"></i>';
-        btnCCenter.title = 'Center pivot on object';
+        btnCCenter.innerHTML = '<i class="app-icon" data-lucide="target"></i>';
+        btnCCenter.title = 'Center selection';
         btnCCenter.addEventListener('click', (e) => {
           e.stopPropagation();
-          this.service.centerMeshPivot(child);
-          this.showToast(`Pivot of "${child.name}" centered`, 'success');
+          this.service.selectNodes([child]);
+          this.service.focusOnTarget(child);
+          this.showToast(`Centered on "${child.name}"`, 'success');
         });
         cActions.appendChild(btnCCenter);
+
+        const isCWire = this.service.isMeshWireframe(child);
+        const btnCWire = document.createElement('button');
+        btnCWire.className = `outliner-btn ${isCWire ? 'active' : ''}`;
+        btnCWire.innerHTML = '<i class="app-icon" data-lucide="scan"></i>';
+        btnCWire.title = 'Toggle wireframe';
+        btnCWire.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const state = this.service.toggleMeshWireframe(child);
+          this.showToast(`Wireframe ${state ? 'enabled' : 'disabled'} for "${child.name}"`, 'info');
+          this.updateOutliner();
+        });
+        cActions.appendChild(btnCWire);
 
         childRow.appendChild(cActions);
 
@@ -2632,14 +2898,28 @@ export class MeshEditorApp {
 
       const btnCenter = document.createElement('button');
       btnCenter.className = 'outliner-btn';
-      btnCenter.innerHTML = '<i class="app-icon" data-lucide="crosshair"></i>';
-      btnCenter.title = 'Center pivot on object';
+      btnCenter.innerHTML = '<i class="app-icon" data-lucide="target"></i>';
+      btnCenter.title = 'Center selection';
       btnCenter.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.service.centerMeshPivot(mesh);
-        this.showToast(`Pivot of "${mesh.name}" centered`, 'success');
+        this.service.selectNodes([mesh]);
+        this.service.focusOnTarget(mesh);
+        this.showToast(`Centered on "${mesh.name}"`, 'success');
       });
       actions.appendChild(btnCenter);
+
+      const isWire = this.service.isMeshWireframe(mesh);
+      const btnWire = document.createElement('button');
+      btnWire.className = `outliner-btn ${isWire ? 'active' : ''}`;
+      btnWire.innerHTML = '<i class="app-icon" data-lucide="scan"></i>';
+      btnWire.title = 'Toggle wireframe';
+      btnWire.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const state = this.service.toggleMeshWireframe(mesh);
+        this.showToast(`Wireframe ${state ? 'enabled' : 'disabled'} for "${mesh.name}"`, 'info');
+        this.updateOutliner();
+      });
+      actions.appendChild(btnWire);
 
       const btnDel = document.createElement('button');
       btnDel.className = 'outliner-btn';
@@ -2845,25 +3125,31 @@ export class MeshEditorApp {
       const key = e.key.toLowerCase();
 
       // Ensure WASD / Arrow camera navigation works even if canvas lost focus (e.g. clicked toolbar button or UI)
-      if (isNavigationKey(key, e) && document.activeElement !== this.canvas) {
-        try {
-          this.canvas?.focus();
-        } catch {
-          // Ignore
+      if (isNavigationKey(key, e)) {
+        if (document.activeElement !== this.canvas) {
+          try {
+            this.canvas?.focus();
+          } catch {
+            // Ignore
+          }
+          if (e.target !== this.canvas) {
+            const forwardEvent = new KeyboardEvent(e.type, {
+              key: e.key,
+              code: e.code,
+              keyCode: e.keyCode,
+              which: e.which,
+              bubbles: true,
+              cancelable: true,
+            });
+            this.canvas?.dispatchEvent(forwardEvent);
+          }
         }
-        if (e.target !== this.canvas) {
-          const forwardEvent = new KeyboardEvent(e.type, {
-            key: e.key,
-            code: e.code,
-            keyCode: e.keyCode,
-            which: e.which,
-            bubbles: true,
-            cancelable: true,
-          });
-          this.canvas?.dispatchEvent(forwardEvent);
-          return;
-        }
+        // Camera navigation takes absolute precedence: bare WASD and arrow keys never trigger tool shortcuts!
+        return;
       }
+
+      // Prevent repetitive rapid firing when keys are held down
+      if (e.repeat) return;
 
       // Undo / Redo
       if ((e.metaKey || e.ctrlKey) && key === 'z') {
@@ -2889,6 +3175,47 @@ export class MeshEditorApp {
       } else if ((e.metaKey || e.ctrlKey) && key === 'e') {
         e.preventDefault();
         this.openExportDialog();
+      } else if (this.service.facetEditorActive && this.service.selectedFaceId !== null && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (!e.shiftKey && key === 'x') {
+          e.preventDefault();
+          this.facetParams.extrudeNow();
+        } else if (!e.shiftKey && key === 'i') {
+          e.preventDefault();
+          this.facetParams.insetNow();
+        } else if (e.shiftKey && key === 'a') {
+          e.preventDefault();
+          this.facetParams.arcNow();
+        } else if (!e.shiftKey && key === 'c') {
+          e.preventDefault();
+          this.facetParams.knifeNow();
+        } else if (e.shiftKey && key === 'e') {
+          e.preventDefault();
+          this.facetParams.loopCutNow();
+        } else if (!e.shiftKey && (key === '-' || key === '_')) {
+          e.preventDefault();
+          this.facetParams.bevelNow();
+        } else if (!e.shiftKey && key === 'h') {
+          e.preventDefault();
+          this.facetParams.solidifyNow();
+        } else if (!e.shiftKey && key === 't') {
+          e.preventDefault();
+          this.facetParams.cutThroughNow();
+        } else if (!e.shiftKey && key === 'v') {
+          e.preventDefault();
+          this.facetParams.relaxNow();
+        } else if (!e.shiftKey && key === 'k') {
+          e.preventDefault();
+          this.facetParams.subdivideNow();
+        } else if (e.shiftKey && key === 's') {
+          e.preventDefault();
+          this.facetParams.subDNow();
+        } else if (!e.shiftKey && key === 'n') {
+          e.preventDefault();
+          this.facetParams.flipNormal();
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault();
+          this.facetParams.deleteFacet();
+        }
       } else if (key === 'm') {
         document.getElementById('btnGizmoTranslate')?.click();
       } else if (key === 'e') {
