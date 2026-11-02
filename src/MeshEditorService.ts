@@ -140,6 +140,16 @@ export class MeshEditorService {
   public isDraggingVertex: boolean = false;
   private vertexPreDragPos: Vector3 = Vector3.Zero();
 
+  // Marquee selection state
+  public isGizmoDragging: boolean = false;
+  public isMarqueeCandidate: boolean = false;
+  public isMarqueeActive: boolean = false;
+  public marqueeStartPointer: { x: number; y: number } = { x: 0, y: 0 };
+  public marqueeStartClient: { x: number; y: number } = { x: 0, y: 0 };
+  private marqueeElement: HTMLElement | null = null;
+  private onWindowPointerUpHandler: ((e: PointerEvent) => void) | null = null;
+  private onWindowKeyDownHandler: ((e: KeyboardEvent) => void) | null = null;
+
   // Events listener
   public events: MeshEditorServiceEvents = {};
 
@@ -306,6 +316,25 @@ export class MeshEditorService {
       this.resizeObserver.observe(this.canvas);
     }
 
+    if (typeof window !== 'undefined') {
+      this.onWindowPointerUpHandler = () => {
+        if (this.isMarqueeActive || this.isMarqueeCandidate) {
+          this.isMarqueeActive = false;
+          this.isMarqueeCandidate = false;
+          this.hideMarqueeVisual();
+        }
+      };
+      this.onWindowKeyDownHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && (this.isMarqueeActive || this.isMarqueeCandidate)) {
+          this.isMarqueeActive = false;
+          this.isMarqueeCandidate = false;
+          this.hideMarqueeVisual();
+        }
+      };
+      window.addEventListener('pointerup', this.onWindowPointerUpHandler);
+      window.addEventListener('keydown', this.onWindowKeyDownHandler);
+    }
+
     this.setupLoaderInterceptors();
   }
 
@@ -321,6 +350,14 @@ export class MeshEditorService {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
+    }
+    if (this.onWindowPointerUpHandler && typeof window !== 'undefined') {
+      window.removeEventListener('pointerup', this.onWindowPointerUpHandler);
+      this.onWindowPointerUpHandler = null;
+    }
+    if (this.onWindowKeyDownHandler && typeof window !== 'undefined') {
+      window.removeEventListener('keydown', this.onWindowKeyDownHandler);
+      this.onWindowKeyDownHandler = null;
     }
     if (this.loaderObserver) {
       SceneLoader.OnPluginActivatedObservable.remove(this.loaderObserver);
@@ -459,6 +496,7 @@ export class MeshEditorService {
         const part = (gizmo as any)[partName];
         if (part && part.dragBehavior) {
           part.dragBehavior.onDragStartObservable.add(() => {
+            this.isGizmoDragging = true;
             if (
               name === 'Move' &&
               this.facetEditorActive &&
@@ -484,6 +522,7 @@ export class MeshEditorService {
             });
           }
           part.dragBehavior.onDragEndObservable.add(() => {
+            this.isGizmoDragging = false;
             if (
               name === 'Move' &&
               this.facetEditorActive &&
@@ -510,15 +549,65 @@ export class MeshEditorService {
         pointerDownPos = { x: this.scene.pointerX, y: this.scene.pointerY };
         this.lastPointerX = this.scene.pointerX;
         this.lastPointerY = this.scene.pointerY;
+
+        const evt = pointerInfo.event as MouseEvent;
+        const isLeftButton = evt ? evt.button === 0 : true;
+        const pick = pointerInfo.pickInfo;
+        const isGizmoHit = this.isGizmoMesh(pick?.pickedMesh);
+
+        if (
+          isLeftButton &&
+          !isGizmoHit &&
+          !this.isPlaceModeActive &&
+          !this.facetEditorActive &&
+          !this.voxelPainter?.isActive &&
+          !this.pathExtrusion?.isActive
+        ) {
+          this.isMarqueeCandidate = true;
+          this.isMarqueeActive = false;
+          this.marqueeStartPointer = { x: this.scene.pointerX, y: this.scene.pointerY };
+          this.marqueeStartClient = {
+            x: evt?.clientX ?? this.scene.pointerX,
+            y: evt?.clientY ?? this.scene.pointerY,
+          };
+        } else {
+          this.isMarqueeCandidate = false;
+          this.isMarqueeActive = false;
+        }
+      } else if (pointerInfo.type === PointerEventTypes.POINTERMOVE) {
+        this.lastPointerX = this.scene.pointerX;
+        this.lastPointerY = this.scene.pointerY;
+
+        if (this.isMarqueeCandidate && !this.isAnyGizmoDragging()) {
+          const dist = Math.hypot(
+            this.scene.pointerX - this.marqueeStartPointer.x,
+            this.scene.pointerY - this.marqueeStartPointer.y
+          );
+          if (dist > 6) {
+            this.isMarqueeActive = true;
+            const evt = pointerInfo.event as MouseEvent;
+            this.updateMarqueeVisual(
+              this.marqueeStartClient.x,
+              this.marqueeStartClient.y,
+              evt?.clientX ?? this.scene.pointerX,
+              evt?.clientY ?? this.scene.pointerY
+            );
+          }
+        }
       } else if (pointerInfo.type === PointerEventTypes.POINTERUP) {
         this.lastPointerX = this.scene.pointerX;
         this.lastPointerY = this.scene.pointerY;
+
+        const wasMarquee = this.isMarqueeActive;
+        const startPointer = { ...this.marqueeStartPointer };
+        this.isMarqueeCandidate = false;
+        this.isMarqueeActive = false;
+        this.hideMarqueeVisual();
 
         const dist = Math.hypot(
           this.scene.pointerX - pointerDownPos.x,
           this.scene.pointerY - pointerDownPos.y
         );
-        if (dist > 6) return; // Camera orbit or drag, ignore click
 
         // If placement mode is active
         if (this.isPlaceModeActive) {
@@ -537,13 +626,28 @@ export class MeshEditorService {
           return;
         }
 
-        const pick = pointerInfo.pickInfo;
         const evt = pointerInfo.event as MouseEvent;
+
+        // If a marquee selection rectangle was dragged (> 6px)
+        if (wasMarquee && dist > 6) {
+          const minX = Math.min(startPointer.x, this.scene.pointerX);
+          const maxX = Math.max(startPointer.x, this.scene.pointerX);
+          const minY = Math.min(startPointer.y, this.scene.pointerY);
+          const maxY = Math.max(startPointer.y, this.scene.pointerY);
+          const isAdditive = !!(evt && (evt.shiftKey || evt.metaKey || evt.ctrlKey));
+
+          this.selectMeshesInScreenRect(minX, minY, maxX, maxY, isAdditive);
+          return;
+        }
+
+        if (dist > 6) return; // Camera orbit or drag, ignore click
+
+        const pick = pointerInfo.pickInfo;
 
         if (pick && pick.hit && pick.pickedMesh) {
           const mesh = pick.pickedMesh as Mesh;
           if (this.isEditorHelper(mesh) || mesh === this.gridMesh) {
-            if (!evt.shiftKey && !evt.metaKey && !evt.ctrlKey) {
+            if (!evt || (!evt.shiftKey && !evt.metaKey && !evt.ctrlKey)) {
               this.selectNodes([]);
             }
             return;
@@ -554,15 +658,13 @@ export class MeshEditorService {
             targetNode = mesh.parent as TransformNode;
           }
 
-          if (evt.shiftKey) {
-            this.rangeSelectNodes(targetNode);
-          } else if (evt.metaKey || evt.ctrlKey) {
+          if (evt && (evt.shiftKey || evt.metaKey || evt.ctrlKey)) {
             this.toggleNodeSelection(targetNode);
           } else {
             this.selectNodes([targetNode], false, pick.subMeshId);
           }
         } else {
-          if (!evt.shiftKey && !evt.metaKey && !evt.ctrlKey) {
+          if (!evt || (!evt.shiftKey && !evt.metaKey && !evt.ctrlKey)) {
             this.selectNodes([]);
           }
         }
@@ -582,6 +684,178 @@ export class MeshEditorService {
     const name = mesh.name || '';
     if (name.startsWith('editor_') || name.startsWith('gizmo') || name.startsWith('Lines')) return true;
     return !!((mesh as any).metadata && (mesh as any).metadata.isEditorHelper);
+  }
+
+  public isAnyGizmoDragging(): boolean {
+    if (this.isGizmoDragging) return true;
+    const gm = this.gizmoManager;
+    if (!gm || !gm.gizmos) return false;
+    const gizmoList = [gm.gizmos.positionGizmo, gm.gizmos.rotationGizmo, gm.gizmos.scaleGizmo, gm.gizmos.boundingBoxGizmo];
+    for (const g of gizmoList) {
+      if (!g) continue;
+      for (const partName of ['xGizmo', 'yGizmo', 'zGizmo', 'uniformGizmo', 'planeGizmo']) {
+        const part = (g as any)[partName];
+        if (part?.dragBehavior?.dragging) return true;
+      }
+    }
+    return false;
+  }
+
+  public isGizmoMesh(mesh: Nullable<AbstractMesh | TransformNode>): boolean {
+    if (!mesh) return false;
+    if (mesh === this.gridMesh || mesh === this.facetHighlightMesh) return false;
+    let curr: Nullable<any> = mesh;
+    while (curr) {
+      const name = curr.name || '';
+      if (
+        name.toLowerCase().includes('gizmo') ||
+        name.startsWith('editor_') ||
+        name.startsWith('Lines') ||
+        curr.metadata?.isGizmo ||
+        curr.metadata?.isEditorHelper ||
+        curr._isGizmo
+      ) {
+        return true;
+      }
+      curr = curr.parent;
+    }
+    return false;
+  }
+
+  public getMarqueeElement(): HTMLElement | null {
+    if (!this.marqueeElement && typeof document !== 'undefined') {
+      let el = document.getElementById('selectionMarquee');
+      if (!el && this.canvas && this.canvas.parentElement) {
+        el = document.createElement('div');
+        el.id = 'selectionMarquee';
+        el.className = 'selection-marquee';
+        el.style.display = 'none';
+        this.canvas.parentElement.appendChild(el);
+      }
+      this.marqueeElement = el;
+    }
+    return this.marqueeElement;
+  }
+
+  public updateMarqueeVisual(
+    startX: number,
+    startY: number,
+    currentX: number,
+    currentY: number
+  ): void {
+    const el = this.getMarqueeElement();
+    if (!el || !this.canvas) return;
+
+    const parent = this.canvas.parentElement || document.body;
+    const parentRect = parent.getBoundingClientRect ? parent.getBoundingClientRect() : { left: 0, top: 0 };
+
+    const x1 = startX - (parentRect.left || 0);
+    const y1 = startY - (parentRect.top || 0);
+    const x2 = currentX - (parentRect.left || 0);
+    const y2 = currentY - (parentRect.top || 0);
+
+    const left = Math.min(x1, x2);
+    const top = Math.min(y1, y2);
+    const width = Math.abs(x2 - x1);
+    const height = Math.abs(y2 - y1);
+
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    el.style.width = `${width}px`;
+    el.style.height = `${height}px`;
+    el.style.display = 'block';
+  }
+
+  public hideMarqueeVisual(): void {
+    const el = this.getMarqueeElement();
+    if (el) {
+      el.style.display = 'none';
+    }
+  }
+
+  public getMeshesInScreenRect(
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number
+  ): TransformNode[] {
+    const foundNodes = new Set<TransformNode>();
+    if (!this.scene || !this.camera) return [];
+
+    const vp = this.camera.viewport.toGlobal(
+      this.engine.getRenderWidth(),
+      this.engine.getRenderHeight()
+    );
+    const tm = this.scene.getTransformMatrix();
+    const identity = Matrix.Identity();
+
+    for (const mesh of this.scene.meshes) {
+      if (!(mesh instanceof Mesh)) continue;
+      if (mesh.isDisposed() || !mesh.isVisible || !mesh.isEnabled()) continue;
+      if (this.isEditorHelper(mesh) || mesh === this.gridMesh || mesh === this.facetHighlightMesh) continue;
+      if (mesh.getTotalVertices() === 0) continue;
+
+      mesh.computeWorldMatrix(true);
+      const bb = mesh.getBoundingInfo().boundingBox;
+
+      let screenMinX = Infinity;
+      let screenMaxX = -Infinity;
+      let screenMinY = Infinity;
+      let screenMaxY = -Infinity;
+      let hasValidPoint = false;
+
+      const points = [...bb.vectorsWorld, bb.centerWorld];
+      for (const pt of points) {
+        const proj = Vector3.Project(pt, identity, tm, vp);
+        if (proj.z >= 0 && proj.z <= 1) {
+          hasValidPoint = true;
+          screenMinX = Math.min(screenMinX, proj.x);
+          screenMaxX = Math.max(screenMaxX, proj.x);
+          screenMinY = Math.min(screenMinY, proj.y);
+          screenMaxY = Math.max(screenMaxY, proj.y);
+        }
+      }
+
+      if (!hasValidPoint) continue;
+
+      const overlaps = !(
+        screenMaxX < minX ||
+        screenMinX > maxX ||
+        screenMaxY < minY ||
+        screenMinY > maxY
+      );
+
+      if (overlaps) {
+        let target: TransformNode = mesh;
+        if (mesh.parent && this.isGroupNode(mesh.parent)) {
+          target = mesh.parent as TransformNode;
+        }
+        foundNodes.add(target);
+      }
+    }
+
+    return Array.from(foundNodes);
+  }
+
+  public selectMeshesInScreenRect(
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number,
+    additive: boolean = false
+  ): void {
+    const nodesInRect = this.getMeshesInScreenRect(minX, minY, maxX, maxY);
+    if (additive) {
+      const merged = [...this.selectedNodes];
+      for (const node of nodesInRect) {
+        if (!merged.includes(node)) {
+          merged.push(node);
+        }
+      }
+      this.selectNodes(merged);
+    } else {
+      this.selectNodes(nodesInRect);
+    }
   }
 
   public clearSelectionProxy(): void {

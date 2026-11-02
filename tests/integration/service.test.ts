@@ -1,4 +1,4 @@
-import { NullEngine, Vector3, VertexBuffer } from '@babylonjs/core';
+import { NullEngine, PointerEventTypes, Vector3, VertexBuffer } from '@babylonjs/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MeshEditorService } from '../../src/MeshEditorService';
 import { PrimitiveConfig } from '../../src/types';
@@ -159,6 +159,97 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
       expect(service.selectedNodes).toContain(box1);
       expect(service.selectedNodes).toContain(box2);
       expect(service.selectedNodes).toContain(box3);
+    });
+
+    it('handles pointer pick multi-selection with Shift key', () => {
+      const box1 = service.createPrimitive(defaultPrimitiveConfig({ name: 'ShiftPick1' }));
+      const box2 = service.createPrimitive(defaultPrimitiveConfig({ name: 'ShiftPick2' }));
+
+      // 1. Single click on box1 without shift
+      service.scene.onPointerObservable.notifyObservers({
+        type: PointerEventTypes.POINTERDOWN,
+        event: { button: 0, clientX: 10, clientY: 10 },
+      } as any);
+      service.scene.onPointerObservable.notifyObservers({
+        type: PointerEventTypes.POINTERUP,
+        event: { button: 0, shiftKey: false, clientX: 10, clientY: 10 },
+        pickInfo: { hit: true, pickedMesh: box1, subMeshId: null },
+      } as any);
+      expect(service.selectedNodes).toEqual([box1]);
+      expect(service.selectedMesh).toBe(box1);
+
+      // 2. Shift + click on box2 adds box2 to selection
+      service.scene.onPointerObservable.notifyObservers({
+        type: PointerEventTypes.POINTERDOWN,
+        event: { button: 0, clientX: 20, clientY: 20 },
+      } as any);
+      service.scene.onPointerObservable.notifyObservers({
+        type: PointerEventTypes.POINTERUP,
+        event: { button: 0, shiftKey: true, clientX: 20, clientY: 20 },
+        pickInfo: { hit: true, pickedMesh: box2, subMeshId: null },
+      } as any);
+      expect(service.selectedNodes).toContain(box1);
+      expect(service.selectedNodes).toContain(box2);
+      expect(service.selectedNodes.length).toBe(2);
+
+      // 3. Shift + click on box1 removes box1 from selection
+      service.scene.onPointerObservable.notifyObservers({
+        type: PointerEventTypes.POINTERDOWN,
+        event: { button: 0, clientX: 10, clientY: 10 },
+      } as any);
+      service.scene.onPointerObservable.notifyObservers({
+        type: PointerEventTypes.POINTERUP,
+        event: { button: 0, shiftKey: true, clientX: 10, clientY: 10 },
+        pickInfo: { hit: true, pickedMesh: box1, subMeshId: null },
+      } as any);
+      expect(service.selectedNodes).toEqual([box2]);
+      expect(service.selectedMesh).toBe(box2);
+    });
+
+    it('selects meshes via screen marquee rectangle and supports additive selection', () => {
+      const boxA = service.createPrimitive(defaultPrimitiveConfig({ name: 'MarqueeA' }));
+      boxA.position.set(0, 0, 0);
+
+      const boxFar = service.createPrimitive(defaultPrimitiveConfig({ name: 'MarqueeFar' }));
+      boxFar.position.set(5000, 5000, 5000);
+
+      service.scene.render();
+
+      // Screen rect covering boxA at center
+      const renderW = service.getEngine().getRenderWidth();
+      const renderH = service.getEngine().getRenderHeight();
+      const meshesInRect = service.getMeshesInScreenRect(0, 0, renderW, renderH);
+
+      expect(meshesInRect).toContain(boxA);
+      expect(meshesInRect).not.toContain(boxFar);
+
+      // Select via marquee
+      service.selectMeshesInScreenRect(0, 0, renderW, renderH, false);
+      expect(service.selectedNodes).toContain(boxA);
+
+      // Empty marquee without additive clears selection
+      service.selectMeshesInScreenRect(0, 0, 5, 5, false);
+      expect(service.selectedNodes.length).toBe(0);
+
+      // Re-select boxA
+      service.selectNodes([boxA]);
+      expect(service.selectedNodes).toEqual([boxA]);
+
+      // Empty marquee WITH additive preserves selection
+      service.selectMeshesInScreenRect(0, 0, 5, 5, true);
+      expect(service.selectedNodes).toEqual([boxA]);
+    });
+
+    it('updates and hides selection marquee visual element during drag', () => {
+      service.updateMarqueeVisual(10, 20, 110, 120);
+      const marqueeEl = service.getMarqueeElement();
+      expect(marqueeEl).not.toBeNull();
+      expect(marqueeEl?.style.display).toBe('block');
+      expect(marqueeEl?.style.width).toBe('100px');
+      expect(marqueeEl?.style.height).toBe('100px');
+
+      service.hideMarqueeVisual();
+      expect(marqueeEl?.style.display).toBe('none');
     });
   });
 
