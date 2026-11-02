@@ -4992,6 +4992,40 @@ export class MeshEditorService {
   /* =========================================================================
      14. EXPORTING
      ========================================================================= */
+  public isNodeSelectedForExport(node: any, selectedNodes: any[]): boolean {
+    if (!node) return false;
+    const selectedSet = new Set(selectedNodes);
+    if (selectedSet.has(node)) return true;
+
+    // Check if any ancestor is in selectedSet (child of selected parent/group)
+    let parent = node.parent;
+    while (parent) {
+      if (selectedSet.has(parent)) return true;
+      parent = parent.parent;
+    }
+
+    // Check if any descendant is in selectedSet (parent/group of selected child)
+    const hasSelectedDescendant = (n: any): boolean => {
+      if (!n || !n.getChildren) return false;
+      for (const child of n.getChildren()) {
+        if (selectedSet.has(child) || hasSelectedDescendant(child)) return true;
+      }
+      return false;
+    };
+
+    return hasSelectedDescendant(node);
+  }
+
+  public shouldExportNode(node: any, selectedOnly: boolean = false): boolean {
+    if (!node) return false;
+    if (node.isDisposed && node.isDisposed()) return false;
+    if (this.isEditorHelper(node)) return false;
+    if (node.isEnabled && !node.isEnabled(true)) return false;
+    if (node instanceof AbstractMesh && !this.importedMeshes.includes(node as Mesh)) return false;
+    if (selectedOnly && !this.isNodeSelectedForExport(node, this.selectedNodes)) return false;
+    return true;
+  }
+
   public async exportCurrentModel(options?: Partial<ExportOptions>): Promise<void> {
     const opts: ExportOptions = {
       format: (options?.format || this.exportParams.format || 'glb') as ExportOptions['format'],
@@ -5002,11 +5036,7 @@ export class MeshEditorService {
     const format = opts.format.toLowerCase() as ExportOptions['format'];
     this.events.onStatusChanged?.(`Exporting as ${format.toUpperCase()}...`, true);
 
-    const shouldExport = (node: any) => {
-      if (this.isEditorHelper(node)) return false;
-      if (opts.selectedOnly && !this.selectedNodes.includes(node)) return false;
-      return true;
-    };
+    const shouldExport = (node: any) => this.shouldExportNode(node, opts.selectedOnly);
 
     try {
       let exportedBlob: Blob | null = null;
@@ -5104,14 +5134,12 @@ export class MeshEditorService {
           if (!node) continue;
           originalDoNotSerialize.set(node, !!node.doNotSerialize);
           if (
-            this.isEditorHelper(node) ||
+            !this.shouldExportNode(node, opts.selectedOnly) ||
             node === this.gridMesh ||
             node === this.camera ||
             node === this.ambientLight ||
             node === this.sunLight
           ) {
-            node.doNotSerialize = true;
-          } else if (opts.selectedOnly && !this.selectedNodes.includes(node)) {
             node.doNotSerialize = true;
           }
         }
@@ -5155,7 +5183,7 @@ export class MeshEditorService {
   }
 
   public async exportToGLBBlob(filename: string = 'model'): Promise<Blob> {
-    const shouldExport = (node: any) => !this.isEditorHelper(node);
+    const shouldExport = (node: any) => this.shouldExportNode(node, false);
     const glb = await GLTF2Export.GLBAsync(this.scene, filename, {
       shouldExportNode: shouldExport,
     });

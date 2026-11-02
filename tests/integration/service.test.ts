@@ -621,5 +621,72 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
       expect(service.voxelPainter.blocks.has('0,1,0')).toBe(true);
       expect(service.voxelPainter.blocks.has('1,0,0')).toBe(true);
     });
+
+    it('excludes deleted meshes when exporting GLTF/GLB and restores them on undo', async () => {
+      service.clearModel();
+
+      const boxA = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box', name: 'MeshAlpha' }));
+      const boxB = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box', name: 'MeshBeta' }));
+
+      expect(service.importedMeshes).toContain(boxA);
+      expect(service.importedMeshes).toContain(boxB);
+
+      // Delete boxB
+      service.selectMesh(boxB);
+      service.deleteSelected();
+
+      expect(service.importedMeshes).not.toContain(boxB);
+      expect(boxB.isEnabled()).toBe(false);
+
+      let exportedBlob: Blob | null = null;
+      let exportedFormat = '';
+      service.events.onExportModel = async (blob, filename, format) => {
+        exportedBlob = blob;
+        exportedFormat = format;
+        return true;
+      };
+
+      // Export as GLTF to inspect JSON node graph
+      await service.exportCurrentModel({ format: 'gltf', filename: 'clean_export' });
+
+      expect(exportedFormat).toBe('gltf');
+      expect(exportedBlob).not.toBeNull();
+
+      const jsonText = await (exportedBlob as unknown as Blob).text();
+      const parsed = JSON.parse(jsonText);
+      const nodeNames = (parsed.nodes || []).map((n: any) => n.name);
+
+      expect(nodeNames).toContain(boxA.name);
+      expect(nodeNames).not.toContain(boxB.name);
+
+      // Verify shouldExportNode directly
+      expect(service.shouldExportNode(boxA)).toBe(true);
+      expect(service.shouldExportNode(boxB)).toBe(false);
+
+      // Undo deletion and verify boxB is restored
+      service.undo();
+      expect(service.importedMeshes).toContain(boxB);
+      expect(boxB.isEnabled()).toBe(true);
+      expect(service.shouldExportNode(boxB)).toBe(true);
+
+      exportedBlob = null;
+      await service.exportCurrentModel({ format: 'gltf', filename: 'restored_export' });
+      const jsonRestored = JSON.parse(await (exportedBlob as unknown as Blob).text());
+      const restoredNodeNames = (jsonRestored.nodes || []).map((n: any) => n.name);
+      expect(restoredNodeNames).toContain(boxA.name);
+      expect(restoredNodeNames).toContain(boxB.name);
+
+      // Verify selectedOnly scope
+      service.selectNodes([boxA]);
+      expect(service.shouldExportNode(boxA, true)).toBe(true);
+      expect(service.shouldExportNode(boxB, true)).toBe(false);
+
+      exportedBlob = null;
+      await service.exportCurrentModel({ format: 'gltf', filename: 'selected_only', selectedOnly: true });
+      const jsonSelected = JSON.parse(await (exportedBlob as unknown as Blob).text());
+      const selectedNodeNames = (jsonSelected.nodes || []).map((n: any) => n.name);
+      expect(selectedNodeNames).toContain(boxA.name);
+      expect(selectedNodeNames).not.toContain(boxB.name);
+    });
   });
 });
