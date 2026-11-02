@@ -1,6 +1,10 @@
 export type ProceduralTextureType =
   | 'wood'
   | 'stone'
+  | 'sand'
+  | 'tiles'
+  | 'grass'
+  | 'fabric'
   | 'marble'
   | 'brick'
   | 'metal'
@@ -68,6 +72,10 @@ export function generateProceduralTextureDataUrl(opts: ProceduralTextureOptions)
     const defaults: Record<ProceduralTextureType, [string, string]> = {
       wood: ['#8b5a2b', '#5c3a1b'],
       stone: ['#888c94', '#585c64'],
+      sand: ['#c2b280', '#9c8c5a'],
+      tiles: ['#e2e8f0', '#94a3b8'],
+      grass: ['#4d7c0f', '#2d5a07'],
+      fabric: ['#3b82f6', '#1d4ed8'],
       marble: ['#f0eee9', '#9aa0a8'],
       brick: ['#a64232', '#c8c2b8'],
       metal: ['#9aa2ad', '#626a75'],
@@ -95,6 +103,36 @@ export function generateProceduralTextureDataUrl(opts: ProceduralTextureOptions)
           case 'wood': {
             const n = smoothNoise(nx * 8, ny * 2) * 0.35;
             t = 0.5 + 0.5 * Math.sin((nx * 18 + n * 6) * Math.PI * 2);
+            break;
+          }
+          case 'sand': {
+            const grain = pseudoNoise(x, y) * 0.45;
+            const wave = smoothNoise(nx * 8, ny * 4) * 0.35;
+            const ripple = 0.5 + 0.5 * Math.sin((nx * 14 + wave * 3) * Math.PI * 2);
+            t = Math.min(1, Math.max(0, grain * 0.5 + ripple * 0.3 + wave * 0.2));
+            break;
+          }
+          case 'tiles': {
+            const count = Math.max(2, Math.round(6 * scale));
+            const step = size / count;
+            const border = 3;
+            const isGrout = x % step < border || y % step < border;
+            const n = (smoothNoise(x * 0.1, y * 0.1) - 0.5) * 0.1;
+            t = isGrout ? 1.0 : Math.min(1, Math.max(0, 0.2 + n));
+            break;
+          }
+          case 'grass': {
+            const n1 = smoothNoise(nx * 16, ny * 16) * 0.5;
+            const n2 = smoothNoise(nx * 32, ny * 32) * 0.3;
+            const blades = pseudoNoise(x, y) * 0.2;
+            t = Math.min(1, Math.max(0, n1 + n2 + blades));
+            break;
+          }
+          case 'fabric': {
+            const freq = Math.max(4, Math.round(30 * scale));
+            const wx = Math.sin((x / size) * freq * Math.PI * 2);
+            const wy = Math.sin((y / size) * freq * Math.PI * 2);
+            t = 0.5 + 0.25 * wx - 0.25 * wy;
             break;
           }
           case 'stone':

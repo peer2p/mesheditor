@@ -16,4 +16,11 @@ export * from './DeleteMeshTool';
 export * from './BuildVoxelMeshTool';
 export * from './ExecuteBabylonCodeTool';
 export * from './VoxelPainterTool';
+export * from './SolidifyMeshTool';
+export * from './SubdivideMeshTool';
+export * from './SubDSmoothTool';
+export * from './FacetExtrudeTool';
+export * from './FacetInsetTool';
+export * from './FacetArcTool';
+export * from './FacetCutThroughTool';
 

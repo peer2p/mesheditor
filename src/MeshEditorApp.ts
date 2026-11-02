@@ -53,6 +53,7 @@ import {
   AlertCircle,
   AlertTriangle,
   AppWindow,
+  ArrowLeft,
   Bot,
   Box,
   Boxes,
@@ -138,6 +139,7 @@ export const editorIcons = {
   AlertCircle,
   AlertTriangle,
   AppWindow,
+  ArrowLeft,
   Bot,
   Box,
   Boxes,
@@ -3802,6 +3804,58 @@ export class MeshEditorApp {
   /* =========================================================================
      AI MESH AGENT UI (TEXT/IMAGE TO MESH & MESH UPDATE)
      ========================================================================= */
+  public renderAISkills(): void {
+    const skillsList = this.getElement<HTMLElement>('aiSkillsList');
+    if (!skillsList) return;
+    const skills = this.service.aiAgent.getSkills();
+    skillsList.innerHTML = '';
+    for (const skill of skills) {
+      const checked = skill.enabled;
+      const label = document.createElement('label');
+      label.className = 'ai-skill-item';
+      label.title = skill.description;
+      label.innerHTML = `
+        <input type="checkbox" data-skill-id="${skill.id}" ${checked ? 'checked' : ''} />
+        <span class="ai-skill-info">
+          <span class="ai-skill-name">${skill.name}</span>
+          <span class="ai-skill-desc">${skill.description}</span>
+        </span>
+      `;
+      const checkbox = label.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+      checkbox?.addEventListener('change', () => {
+        this.service.aiAgent.setSkillEnabled(skill.id, !!checkbox.checked);
+      });
+      skillsList.appendChild(label);
+    }
+  }
+
+  public toggleAISettings(forceOpen?: boolean): void {
+    const settingsPanel = this.getElement<HTMLElement>('aiSettingsPanel');
+    const agentBody = this.getElement<HTMLElement>('aiAgentBody');
+    const dialogTitleText = this.getElement<HTMLElement>('aiDialogTitleText');
+    const btnSettingsToggle = this.getElement<HTMLButtonElement>('btnAISettingsToggle');
+    if (!settingsPanel) return;
+
+    const isHidden = settingsPanel.style.display === 'none' || settingsPanel.style.display === '';
+    const willOpen = forceOpen !== undefined ? forceOpen : isHidden;
+
+    if (willOpen) {
+      this.service.aiAgent.reloadSkills();
+      this.renderAISkills();
+      settingsPanel.style.display = 'flex';
+      if (agentBody) agentBody.style.display = 'none';
+      btnSettingsToggle?.classList.add('active');
+      btnSettingsToggle?.setAttribute('title', 'Back to Chat & Generation');
+      if (dialogTitleText) dialogTitleText.textContent = 'AI Agent Settings';
+    } else {
+      settingsPanel.style.display = 'none';
+      if (agentBody) agentBody.style.display = 'flex';
+      btnSettingsToggle?.classList.remove('active');
+      btnSettingsToggle?.setAttribute('title', 'Configure OpenAI-Compatible Endpoint & Skills');
+      if (dialogTitleText) dialogTitleText.textContent = 'AI Mesh Agent';
+    }
+  }
+
   private initAIAgentUI(): void {
     const endpointInput = this.getElement<HTMLInputElement>('aiEndpointUrlInput');
     const apiKeyInput = this.getElement<HTMLInputElement>('aiApiKeyInput');
@@ -3816,6 +3870,12 @@ export class MeshEditorApp {
     const promptInput = this.getElement<HTMLTextAreaElement>('aiPromptInput');
     const imageFileInput = this.getElement<HTMLInputElement>('aiImageFileInput');
     const chatLog = this.getElement<HTMLElement>('aiChatLog');
+    const minPolyInput = this.getElement<HTMLInputElement>('aiMinPolyInput');
+    const minPolyVal = this.getElement<HTMLElement>('aiMinPolyVal');
+    const maxPolyInput = this.getElement<HTMLInputElement>('aiMaxPolyInput');
+    const maxPolyVal = this.getElement<HTMLElement>('aiMaxPolyVal');
+    const createTexturesCheck = this.getElement<HTMLInputElement>('aiCreateTexturesCheck');
+    const createTexturesCheckQuick = this.getElement<HTMLInputElement>('aiCreateTexturesCheckQuick');
 
     if (chatLog) {
       if (!chatLog.innerHTML.trim()) {
@@ -3842,35 +3902,19 @@ export class MeshEditorApp {
       const isLocal = isAgy || host.includes('localhost') || host.includes('127.0.0.1');
       const hasKey = !!cfg.apiKey || isLocal;
       const keyStatus = isAgy ? 'Account ✓' : cfg.apiKey ? 'Key ✓' : isLocal ? 'Local' : 'No Key';
+      const minP = cfg.minPolygons ?? 200;
+      const maxP = cfg.maxPolygons ?? 5000;
+      const formatPoly = (n: number) => {
+        if (n >= 1000000) return (n / 1000000).toFixed(n % 1000000 === 0 ? 0 : 1) + 'M';
+        if (n >= 1000) return (n / 1000).toFixed(n % 1000 === 0 ? 0 : 1) + 'k';
+        return String(n);
+      };
+      const polySummary = `${formatPoly(minP)}–${formatPoly(maxP)}p`;
       if (endpointBadge) {
-        endpointBadge.textContent = `${cfg.model} • ${host} (${keyStatus})`;
+        endpointBadge.textContent = `${cfg.model} • ${polySummary} • ${host} (${keyStatus})`;
       }
       if (endpointDot) {
         endpointDot.classList.toggle('is-ready', hasKey);
-      }
-    };
-
-    const renderSkills = () => {
-      if (!skillsList) return;
-      const skills = this.service.aiAgent.getSkills();
-      skillsList.innerHTML = '';
-      for (const skill of skills) {
-        const checked = skill.enabled;
-        const label = document.createElement('label');
-        label.className = 'ai-skill-item';
-        label.title = skill.description;
-        label.innerHTML = `
-          <input type="checkbox" data-skill-id="${skill.id}" ${checked ? 'checked' : ''} />
-          <span class="ai-skill-info">
-            <span class="ai-skill-name">${skill.name}</span>
-            <span class="ai-skill-desc">${skill.description}</span>
-          </span>
-        `;
-        const checkbox = label.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
-        checkbox?.addEventListener('change', () => {
-          this.service.aiAgent.setSkillEnabled(skill.id, !!checkbox.checked);
-        });
-        skillsList.appendChild(label);
       }
     };
 
@@ -3879,35 +3923,83 @@ export class MeshEditorApp {
     if (endpointInput) endpointInput.value = initialConfig.baseUrl;
     if (apiKeyInput) apiKeyInput.value = initialConfig.apiKey;
     if (modelInput) modelInput.value = initialConfig.model;
+
+    if (minPolyInput) {
+      minPolyInput.value = String(initialConfig.minPolygons ?? 200);
+      if (minPolyVal) minPolyVal.textContent = Number(minPolyInput.value).toLocaleString();
+      minPolyInput.addEventListener('input', () => {
+        const val = Number(minPolyInput.value);
+        if (minPolyVal) minPolyVal.textContent = val.toLocaleString();
+        if (maxPolyInput && Number(maxPolyInput.value) < val) {
+          maxPolyInput.value = String(val);
+          if (maxPolyVal) maxPolyVal.textContent = val.toLocaleString();
+        }
+      });
+    }
+
+    if (maxPolyInput) {
+      maxPolyInput.value = String(initialConfig.maxPolygons ?? 5000);
+      if (maxPolyVal) maxPolyVal.textContent = Number(maxPolyInput.value).toLocaleString();
+      maxPolyInput.addEventListener('input', () => {
+        const val = Number(maxPolyInput.value);
+        if (maxPolyVal) maxPolyVal.textContent = val.toLocaleString();
+        if (minPolyInput && Number(minPolyInput.value) > val) {
+          minPolyInput.value = String(val);
+          if (minPolyVal) minPolyVal.textContent = val.toLocaleString();
+        }
+      });
+    }
+
+    const polyChipsContainer = this.getElement('aiMaxPolyChips');
+    polyChipsContainer?.querySelectorAll<HTMLButtonElement>('[data-poly]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const poly = btn.getAttribute('data-poly');
+        if (poly && maxPolyInput) {
+          maxPolyInput.value = poly;
+          maxPolyInput.dispatchEvent(new Event('input'));
+        }
+      });
+    });
+
+    const initialTextures = initialConfig.createTextures !== false;
+    if (createTexturesCheck) createTexturesCheck.checked = initialTextures;
+    if (createTexturesCheckQuick) createTexturesCheckQuick.checked = initialTextures;
+
+    const syncTextures = (enabled: boolean) => {
+      if (createTexturesCheck) createTexturesCheck.checked = enabled;
+      if (createTexturesCheckQuick) createTexturesCheckQuick.checked = enabled;
+      this.service.aiAgent.saveConfig({ createTextures: enabled });
+      updateEndpointBadge();
+    };
+
+    createTexturesCheck?.addEventListener('change', () => {
+      syncTextures(!!createTexturesCheck.checked);
+    });
+    createTexturesCheckQuick?.addEventListener('change', () => {
+      syncTextures(!!createTexturesCheckQuick.checked);
+    });
+
     updateEndpointBadge();
-    renderSkills();
+    this.renderAISkills();
 
     // Refresh dynamic skills from local dev server/bridge if available
     if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
       this.service.aiAgent.fetchSkillsFromApi().then(() => {
-        renderSkills();
+        this.renderAISkills();
       });
     }
 
-    // Toggle settings panel
-    const toggleSettings = (forceOpen?: boolean) => {
-      if (!settingsPanel) return;
-      const isHidden = settingsPanel.style.display === 'none' || settingsPanel.style.display === '';
-      const willOpen = forceOpen !== undefined ? forceOpen : isHidden;
-      if (willOpen) {
-        this.service.aiAgent.reloadSkills();
-        renderSkills();
-      }
-      settingsPanel.style.display = willOpen ? 'block' : 'none';
-    };
-
     this.getElement('btnAISettingsToggle')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      toggleSettings();
+      this.toggleAISettings();
     });
     this.getElement('btnOpenAISettingsInline')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      toggleSettings();
+      this.toggleAISettings(true);
+    });
+    this.getElement('btnCancelAISettings')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleAISettings(false);
     });
 
     // Endpoint presets
@@ -3960,15 +4052,26 @@ export class MeshEditorApp {
 
     // Save settings button
     this.getElement('btnSaveAISettings')?.addEventListener('click', () => {
+      const minVal = minPolyInput ? Math.max(50, Number(minPolyInput.value) || 200) : 200;
+      const maxVal = maxPolyInput ? Math.max(minVal, Number(maxPolyInput.value) || 5000) : 5000;
+      const createTex = createTexturesCheck ? !!createTexturesCheck.checked : true;
+
+      if (createTexturesCheckQuick && createTexturesCheck) {
+        createTexturesCheckQuick.checked = createTexturesCheck.checked;
+      }
+
       this.service.aiAgent.saveConfig({
         baseUrl: endpointInput?.value.trim() || 'https://api.openai.com/v1',
         apiKey: apiKeyInput?.value.trim() || '',
         model: modelInput?.value.trim() || 'gpt-4o',
+        minPolygons: minVal,
+        maxPolygons: maxVal,
+        createTextures: createTex,
       });
       updateEndpointBadge();
       if (settingsStatus) settingsStatus.textContent = 'Saved ✓';
-      toggleSettings(false);
-      this.showToast('AI Agent endpoint configuration saved.', 'success');
+      this.toggleAISettings(false);
+      this.showToast(`AI settings saved (${minVal.toLocaleString()}–${maxVal.toLocaleString()} polys, textures ${createTex ? 'on' : 'off'}).`, 'success');
     });
 
     // Quick prompt chips
@@ -4389,8 +4492,7 @@ export class MeshEditorApp {
 
       // Automatically open endpoint settings if API key or connection failed
       if (errMsg.includes('401') || errMsg.includes('API key') || errMsg.includes('Endpoint')) {
-        const settingsPanel = this.getElement<HTMLElement>('aiSettingsPanel');
-        if (settingsPanel) settingsPanel.style.display = 'block';
+        this.toggleAISettings(true);
       }
     } finally {
       this.aiAbortController = null;

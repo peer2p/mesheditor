@@ -1,6 +1,6 @@
 <div id="dialog-ai-agent" class="floating-dialog" style="top: 64px; left: 660px; width: 380px; z-index: 58">
           <div class="dialog-header">
-            <span class="dialog-title"><i class="app-icon" data-lucide="bot"></i> AI Mesh Agent</span>
+            <span class="dialog-title" id="aiDialogTitle"><i class="app-icon" data-lucide="bot" id="aiDialogTitleIcon"></i> <span id="aiDialogTitleText">AI Mesh Agent</span></span>
             <div class="dialog-actions">
               <button class="dialog-btn" id="btnAISettingsToggle" title="Configure OpenAI-Compatible Endpoint & Skills">
                 <i class="app-icon" data-lucide="settings"></i>
@@ -86,21 +86,84 @@
               <div id="aiSkillsList" class="ai-skills-list"></div>
             </div>
 
-            <div class="ai-settings-actions">
-              <button type="button" class="tool-btn btn-primary" id="btnSaveAISettings" style="width: 100%">
+            <!-- Mesh Generation Constraints -->
+            <div class="ai-settings-title-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+              <span class="ai-settings-title">Mesh Generation & Asset Budget</span>
+            </div>
+
+            <div class="ai-form-group">
+              <div class="ai-slider-header">
+                <label for="aiMinPolyInput">Minimum Polygons</label>
+                <span class="ai-slider-value" id="aiMinPolyVal">200</span>
+              </div>
+              <input
+                type="range"
+                id="aiMinPolyInput"
+                class="ai-slider"
+                min="50"
+                max="5000"
+                step="50"
+                value="200"
+              />
+              <div class="ai-slider-subtext">Ensures sufficient geometric definition for game models.</div>
+            </div>
+
+            <div class="ai-form-group">
+              <div class="ai-slider-header">
+                <label for="aiMaxPolyInput">Maximum Polygons</label>
+                <span class="ai-slider-value" id="aiMaxPolyVal">5,000</span>
+              </div>
+              <input
+                type="range"
+                id="aiMaxPolyInput"
+                class="ai-slider"
+                min="500"
+                max="1000000"
+                step="500"
+                value="5000"
+              />
+              <div class="ai-preset-chips" id="aiMaxPolyChips" style="margin-top: 5px;">
+                <button type="button" class="ai-chip-btn" data-poly="2500">2.5k</button>
+                <button type="button" class="ai-chip-btn" data-poly="5000">5k (Default)</button>
+                <button type="button" class="ai-chip-btn" data-poly="25000">25k</button>
+                <button type="button" class="ai-chip-btn" data-poly="100000">100k</button>
+                <button type="button" class="ai-chip-btn" data-poly="500000">500k</button>
+                <button type="button" class="ai-chip-btn" data-poly="1000000">1M</button>
+              </div>
+              <div class="ai-slider-subtext" style="margin-top: 4px;">Target geometric complexity ceiling (500 to 1,000,000 polygons).</div>
+            </div>
+
+            <div class="ai-form-group">
+              <label class="ai-checkbox-label" for="aiCreateTexturesCheck" style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="aiCreateTexturesCheck" checked />
+                <span><strong>Create Textures</strong></span>
+              </label>
+              <div class="ai-slider-subtext">AI creates PBR textures when checked, otherwise solid PBR colors are used.</div>
+            </div>
+
+            <div class="ai-settings-actions" style="display: flex; gap: 8px;">
+              <button type="button" class="tool-btn" id="btnCancelAISettings" style="flex: 1;">
+                <span class="btn-icon"><i class="app-icon" data-lucide="arrow-left"></i></span>
+                <span class="btn-label">Back</span>
+              </button>
+              <button type="button" class="tool-btn btn-primary" id="btnSaveAISettings" style="flex: 1.5;">
                 <span class="btn-icon"><i class="app-icon" data-lucide="check"></i></span>
-                <span class="btn-label">Save Endpoint Config</span>
+                <span class="btn-label">Save Settings</span>
               </button>
             </div>
           </div>
 
-          <div class="dialog-body ai-agent-body">
+          <div class="dialog-body ai-agent-body" id="aiAgentBody">
             <!-- Status & Mode Bar -->
             <div class="ai-mode-bar">
               <select id="aiActionModeSelect" class="ai-select tool-select" title="Choose how generated meshes interact with current scene">
                 <option value="create_or_update">Create / Update in Scene</option>
                 <option value="replace_scene">Replace Scene (Clear First)</option>
               </select>
+              <label class="ai-checkbox-label" title="Generate procedural and seamless textures on created meshes">
+                <input type="checkbox" id="aiCreateTexturesCheckQuick" checked />
+                <span>Textures</span>
+              </label>
               <label class="ai-checkbox-label" title="Send a screenshot of the current 3D viewport to the vision model">
                 <input type="checkbox" id="aiIncludeViewportCheck" />
                 <span>+ 3D View</span>

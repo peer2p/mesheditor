@@ -101,11 +101,11 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
   });
 
   describe('2. ToolRegistry Management', () => {
-    it('initializes default registry with all 18 built-in modeling tools', () => {
+    it('initializes default registry with all 25 built-in modeling tools', () => {
       const registry = createDefaultToolRegistry();
       const allTools = registry.getAll();
 
-      expect(allTools.length).toBe(18);
+      expect(allTools.length).toBe(25);
       expect(registry.has('modeler_get_scene_info')).toBe(true);
       expect(registry.has('modeler_create_primitive')).toBe(true);
       expect(registry.has('modeler_extrude_polygon')).toBe(true);
@@ -124,9 +124,16 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       expect(registry.has('modeler_build_voxel_mesh')).toBe(true);
       expect(registry.has('modeler_paint_voxels')).toBe(true);
       expect(registry.has('modeler_execute_babylon_code')).toBe(true);
+      expect(registry.has('modeler_solidify_mesh')).toBe(true);
+      expect(registry.has('modeler_subdivide_mesh')).toBe(true);
+      expect(registry.has('modeler_subd_smooth')).toBe(true);
+      expect(registry.has('modeler_facet_extrude')).toBe(true);
+      expect(registry.has('modeler_facet_inset')).toBe(true);
+      expect(registry.has('modeler_facet_arc')).toBe(true);
+      expect(registry.has('modeler_facet_cut_through')).toBe(true);
 
       const openAiDefs = registry.getOpenAITools();
-      expect(openAiDefs.length).toBe(18);
+      expect(openAiDefs.length).toBe(25);
       expect(openAiDefs.every((d) => d.type === 'function' && typeof d.function.name === 'string')).toBe(true);
     });
 
@@ -546,6 +553,180 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       const customBtn = menuTools!.querySelector('#btnToggleCustomProceduralTool') as HTMLButtonElement | null;
       expect(customBtn).not.toBeNull();
       expect(customBtn?.textContent).toContain('Procedural Generator');
+    });
+  });
+
+  describe('5. Facet & Box Modeling Builtin AI Tools', () => {
+    it('solidifies an open mesh sheet with real physical wall thickness', async () => {
+      // Create a test box
+      const box = MeshBuilder.CreateBox('test_box', { size: 1 }, service.scene);
+      service.importedMeshes.push(box);
+      const initialVerts = box.getTotalVertices();
+
+      const result = await service.aiAgent.executeToolCall('modeler_solidify_mesh', {
+        meshName: 'test_box',
+        thickness: 0.15,
+      });
+
+      const parsed = JSON.parse(result);
+      expect(parsed.status).toBe('ok');
+      expect(parsed.meshName).toBe('test_box');
+      expect(parsed.totalVertices).toBeGreaterThan(initialVerts);
+      expect(parsed.thickness).toBe(0.15);
+    });
+
+    it('subdivides mesh faces into equilateral subtriangles', async () => {
+      const box = MeshBuilder.CreateBox('subdiv_box', { size: 1 }, service.scene);
+      service.importedMeshes.push(box);
+      const initialIndices = box.getTotalIndices(); // 36 indices = 12 triangles
+
+      const result = await service.aiAgent.executeToolCall('modeler_subdivide_mesh', {
+        meshName: 'subdiv_box',
+        iterations: 1,
+      });
+
+      const parsed = JSON.parse(result);
+      expect(parsed.status).toBe('ok');
+      expect(parsed.totalIndices).toBe(initialIndices * 4); // 48 triangles = 144 indices
+    });
+
+    it('applies Sub-D smoothing with midpoint subdivision and Laplacian relaxation', async () => {
+      const box = MeshBuilder.CreateBox('smooth_cage', { size: 2 }, service.scene);
+      service.importedMeshes.push(box);
+      const initialVerts = box.getTotalVertices();
+
+      const result = await service.aiAgent.executeToolCall('modeler_subd_smooth', {
+        meshName: 'smooth_cage',
+        iterations: 2,
+      });
+
+      const parsed = JSON.parse(result);
+      expect(parsed.status).toBe('ok');
+      expect(parsed.meshName).toBe('smooth_cage');
+      expect(parsed.totalVertices).toBeGreaterThan(initialVerts);
+    });
+
+    it('extrudes a facet along normal with connecting side quads', async () => {
+      const box = MeshBuilder.CreateBox('extrude_tower', { size: 1 }, service.scene);
+      service.importedMeshes.push(box);
+      const initialVerts = box.getTotalVertices();
+
+      const result = await service.aiAgent.executeToolCall('modeler_facet_extrude', {
+        meshName: 'extrude_tower',
+        direction: 'top',
+        distance: 0.8,
+      });
+
+      const parsed = JSON.parse(result);
+      expect(parsed.status).toBe('ok');
+      expect(parsed.faceDirection).toBe('top');
+      expect(parsed.distance).toBe(0.8);
+      expect(parsed.totalVertices).toBeGreaterThan(initialVerts);
+    });
+
+    it('insets a facet toward centroid with depth offset', async () => {
+      const box = MeshBuilder.CreateBox('inset_window', { size: 1 }, service.scene);
+      service.importedMeshes.push(box);
+      const initialVerts = box.getTotalVertices();
+
+      const result = await service.aiAgent.executeToolCall('modeler_facet_inset', {
+        meshName: 'inset_window',
+        direction: 'front',
+        insetAmount: 0.2,
+        depth: -0.1,
+      });
+
+      const parsed = JSON.parse(result);
+      expect(parsed.status).toBe('ok');
+      expect(parsed.faceDirection).toBe('front');
+      expect(parsed.insetAmount).toBe(0.2);
+      expect(parsed.depth).toBe(-0.1);
+      expect(parsed.totalVertices).toBeGreaterThan(initialVerts);
+    });
+
+    it('extrudes a facet along a curved circular arch', async () => {
+      const box = MeshBuilder.CreateBox('arch_bridge', { size: 1 }, service.scene);
+      service.importedMeshes.push(box);
+      const initialVerts = box.getTotalVertices();
+
+      const result = await service.aiAgent.executeToolCall('modeler_facet_arc', {
+        meshName: 'arch_bridge',
+        direction: 'top',
+        segments: 4,
+        height: 0.6,
+      });
+
+      const parsed = JSON.parse(result);
+      expect(parsed.status).toBe('ok');
+      expect(parsed.segments).toBe(4);
+      expect(parsed.height).toBe(0.6);
+      expect(parsed.totalVertices).toBeGreaterThan(initialVerts);
+    });
+
+    it('punches a cut-through portal into a mesh', async () => {
+      const box = MeshBuilder.CreateBox('portal_wall', { size: 1 }, service.scene);
+      service.importedMeshes.push(box);
+      const initialVerts = box.getTotalVertices();
+
+      const result = await service.aiAgent.executeToolCall('modeler_facet_cut_through', {
+        meshName: 'portal_wall',
+        direction: 'front',
+        depth: 0.5,
+      });
+
+      const parsed = JSON.parse(result);
+      expect(parsed.status).toBe('ok');
+      expect(parsed.depth).toBe(0.5);
+      expect(parsed.totalVertices).toBeGreaterThan(initialVerts);
+    });
+
+    it('generates seamless sand procedural texture and sets up tiling', async () => {
+      const result = await service.aiAgent.executeToolCall('modeler_create_material', {
+        materialName: 'DesertSandMat',
+        roughness: 0.9,
+        metallic: 0.0,
+        uScale: 3,
+        vScale: 3,
+        proceduralTexture: {
+          type: 'sand',
+          primaryColor: '#c2b280',
+          secondaryColor: '#9c8c5a',
+          scale: 1.5,
+        },
+      });
+
+      const parsed = JSON.parse(result);
+      expect(parsed.status).toBe('ok');
+      expect(parsed.materialName).toBe('DesertSandMat');
+
+      const mat = service.scene.getMaterialByName('DesertSandMat') as any;
+      expect(mat).toBeDefined();
+      expect(mat.roughness).toBe(0.9);
+      expect(mat.albedoTexture).toBeDefined();
+      expect(mat.albedoTexture.uScale).toBe(3);
+      expect(mat.albedoTexture.vScale).toBe(3);
+    });
+
+    it('applies direct image texture URL and tiling to PBR material', async () => {
+      const fakeDataUrl =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=';
+
+      const result = await service.aiAgent.executeToolCall('modeler_create_material', {
+        materialName: 'AiGeneratedSandMat',
+        textureUrl: fakeDataUrl,
+        uScale: 5,
+        vScale: 5,
+        roughness: 0.95,
+      });
+
+      const parsed = JSON.parse(result);
+      expect(parsed.status).toBe('ok');
+
+      const mat = service.scene.getMaterialByName('AiGeneratedSandMat') as any;
+      expect(mat).toBeDefined();
+      expect(mat.albedoTexture).toBeDefined();
+      expect(mat.albedoTexture.uScale).toBe(5);
+      expect(mat.albedoTexture.vScale).toBe(5);
     });
   });
 });

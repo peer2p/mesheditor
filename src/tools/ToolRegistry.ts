@@ -19,6 +19,13 @@ import {
   SeparateMeshTool,
   TransformMeshTool,
   VoxelPainterTool,
+  SolidifyMeshTool,
+  SubdivideMeshTool,
+  SubDSmoothTool,
+  FacetExtrudeTool,
+  FacetInsetTool,
+  FacetArcTool,
+  FacetCutThroughTool,
 } from './builtin';
 
 /**
@@ -121,6 +128,13 @@ export function createDefaultToolRegistry(): ToolRegistry {
     new BuildVoxelMeshTool(),
     new ExecuteBabylonCodeTool(),
     new VoxelPainterTool(),
+    new SolidifyMeshTool(),
+    new SubdivideMeshTool(),
+    new SubDSmoothTool(),
+    new FacetExtrudeTool(),
+    new FacetInsetTool(),
+    new FacetArcTool(),
+    new FacetCutThroughTool(),
   ]);
 }
 

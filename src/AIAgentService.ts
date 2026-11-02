@@ -57,6 +57,9 @@ export const DEFAULT_AI_AGENT_CONFIG: AIAgentEndpointConfig = {
   model: 'gemini-3.8-flash-medium',
   temperature: 0.2,
   maxIterations: 12,
+  minPolygons: 200,
+  maxPolygons: 5000,
+  createTextures: true,
 };
 
 export interface EndpointPreset {
@@ -233,6 +236,12 @@ export class AIAgentService {
           typeof parsed.temperature === 'number' ? parsed.temperature : DEFAULT_AI_AGENT_CONFIG.temperature,
         maxIterations:
           typeof parsed.maxIterations === 'number' ? parsed.maxIterations : DEFAULT_AI_AGENT_CONFIG.maxIterations,
+        minPolygons:
+          typeof parsed.minPolygons === 'number' ? parsed.minPolygons : DEFAULT_AI_AGENT_CONFIG.minPolygons,
+        maxPolygons:
+          typeof parsed.maxPolygons === 'number' ? parsed.maxPolygons : DEFAULT_AI_AGENT_CONFIG.maxPolygons,
+        createTextures:
+          typeof parsed.createTextures === 'boolean' ? parsed.createTextures : DEFAULT_AI_AGENT_CONFIG.createTextures,
       };
     } catch {
       return {};
@@ -543,6 +552,14 @@ export class AIAgentService {
 
     const sceneStateJson = JSON.stringify(this.buildSceneSummary(), null, 2);
 
+    const minPoly = typeof this.config.minPolygons === 'number' ? this.config.minPolygons : 200;
+    const maxPoly = typeof this.config.maxPolygons === 'number' ? this.config.maxPolygons : 5000;
+    const createTextures = this.config.createTextures !== false;
+
+    const textureRule = createTextures
+      ? `3. **Colors & Materials**: Assign appropriate PBR colors (\`color\` / \`albedoColor\`, \`roughness\`, \`metallic\`) or procedural textures (\`proceduralTexture\` in \`modeler_create_material\`) to each created part so the model looks detailed and polished right away.`
+      : `3. **Colors & Materials (Textures DISABLED)**: Texturing is turned OFF by the user. Do NOT generate or apply procedural or image textures (\`proceduralTexture\` / \`textureUrl\`). Use ONLY solid PBR colors (\`color\` / \`albedoColor\`, \`roughness\`, \`metallic\`).`;
+
     return `You are the built-in 3D AI Mesh Agent in **Mesh Editor**.
 Your mission is to procedurally build high-quality 3D meshes or accurately update existing meshes directly in the active Babylon.js 3D scene from text prompts and/or reference images ("Text-to-Mesh", "Image-to-Mesh", "Text/Image-to-Mesh Update").
 
@@ -558,9 +575,13 @@ ${sceneStateJson}
 ## Key Execution Rules
 1. **Actively call the provided tools** to create or modify geometry in the scene! Never reply with text alone when the user requests a 3D model or modification.
 2. **Descriptive Naming**: Give every created mesh and material a meaningful name (e.g., \`"stone_pillar_base"\`, \`"gear_wheel"\`, \`"oak_wood_mat"\`).
-3. **Colors & Materials**: Assign appropriate PBR colors (\`color\` / \`albedoColor\`, \`roughness\`, \`metallic\`) or procedural textures (\`proceduralTexture\` in \`modeler_create_material\`) to each created part so the model looks detailed and polished right away.
+${textureRule}
 4. **Complex Geometries**: For complex, parametric, or multi-loop models (e.g. gears, multi-column temples, stairs, detailed furniture/castles/vehicles), you can either combine multiple tool calls or use \`modeler_execute_babylon_code\`.
-5. **Concise Summary at the End**: When all tool calls are completed, explain concisely to the user what you built or updated.`;
+5. **Concise Summary at the End**: When all tool calls are completed, explain concisely to the user what you built or updated.
+6. **Polygon Budget & Detail Target (Game Asset)**:
+   - Target Polygon Budget: **${minPoly.toLocaleString()} to ${maxPoly.toLocaleString()} triangles**.
+   - **Minimum Polygons (${minPoly.toLocaleString()})**: Ensure the asset has sufficient geometric definition, bevels, segments, or facets to meet or exceed this baseline without being an oversimplified flat shape.
+   - **Maximum Polygons (${maxPoly.toLocaleString()})**: Do NOT exceed this limit! Use clean game-ready topology and keep the total triangle count strictly within this budget.`;
   }
 
   /* =========================================================================

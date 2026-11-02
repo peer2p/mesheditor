@@ -21,13 +21,37 @@ export class CreateMaterialTool extends AbstractTool {
       bumpLevel: { type: 'number', description: 'Bump / normal map intensity (0.0 to 5.0, default 1.0).' },
       invertNormalMapX: { type: 'boolean', description: 'Invert normal map X axis.' },
       invertNormalMapY: { type: 'boolean', description: 'Invert normal map Y axis (DirectX standard).' },
+      textureUrl: {
+        type: 'string',
+        description: 'Optional URL or data:image base64 URI for diffuse/albedo texture (from image generator or web asset).',
+      },
+      bumpTextureUrl: {
+        type: 'string',
+        description: 'Optional URL or data:image base64 URI for normal/bump map texture.',
+      },
+      uScale: { type: 'number', description: 'Horizontal texture tiling multiplier (default: 1.0).' },
+      vScale: { type: 'number', description: 'Vertical texture tiling multiplier (default: 1.0).' },
       proceduralTexture: {
         type: 'object',
         description: 'Optional generated procedural surface texture.',
         properties: {
           type: {
             type: 'string',
-            enum: ['wood', 'stone', 'marble', 'brick', 'metal', 'checker', 'grid', 'noise', 'gradient'],
+            enum: [
+              'wood',
+              'stone',
+              'sand',
+              'tiles',
+              'grass',
+              'fabric',
+              'marble',
+              'brick',
+              'metal',
+              'checker',
+              'grid',
+              'noise',
+              'gradient',
+            ],
           },
           primaryColor: { type: 'string' },
           secondaryColor: { type: 'string' },
@@ -76,7 +100,28 @@ export class CreateMaterialTool extends AbstractTool {
     }
     mat.backFaceCulling = false;
 
-    if (args.proceduralTexture) {
+    const createTexturesEnabled = context.aiAgent?.config?.createTextures !== false;
+
+    if ((args.textureUrl || args.albedoTextureUrl) && createTexturesEnabled) {
+      const url = String(args.textureUrl || args.albedoTextureUrl);
+      const tex = new Texture(url, context.scene, false, false);
+      tex.uScale = typeof args.uScale === 'number' ? args.uScale : 1;
+      tex.vScale = typeof args.vScale === 'number' ? args.vScale : 1;
+      mat.albedoTexture = tex;
+      if (!args.albedoColor) {
+        mat.albedoColor = new Color3(1, 1, 1);
+      }
+    }
+
+    if (args.bumpTextureUrl && createTexturesEnabled) {
+      const url = String(args.bumpTextureUrl);
+      const tex = new Texture(url, context.scene, false, false);
+      tex.uScale = typeof args.uScale === 'number' ? args.uScale : 1;
+      tex.vScale = typeof args.vScale === 'number' ? args.vScale : 1;
+      mat.bumpTexture = tex;
+    }
+
+    if (args.proceduralTexture && createTexturesEnabled) {
       const proc =
         typeof args.proceduralTexture === 'string'
           ? { type: args.proceduralTexture, uScale: args.uScale, vScale: args.vScale }

@@ -2891,6 +2891,214 @@ export class MeshEditorService {
     return [i0, i1, i2];
   }
 
+  public selectFace(mesh: Mesh, faceId: number): boolean {
+    const indices = mesh.getIndices();
+    if (!indices || faceId < 0 || faceId * 3 + 2 >= indices.length) return false;
+    this.selectMesh(mesh);
+    this.selectedFaceId = faceId;
+    this.highlightFace(mesh, faceId);
+    const quad = this.getQuadFaceInfo(mesh, faceId);
+    this.events.onFaceSelected?.(faceId, !!quad);
+    return true;
+  }
+
+  public findFaceId(
+    mesh: Mesh,
+    query: {
+      faceId?: number;
+      direction?: string;
+      normal?: { x: number; y: number; z: number } | [number, number, number];
+      point?: { x: number; y: number; z: number } | [number, number, number];
+    }
+  ): number | null {
+    const indices = mesh.getIndices();
+    const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+    if (!indices || !positions || indices.length < 3) return null;
+
+    if (query.faceId !== undefined && query.faceId !== null) {
+      const fid = Math.floor(Number(query.faceId));
+      if (fid >= 0 && fid * 3 + 2 < indices.length) return fid;
+    }
+
+    mesh.computeWorldMatrix(true);
+    const wm = mesh.getWorldMatrix();
+    const triCount = Math.floor(indices.length / 3);
+
+    // If query by point
+    if (query.point) {
+      const p = Array.isArray(query.point)
+        ? new Vector3(query.point[0], query.point[1], query.point[2])
+        : new Vector3(query.point.x, query.point.y, query.point.z);
+
+      let closestFid = 0;
+      let minDistSq = Infinity;
+
+      for (let t = 0; t < triCount; t++) {
+        const i0 = indices[t * 3];
+        const i1 = indices[t * 3 + 1];
+        const i2 = indices[t * 3 + 2];
+        const p0 = Vector3.TransformCoordinates(
+          new Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]),
+          wm
+        );
+        const p1 = Vector3.TransformCoordinates(
+          new Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]),
+          wm
+        );
+        const p2 = Vector3.TransformCoordinates(
+          new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]),
+          wm
+        );
+        const centroid = p0.add(p1).add(p2).scale(1 / 3);
+        const dSq = Vector3.DistanceSquared(centroid, p);
+        if (dSq < minDistSq) {
+          minDistSq = dSq;
+          closestFid = t;
+        }
+      }
+      return closestFid;
+    }
+
+    // Target normal resolution
+    let targetNormal: Vector3 | null = null;
+    if (query.normal) {
+      targetNormal = Array.isArray(query.normal)
+        ? new Vector3(query.normal[0], query.normal[1], query.normal[2]).normalize()
+        : new Vector3(query.normal.x, query.normal.y, query.normal.z).normalize();
+    } else if (query.direction) {
+      const dir = String(query.direction).trim().toLowerCase();
+      if (dir === 'top' || dir === '+y' || dir === 'up') targetNormal = new Vector3(0, 1, 0);
+      else if (dir === 'bottom' || dir === '-y' || dir === 'down') targetNormal = new Vector3(0, -1, 0);
+      else if (dir === 'front' || dir === '+z' || dir === 'forward' || dir === 'north') targetNormal = new Vector3(0, 0, 1);
+      else if (dir === 'back' || dir === '-z' || dir === 'backward' || dir === 'south') targetNormal = new Vector3(0, 0, -1);
+      else if (dir === 'right' || dir === '+x' || dir === 'east') targetNormal = new Vector3(1, 0, 0);
+      else if (dir === 'left' || dir === '-x' || dir === 'west') targetNormal = new Vector3(-1, 0, 0);
+    }
+
+    if (!targetNormal) return 0; // Default to first face if unspecified
+
+    let bestFid = 0;
+    let bestScore = -Infinity;
+
+    for (let t = 0; t < triCount; t++) {
+      const i0 = indices[t * 3];
+      const i1 = indices[t * 3 + 1];
+      const i2 = indices[t * 3 + 2];
+      const p0 = Vector3.TransformCoordinates(
+        new Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]),
+        wm
+      );
+      const p1 = Vector3.TransformCoordinates(
+        new Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]),
+        wm
+      );
+      const p2 = Vector3.TransformCoordinates(
+        new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]),
+        wm
+      );
+
+      const cross = Vector3.Cross(p2.subtract(p0), p1.subtract(p0));
+      const len = cross.length();
+      if (len < 1e-6) continue;
+      const normal = cross.scale(1 / len);
+      const centroid = p0.add(p1).add(p2).scale(1 / 3);
+
+      const alignment = Vector3.Dot(normal, targetNormal);
+      const distAlong = Vector3.Dot(centroid, targetNormal);
+      const score = alignment * 1000 + distAlong;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestFid = t;
+      }
+    }
+
+    return bestFid;
+  }
+
+  public selectFaceByQuery(
+    mesh: Mesh,
+    query: {
+      faceId?: number;
+      direction?: string;
+      normal?: { x: number; y: number; z: number } | [number, number, number];
+      point?: { x: number; y: number; z: number } | [number, number, number];
+    }
+  ): number | null {
+    const fid = this.findFaceId(mesh, query);
+    if (fid !== null) {
+      this.selectFace(mesh, fid);
+      return fid;
+    }
+    return null;
+  }
+
+  public extrudeFacet(
+    mesh: Mesh,
+    faceQuery?: { faceId?: number; direction?: string; normal?: any; point?: any },
+    distance: number = 0.5
+  ): boolean {
+    if (faceQuery) {
+      const fid = this.selectFaceByQuery(mesh, faceQuery);
+      if (fid === null) return false;
+    } else if (this.selectedMesh !== mesh || this.selectedFaceId === null) {
+      const fid = this.selectFaceByQuery(mesh, { direction: 'top' });
+      if (fid === null) return false;
+    }
+    this.extrudeSelectedFacet(distance);
+    return true;
+  }
+
+  public insetFacet(
+    mesh: Mesh,
+    faceQuery?: { faceId?: number; direction?: string; normal?: any; point?: any },
+    insetAmount: number = 0.25,
+    depth: number = 0.0
+  ): boolean {
+    if (faceQuery) {
+      const fid = this.selectFaceByQuery(mesh, faceQuery);
+      if (fid === null) return false;
+    } else if (this.selectedMesh !== mesh || this.selectedFaceId === null) {
+      const fid = this.selectFaceByQuery(mesh, { direction: 'top' });
+      if (fid === null) return false;
+    }
+    this.insetSelectedFacet(insetAmount, depth);
+    return true;
+  }
+
+  public arcFacet(
+    mesh: Mesh,
+    faceQuery?: { faceId?: number; direction?: string; normal?: any; point?: any },
+    segments: number = 4,
+    height: number = 0.5
+  ): boolean {
+    if (faceQuery) {
+      const fid = this.selectFaceByQuery(mesh, faceQuery);
+      if (fid === null) return false;
+    } else if (this.selectedMesh !== mesh || this.selectedFaceId === null) {
+      const fid = this.selectFaceByQuery(mesh, { direction: 'top' });
+      if (fid === null) return false;
+    }
+    this.arcSelectedFacet(segments, height);
+    return true;
+  }
+
+  public cutThroughFacet(
+    mesh: Mesh,
+    faceQuery?: { faceId?: number; direction?: string; normal?: any; point?: any },
+    depth: number = 1.0
+  ): boolean {
+    if (faceQuery) {
+      const fid = this.selectFaceByQuery(mesh, faceQuery);
+      if (fid === null) return false;
+    } else if (this.selectedMesh !== mesh || this.selectedFaceId === null) {
+      const fid = this.selectFaceByQuery(mesh, { direction: 'front' });
+      if (fid === null) return false;
+    }
+    this.cutThroughSelectedFacet(depth);
+    return true;
+  }
+
   public extrudeSelectedFacet(distance: number = 0.5): void {
     if (!this.selectedMesh || this.selectedFaceId === null) {
       this.events.onToast?.('Please pick a face first.', 'warning');
@@ -3358,12 +3566,13 @@ export class MeshEditorService {
     this.events.onToast?.(`Subdivided "${mesh.name}" (${triCount * 4} triangles)!`, 'success');
   }
 
-  public subDSmoothMeshOrFacet(iterations: number = 1): void {
-    const mesh = this.selectedMesh;
+  public subDSmoothMeshOrFacet(iterations: number = 1, targetMesh?: Mesh): void {
+    const mesh = targetMesh || this.selectedMesh;
     if (!mesh) {
       this.events.onToast?.('Please select a mesh to apply Sub-D smoothing.', 'warning');
       return;
     }
+    this.selectMesh(mesh);
     // Subdivide first
     this.subdivideMesh(mesh);
 
@@ -3421,12 +3630,13 @@ export class MeshEditorService {
     this.events.onToast?.(`Applied Sub-D smooth subdivision to "${mesh.name}"!`, 'success');
   }
 
-  public solidifyMeshOrFacet(thickness: number = 0.2, selectedOnly: boolean = false): void {
-    if (!this.selectedMesh) {
+  public solidifyMeshOrFacet(thickness: number = 0.2, selectedOnly: boolean = false, targetMesh?: Mesh): void {
+    const mesh = targetMesh || this.selectedMesh;
+    if (!mesh) {
       this.events.onToast?.('Please select a mesh to solidify.', 'warning');
       return;
     }
-    const mesh = this.selectedMesh;
+    this.selectMesh(mesh);
     const indices = Array.from(mesh.getIndices() || []);
     const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
     const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);

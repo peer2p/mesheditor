@@ -82,6 +82,9 @@ export interface AIAgentEndpointConfig {
   model: string;
   temperature?: number;
   maxIterations?: number;
+  minPolygons?: number;
+  maxPolygons?: number;
+  createTextures?: boolean;
 }
 
 export interface AIAgentSkillDefinition {

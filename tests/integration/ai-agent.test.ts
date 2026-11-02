@@ -598,6 +598,157 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       app.dispose();
       container.remove();
     });
+
+    it('manages polygon constraints (min/max) and texture generation toggle in config and UI', () => {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const nullEngine = new NullEngine();
+      const app = new MeshEditorApp({ container, engine: nullEngine });
+
+      // Verify default values in service config
+      const defaultCfg = app.service.aiAgent.getConfig();
+      expect(defaultCfg.minPolygons).toBe(200);
+      expect(defaultCfg.maxPolygons).toBe(5000);
+      expect(defaultCfg.createTextures).toBe(true);
+
+      // Verify default system prompt reflects constraints
+      const defaultPrompt = app.service.aiAgent.buildSystemPrompt();
+      expect(defaultPrompt).toContain('200 to 5,000 triangles');
+      expect(defaultPrompt).toContain('Colors & Materials');
+
+      // Verify UI controls exist in DOM
+      const minPolyInput = container.querySelector('#aiMinPolyInput') as HTMLInputElement | null;
+      const minPolyVal = container.querySelector('#aiMinPolyVal') as HTMLElement | null;
+      const maxPolyInput = container.querySelector('#aiMaxPolyInput') as HTMLInputElement | null;
+      const maxPolyVal = container.querySelector('#aiMaxPolyVal') as HTMLElement | null;
+      const createTexturesCheck = container.querySelector('#aiCreateTexturesCheck') as HTMLInputElement | null;
+      const createTexturesCheckQuick = container.querySelector('#aiCreateTexturesCheckQuick') as HTMLInputElement | null;
+
+      expect(minPolyInput).not.toBeNull();
+      expect(minPolyInput?.value).toBe('200');
+      expect(minPolyVal?.textContent).toBe('200');
+
+      expect(maxPolyInput).not.toBeNull();
+      expect(maxPolyInput?.value).toBe('5000');
+      expect(maxPolyVal?.textContent).toBe('5,000');
+
+      expect(createTexturesCheck?.checked).toBe(true);
+      expect(createTexturesCheckQuick?.checked).toBe(true);
+
+      // Change sliders and save settings
+      minPolyInput!.value = '400';
+      minPolyInput!.dispatchEvent(new Event('input'));
+      expect(minPolyVal?.textContent).toBe('400');
+
+      maxPolyInput!.value = '8000';
+      maxPolyInput!.dispatchEvent(new Event('input'));
+      expect(maxPolyVal?.textContent).toBe('8,000');
+
+      createTexturesCheck!.checked = false;
+      const btnSave = container.querySelector('#btnSaveAISettings') as HTMLButtonElement | null;
+      btnSave?.click();
+
+      // Check updated config
+      const updatedCfg = app.service.aiAgent.getConfig();
+      expect(updatedCfg.minPolygons).toBe(400);
+      expect(updatedCfg.maxPolygons).toBe(8000);
+      expect(updatedCfg.createTextures).toBe(false);
+
+      // Check updated prompt
+      const updatedPrompt = app.service.aiAgent.buildSystemPrompt();
+      expect(updatedPrompt).toContain('400 to 8,000 triangles');
+      expect(updatedPrompt).toContain('Textures DISABLED');
+
+      // Check quick checkbox sync
+      expect(createTexturesCheckQuick?.checked).toBe(false);
+      createTexturesCheckQuick?.click();
+      expect(app.service.aiAgent.getConfig().createTextures).toBe(true);
+      expect(createTexturesCheck?.checked).toBe(true);
+
+      app.dispose();
+      container.remove();
+    });
+
+    it('toggles exclusively between Settings panel and Operative Agent GUI and displays all skills without scrollbox limit', () => {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const nullEngine = new NullEngine();
+      const app = new MeshEditorApp({ container, engine: nullEngine });
+
+      const settingsPanel = container.querySelector('#aiSettingsPanel') as HTMLElement | null;
+      const agentBody = container.querySelector('#aiAgentBody') as HTMLElement | null;
+      const btnToggle = container.querySelector('#btnAISettingsToggle') as HTMLButtonElement | null;
+      const btnCancel = container.querySelector('#btnCancelAISettings') as HTMLButtonElement | null;
+      const titleText = container.querySelector('#aiDialogTitleText') as HTMLElement | null;
+      const skillsList = container.querySelector('#aiSkillsList') as HTMLElement | null;
+
+      expect(settingsPanel).not.toBeNull();
+      expect(agentBody).not.toBeNull();
+      expect(btnToggle).not.toBeNull();
+      expect(btnCancel).not.toBeNull();
+
+      // Initially: operative GUI is shown, settings are hidden
+      expect(settingsPanel?.style.display).toBe('none');
+      expect(agentBody?.style.display).not.toBe('none');
+      expect(titleText?.textContent).toBe('AI Mesh Agent');
+
+      // 1. Switch to Settings
+      btnToggle?.click();
+      expect(settingsPanel?.style.display).toBe('flex');
+      expect(agentBody?.style.display).toBe('none');
+      expect(titleText?.textContent).toBe('AI Agent Settings');
+
+      // Verify all built-in skills are rendered with name and description
+      const skillItems = skillsList?.querySelectorAll('.ai-skill-item');
+      expect(skillItems?.length).toBe(app.service.aiAgent.getSkills().length);
+      expect(skillItems?.length).toBeGreaterThanOrEqual(4);
+
+      // Verify each skill item contains name and description text
+      skillItems?.forEach((item) => {
+        const nameEl = item.querySelector('.ai-skill-name');
+        const descEl = item.querySelector('.ai-skill-desc');
+        expect(nameEl?.textContent).toBeTruthy();
+        expect(descEl?.textContent).toBeTruthy();
+      });
+
+      // 2. Click Cancel/Back to switch back to operative GUI
+      btnCancel?.click();
+      expect(settingsPanel?.style.display).toBe('none');
+      expect(agentBody?.style.display).toBe('flex');
+      expect(titleText?.textContent).toBe('AI Mesh Agent');
+
+      // 3. Test inline "Configure" link opens settings exclusively
+      const btnConfigureInline = container.querySelector('#btnOpenAISettingsInline') as HTMLButtonElement | null;
+      btnConfigureInline?.click();
+      expect(settingsPanel?.style.display).toBe('flex');
+      expect(agentBody?.style.display).toBe('none');
+
+      // 4. Test Maximum Polygons up to 1,000,000 and budget chips
+      const maxPolyInput = container.querySelector('#aiMaxPolyInput') as HTMLInputElement | null;
+      const maxPolyVal = container.querySelector('#aiMaxPolyVal') as HTMLElement | null;
+      expect(maxPolyInput?.max).toBe('1000000');
+
+      // Test preset chip for 1M (1,000,000)
+      const chip1M = container.querySelector('#aiMaxPolyChips button[data-poly="1000000"]') as HTMLButtonElement | null;
+      expect(chip1M).toBeTruthy();
+      chip1M?.click();
+      expect(maxPolyInput?.value).toBe('1000000');
+      expect(maxPolyVal?.textContent).toContain('1');
+
+      // 5. Save settings closes settings exclusively and persists 1,000,000 max polygons
+      const btnSave = container.querySelector('#btnSaveAISettings') as HTMLButtonElement | null;
+      btnSave?.click();
+      expect(settingsPanel?.style.display).toBe('none');
+      expect(agentBody?.style.display).toBe('flex');
+      expect(app.service.aiAgent.getConfig().maxPolygons).toBe(1000000);
+
+      // Verify endpoint summary badge reflects 1Mp ceiling
+      const endpointSummary = container.querySelector('#aiEndpointSummaryBar') as HTMLElement | null;
+      expect(endpointSummary?.textContent).toContain('1Mp');
+
+      app.dispose();
+      container.remove();
+    });
   });
 });
 
