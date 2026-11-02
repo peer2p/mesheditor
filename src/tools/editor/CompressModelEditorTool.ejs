@@ -1,0 +1,140 @@
+<div id="dialog-compress-model" class="floating-dialog" style="top: 140px; right: 16px; width: 340px; display: none">
+  <div class="dialog-header">
+    <span class="dialog-title"><i class="app-icon" data-lucide="file-archive"></i> Compress Model</span>
+    <div class="dialog-actions">
+      <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+      <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+      <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+    </div>
+  </div>
+  <div class="dialog-body compress-model-body">
+   
+    <!-- Source Selection: Scene vs External File -->
+    <div class="tool-control-group">
+      <label class="tool-label" for="compressModelSourceSelect">Source</label>
+      <select id="compressModelSourceSelect" class="tool-select">
+        <option value="scene" selected>Active Scene / Selection</option>
+        <option value="file">Import 3D File (.glb, .gltf, .obj, .stl, .ply, .fbx)</option>
+      </select>
+    </div>
+
+    <!-- Drag & Drop Zone for Files -->
+    <div id="compressDropZone" class="compress-dropzone" style="display: none">
+      <input type="file" id="compressFileInput" class="hidden-input" accept=".glb,.gltf,.obj,.stl,.ply,.fbx" />
+      <div class="compress-dropzone-inner" id="compressDropZoneInner">
+        <i class="app-icon" data-lucide="upload-cloud"></i>
+        <div class="compress-dropzone-text">Drop 3D file here or <span class="compress-browse-link" id="compressBrowseLink">Browse</span></div>
+        <div class="compress-dropzone-sub">GLB, GLTF, OBJ, STL, PLY, FBX</div>
+      </div>
+      <div id="compressLoadedFileInfo" class="compress-file-info" style="display: none">
+        <i class="app-icon" data-lucide="file-check"></i>
+        <span id="compressLoadedFileName" class="compress-file-name">model.glb</span>
+        <span id="compressLoadedFileSize" class="compress-file-size">4.2 MB</span>
+        <button type="button" id="btnCompressClearFile" class="compress-clear-btn" title="Remove file"><i class="app-icon" data-lucide="x"></i></button>
+      </div>
+    </div>
+
+    <!-- Compression Presets -->
+    <div class="tool-control-group">
+      <label class="tool-label" for="compressPresetSelect">Compression Level</label>
+      <select id="compressPresetSelect" class="tool-select">
+        <option value="lossless" selected>Lossless (Standard - 100% Polygons Kept)</option>
+        <option value="draco_balanced">Draco Compression (High - GLB / GLTF)</option>
+        <option value="draco_ultra">Draco Compression (Ultra - Smallest Size)</option>
+        <option value="decimate_50">Balanced Decimation (50% Polygon Reduction)</option>
+        <option value="custom">Custom Configuration...</option>
+      </select>
+      <div id="compressPresetDesc" class="compress-preset-desc">
+        Removes duplicate vertices and unused geometry data without altering any polygons.
+      </div>
+    </div>
+
+    <!-- Advanced Settings (Collapsible / Visible when Custom or toggled) -->
+    <div id="compressAdvancedSection" class="compress-advanced-box" style="display: none">
+      <div class="compress-checkbox-row">
+        <label class="compress-checkbox-label">
+          <input type="checkbox" id="chkCompressWeld" checked />
+          <span>Weld duplicate vertices</span>
+        </label>
+      </div>
+      <div class="compress-checkbox-row">
+        <label class="compress-checkbox-label">
+          <input type="checkbox" id="chkCompressDegenerate" checked />
+          <span>Remove degenerate / zero-area faces</span>
+        </label>
+      </div>
+      <div class="compress-checkbox-row">
+        <label class="compress-checkbox-label">
+          <input type="checkbox" id="chkCompressUnused" checked />
+          <span>Purge unreferenced vertex buffers</span>
+        </label>
+      </div>
+      <div class="compress-checkbox-row">
+        <label class="compress-checkbox-label">
+          <input type="checkbox" id="chkCompressDraco" />
+          <span>Draco geometry encoding (GLB / GLTF)</span>
+        </label>
+      </div>
+      <div class="compress-slider-row">
+        <div class="tool-row">
+          <span class="tool-label">Polygon Decimation</span>
+          <span id="compressDecimateValue" class="compress-slider-val">0% (Lossless)</span>
+        </div>
+        <input type="range" id="sliderCompressDecimate" min="0" max="80" step="5" value="0" class="tool-range" />
+      </div>
+      <div class="compress-checkbox-row">
+        <label class="compress-checkbox-label">
+          <input type="checkbox" id="chkCompressWebP" />
+          <span>Convert textures to WebP (80% Quality)</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Export Format Selector -->
+    <div class="tool-control-group">
+      <label class="tool-label" for="compressExportFormatSelect">Export Format</label>
+      <select id="compressExportFormatSelect" class="tool-select">
+        <option value="glb" selected>GLB (Binary glTF - Recommended)</option>
+        <option value="gltf">glTF (JSON + Bin)</option>
+        <option value="obj">OBJ (Wavefront Mesh)</option>
+        <option value="stl">STL (3D Print Triangle Mesh)</option>
+      </select>
+    </div>
+
+    <!-- Live Comparison Metrics Dashboard -->
+    <div class="compress-stats-card" id="compressStatsCard">
+      <div class="compress-stats-header">
+        <span class="compress-stats-title"><i class="app-icon" data-lucide="bar-chart-2"></i> Optimization Results</span>
+        <span id="compressSavingsBadge" class="compress-savings-badge" style="display: none">-0%</span>
+      </div>
+      <div class="compress-metrics-grid">
+        <div class="compress-metric-item">
+          <div class="compress-metric-label">Size</div>
+          <div id="compressMetricSize" class="compress-metric-val">--</div>
+        </div>
+        <div class="compress-metric-item">
+          <div class="compress-metric-label">Vertices</div>
+          <div id="compressMetricVerts" class="compress-metric-val">--</div>
+        </div>
+        <div class="compress-metric-item">
+          <div class="compress-metric-label">Polygons / Faces</div>
+          <div id="compressMetricFaces" class="compress-metric-val">--</div>
+        </div>
+      </div>
+      <div id="compressStatusNotice" class="compress-status-notice">
+        Ready. Select settings and click Compress.
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="compress-actions-row">
+      <button type="button" id="btnCompressDownload" class="tool-btn tool-btn-primary btn-block">
+        <i class="app-icon" data-lucide="download"></i> Compress &amp; Download
+      </button>
+      <button type="button" id="btnCompressApplyScene" class="tool-btn btn-block" title="Apply compression directly into the active 3D scene">
+        <i class="app-icon" data-lucide="check"></i> Apply to Scene
+      </button>
+    </div>
+  </div>
+</div>
+

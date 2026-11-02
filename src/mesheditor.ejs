@@ -10,8 +10,8 @@
   <body>
     <div id="app-container">
       <!-- Hidden file inputs -->
-      <input type="file" id="modelFileInput" class="hidden-input" accept=".glb,.gltf,.obj,.stl,.ply,.babylon,.bin,.png,.jpg,.jpeg,.webp" multiple />
-      <input type="file" id="importFileInput" class="hidden-input" accept=".glb,.gltf,.obj,.stl,.ply,.babylon,.bin,.png,.jpg,.jpeg,.webp" multiple />
+      <input type="file" id="modelFileInput" class="hidden-input" accept=".glb,.gltf,.obj,.stl,.ply,.fbx,.babylon,.bin,.png,.jpg,.jpeg,.webp" multiple />
+      <input type="file" id="importFileInput" class="hidden-input" accept=".glb,.gltf,.obj,.stl,.ply,.fbx,.babylon,.bin,.png,.jpg,.jpeg,.webp" multiple />
       <input type="file" id="textureFileInput" class="hidden-input" accept="image/*" />
       <input type="file" id="bumpFileInput" class="hidden-input" accept="image/*" />
       <input type="file" id="aiImageFileInput" class="hidden-input" accept="image/*" multiple />
@@ -74,6 +74,7 @@
               <span class="btn-icon"><i class="app-icon" data-lucide="target"></i></span>
               <span class="btn-label">Center Pivot</span>
             </button>
+            <div class="dropdown-divider"></div>
             <button class="dropdown-item" id="btnExtractSubmesh" title="Separate into loose parts or submeshes">
               <span class="btn-icon"><i class="app-icon" data-lucide="scissors"></i></span>
               <span class="btn-label">Separate Loose Parts</span>
@@ -100,7 +101,7 @@
               <span class="shortcut-tag">Del</span>
             </button>
 
-                  <div class="dropdown-divider"></div>
+          <div class="dropdown-divider"></div>
             <button class="dropdown-item active" id="btnToggleGrid" title="Toggle ground grid">
               <span class="btn-icon"><i class="app-icon" data-lucide="grid-3x3"></i></span>
               <span class="btn-label">Ground Grid</span>
@@ -328,6 +329,7 @@
         <%- include('./tools/editor/MaterialEditorTool.ejs') %>
         <%- include('./tools/editor/AnimationPlayerEditorTool.ejs') %>
         <%- include('./tools/editor/TextureOptimizerEditorTool.ejs') %>
+        <%- include('./tools/editor/CompressModelEditorTool.ejs') %>
         <%- include('./tools/editor/VoxelPainterEditorTool.ejs') %>
         <%- include('./tools/editor/PathExtrusionEditorTool.ejs') %>
       </div>

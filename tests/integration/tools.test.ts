@@ -17,6 +17,7 @@ import {
   CSGEditorTool,
   FacetEditorTool,
   TextureOptimizerEditorTool,
+  CompressModelEditorTool,
   VoxelPainterEditorTool,
   PathExtrusionEditorTool,
   AIAgentEditorTool,
@@ -250,9 +251,9 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
   });
 
   describe('4. Tool Abstraction, In-App Help Guides & Dialog Wiring', () => {
-    it('provides unified ToolInterface metadata and comprehensive English help text for all 12 editor tools', () => {
+    it('provides unified ToolInterface metadata and comprehensive English help text for all 13 editor tools', () => {
       const editorTools = getBuiltinEditorTools();
-      expect(editorTools.length).toBe(12);
+      expect(editorTools.length).toBe(13);
 
       const requiredTools = [
         'scene_outliner',
@@ -260,6 +261,7 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
         'csg_sculpting',
         'facet_editor',
         'texture_optimizer',
+        'compress_model',
         'voxel_painter',
         'path_extrusion',
         'ai_agent',
@@ -413,7 +415,7 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
 
     it('instantiates all decentralized editor tool classes with self-contained configurations and help guides', () => {
       const tools = createBuiltinEditorTools();
-      expect(tools.length).toBe(12);
+      expect(tools.length).toBe(13);
 
       const outliner = new OutlinerEditorTool();
       expect(outliner.name).toBe('scene_outliner');
@@ -437,6 +439,11 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       const tex = new TextureOptimizerEditorTool();
       expect(tex.name).toBe('texture_optimizer');
       expect(tex.dialogId).toBe('dialog-textures');
+
+      const compressTool = new CompressModelEditorTool();
+      expect(compressTool.name).toBe('compress_model');
+      expect(compressTool.dialogId).toBe('dialog-compress-model');
+      expect(compressTool.helpText).toContain('Compress Model');
 
       const voxel = new VoxelPainterEditorTool();
       expect(voxel.name).toBe('voxel_painter');

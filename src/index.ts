@@ -9,6 +9,7 @@ export * from './template';
 export * from './builtInSkills';
 export * from './voxel';
 export * from './pathExtrusion';
+export * from './compression/ModelCompressor';
 export * from './tools';
 export * from './AIAgentService';
 export * from './MeshEditorService';

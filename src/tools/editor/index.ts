@@ -11,6 +11,7 @@ import { OutlinerEditorTool } from './OutlinerEditorTool';
 import { PathExtrusionEditorTool } from './PathExtrusionEditorTool';
 import { SceneEnvironmentEditorTool } from './SceneEnvironmentEditorTool';
 import { TextureOptimizerEditorTool } from './TextureOptimizerEditorTool';
+import { CompressModelEditorTool } from './CompressModelEditorTool';
 import { VoxelPainterEditorTool } from './VoxelPainterEditorTool';
 import { TOOL_VIEWS, getToolViewTemplate } from './toolViews';
 
@@ -27,6 +28,7 @@ export {
   PathExtrusionEditorTool,
   SceneEnvironmentEditorTool,
   TextureOptimizerEditorTool,
+  CompressModelEditorTool,
   VoxelPainterEditorTool,
   TOOL_VIEWS,
   getToolViewTemplate,
@@ -42,6 +44,7 @@ export function createBuiltinEditorTools(): ToolInterface[] {
     new CSGEditorTool(),
     new FacetEditorTool(),
     new TextureOptimizerEditorTool(),
+    new CompressModelEditorTool(),
     new VoxelPainterEditorTool(),
     new PathExtrusionEditorTool(),
     new AIAgentEditorTool(),

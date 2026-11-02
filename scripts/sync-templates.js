@@ -19,6 +19,7 @@ const TOOLS = [
   { className: 'MaterialEditorTool', file: 'MaterialEditorTool.ejs', id: 'dialog-material' },
   { className: 'AnimationPlayerEditorTool', file: 'AnimationPlayerEditorTool.ejs', id: 'dialog-anim' },
   { className: 'TextureOptimizerEditorTool', file: 'TextureOptimizerEditorTool.ejs', id: 'dialog-textures' },
+  { className: 'CompressModelEditorTool', file: 'CompressModelEditorTool.ejs', id: 'dialog-compress-model' },
   { className: 'VoxelPainterEditorTool', file: 'VoxelPainterEditorTool.ejs', id: 'dialog-voxel-painter' },
   { className: 'PathExtrusionEditorTool', file: 'PathExtrusionEditorTool.ejs', id: 'dialog-path-extrusion' },
 ];

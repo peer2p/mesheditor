@@ -49,6 +49,11 @@ import {
 } from './voxel';
 import { PathExtrusionController } from './pathExtrusion';
 import {
+  ModelCompressor,
+  ModelCompressorOptions,
+  ModelCompressorStats,
+} from './compression/ModelCompressor';
+import {
   ActionRecord,
   CSGOperationType,
   ExportOptions,
@@ -5540,6 +5545,89 @@ export class MeshEditorService {
     });
   }
 
+  /**
+   * Compresses the currently selected mesh or all visible scene meshes.
+   * Performs lossless vertex deduplication, degenerate facet culling, and unused buffer cleanup.
+   * Full Undo / Redo history is recorded.
+   */
+  public async compressActiveModel(
+    options?: Partial<ModelCompressorOptions>
+  ): Promise<ModelCompressorStats> {
+    const targetMeshes = this.selectedMesh
+      ? [this.selectedMesh]
+      : this.importedMeshes.filter((m) => !m.isDisposed() && m.isEnabled());
+
+    if (targetMeshes.length === 0) {
+      throw new Error('No 3D meshes available in scene to compress.');
+    }
+
+    // Capture pre-compression vertex data snapshots for undo
+    const preSnapshots = targetMeshes.map((m) => ({
+      mesh: m,
+      vertexData: VertexData.ExtractFromMesh(m),
+    }));
+
+    const stats = await ModelCompressor.optimizeMeshes(targetMeshes, options);
+
+    // Capture post-compression snapshots for redo
+    const postSnapshots = targetMeshes.map((m) => ({
+      mesh: m,
+      vertexData: VertexData.ExtractFromMesh(m),
+    }));
+
+    this.recordAction({
+      name: `Compress Model (${stats.duplicateVerticesRemoved} duplicate verts welded, ${stats.degenerateFacesRemoved} faces cleaned)`,
+      undo: () => {
+        for (const snap of preSnapshots) {
+          if (!snap.mesh.isDisposed()) {
+            snap.vertexData.applyToMesh(
+              snap.mesh,
+              snap.mesh.isVertexBufferUpdatable(VertexBuffer.PositionKind)
+            );
+          }
+        }
+        this.updateStats();
+        this.events.onSceneModified?.();
+      },
+      redo: () => {
+        for (const snap of postSnapshots) {
+          if (!snap.mesh.isDisposed()) {
+            snap.vertexData.applyToMesh(
+              snap.mesh,
+              snap.mesh.isVertexBufferUpdatable(VertexBuffer.PositionKind)
+            );
+          }
+        }
+        this.updateStats();
+        this.events.onSceneModified?.();
+      },
+    });
+
+    this.updateStats();
+    this.events.onSceneModified?.();
+    return stats;
+  }
+
+  /**
+   * Compresses active scene meshes and exports them directly to the chosen format (GLB, glTF, OBJ, STL)
+   * with optional Draco compression.
+   */
+  public async exportCompressedActiveModel(
+    options?: Partial<ModelCompressorOptions>,
+    filename?: string
+  ): Promise<{ blob: Blob; filename: string; size: number }> {
+    const targetMeshes = this.selectedMesh
+      ? [this.selectedMesh]
+      : this.importedMeshes.filter((m) => !m.isDisposed() && m.isEnabled());
+
+    if (targetMeshes.length === 0) {
+      throw new Error('No 3D meshes available in scene to export.');
+    }
+
+    const baseName = filename || this.currentFilename || 'compressed_model';
+    return ModelCompressor.exportCompressedModel(this.scene, targetMeshes, baseName, options);
+  }
+
   /* =========================================================================
      15. FILE LOADING & SCENE MANAGEMENT
      ========================================================================= */
@@ -5653,7 +5741,7 @@ export class MeshEditorService {
 
   public async loadFiles(files: File[]): Promise<void> {
     if (!files || files.length === 0) return;
-    const modelExtensions = ['.glb', '.gltf', '.obj', '.stl', '.ply', '.babylon'];
+    const modelExtensions = ['.glb', '.gltf', '.obj', '.stl', '.ply', '.fbx', '.babylon'];
 
     const validFiles = files.filter((f) => !f.name.startsWith('.'));
     if (validFiles.length === 0) return;
@@ -5710,7 +5798,7 @@ export class MeshEditorService {
 
   public async importFiles(files: File[]): Promise<void> {
     if (!files || files.length === 0) return;
-    const modelExtensions = ['.glb', '.gltf', '.obj', '.stl', '.ply', '.babylon'];
+    const modelExtensions = ['.glb', '.gltf', '.obj', '.stl', '.ply', '.fbx', '.babylon'];
 
     const validFiles = files.filter((f) => !f.name.startsWith('.'));
     if (validFiles.length === 0) return;
