@@ -313,4 +313,25 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
     expect(dialogMesh.classList.contains('minimized')).toBe(true);
     expect(dialogMesh.classList.contains('active-focus')).toBe(false);
   });
+
+  it('renders btnMergeMeshes in Actions menu and triggers service.mergeSelectedMeshes()', () => {
+    app = new MeshEditorApp({
+      container,
+      engine,
+      layoutMode: 'floating',
+    });
+
+    const btnMerge = container.querySelector('#btnMergeMeshes') as HTMLButtonElement | null;
+    expect(btnMerge).not.toBeNull();
+    expect(btnMerge?.textContent).toContain('Merge Meshes');
+
+    let mergeCalled = false;
+    (app.service as any).mergeSelectedMeshes = () => {
+      mergeCalled = true;
+      return null;
+    };
+
+    btnMerge?.click();
+    expect(mergeCalled).toBe(true);
+  });
 });

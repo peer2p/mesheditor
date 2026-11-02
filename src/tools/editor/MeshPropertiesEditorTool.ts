@@ -34,6 +34,7 @@ export class MeshPropertiesEditorTool extends AbstractEditorTool {
   <li><strong>Center Pivot:</strong> Recalculates the mesh origin and sets the transform pivot to the exact geometric center.</li>
   <li><strong>Bake Transform:</strong> Applies current position, rotation, and scale permanently into vertex buffer data and resets transform vectors to identity.</li>
   <li><strong>Separate Loose Parts:</strong> Scans disconnected mesh vertex clusters and splits them into separate, individually selectable scene meshes.</li>
+  <li><strong>Merge Meshes:</strong> Combines multiple selected meshes into a single mesh while preserving individual sub-materials.</li>
 </ul>
 `.trim();
 }

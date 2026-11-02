@@ -78,6 +78,10 @@
               <span class="btn-icon"><i class="app-icon" data-lucide="scissors"></i></span>
               <span class="btn-label">Separate Loose Parts</span>
             </button>
+            <button class="dropdown-item" id="btnMergeMeshes" title="Merge selected meshes into a single combined mesh">
+              <span class="btn-icon"><i class="app-icon" data-lucide="combine"></i></span>
+              <span class="btn-label">Merge Meshes</span>
+            </button>
             <div class="dropdown-divider"></div>
             <button class="dropdown-item" id="btnGroup" title="Group selected meshes (Cmd+G / Ctrl+G)">
               <span class="btn-icon"><i class="app-icon" data-lucide="folder-plus"></i></span>
@@ -457,6 +461,7 @@
               <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5">
                 • <strong>Separate Loose Parts:</strong> AI models often merge all pieces into one mesh. Click "Separate" to instantly split
                 disconnected parts into individual selectable objects!<br />
+                • <strong>Merge Meshes:</strong> Combine multiple selected meshes into a single object while preserving all materials.<br />
                 • <strong>Center Pivot:</strong> Click "Center Pivot" if gizmos appear offset from the visual object.<br />
                 • <strong>Pick & Place:</strong> In the Tools menu, choose "Create Mesh..." and click on any surface to spawn new meshes
                 directly in 3D.<br />

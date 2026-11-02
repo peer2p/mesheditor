@@ -200,6 +200,49 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
       expect(m1.parent).toBeNull();
       expect(m2.parent).toBeNull();
     });
+
+    it('merges selected meshes into a single combined mesh with multiMultiMaterials and undo/redo support', () => {
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box', name: 'MeshA' }));
+      const sphere = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Sphere', name: 'MeshB' }));
+      sphere.position.x = 5;
+
+      // When fewer than 2 meshes are selected, returns null and triggers warning
+      service.selectMesh(box);
+      expect(service.mergeSelectedMeshes()).toBeNull();
+
+      // Select both meshes
+      service.selectNodes([box, sphere]);
+      expect(service.selectedNodes.length).toBe(2);
+
+      const merged = service.mergeSelectedMeshes();
+      expect(merged).not.toBeNull();
+      expect(merged?.name).toBe(`${box.name}_merged`);
+      expect(service.importedMeshes).toContain(merged);
+      expect(service.importedMeshes).not.toContain(box);
+      expect(service.importedMeshes).not.toContain(sphere);
+      expect(box.isEnabled()).toBe(false);
+      expect(sphere.isEnabled()).toBe(false);
+      expect(service.selectedMesh).toBe(merged);
+
+      // Undo merge
+      service.undo();
+      expect(service.importedMeshes).not.toContain(merged);
+      expect(merged?.isEnabled()).toBe(false);
+      expect(service.importedMeshes).toContain(box);
+      expect(service.importedMeshes).toContain(sphere);
+      expect(box.isEnabled()).toBe(true);
+      expect(sphere.isEnabled()).toBe(true);
+      expect(service.selectedNodes).toContain(box);
+      expect(service.selectedNodes).toContain(sphere);
+
+      // Redo merge
+      service.redo();
+      expect(service.importedMeshes).toContain(merged);
+      expect(merged?.isEnabled()).toBe(true);
+      expect(box.isEnabled()).toBe(false);
+      expect(sphere.isEnabled()).toBe(false);
+      expect(service.selectedMesh).toBe(merged);
+    });
   });
 
   describe('5. Copy, Paste, Duplicate & Delete with Undo/Redo', () => {

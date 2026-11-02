@@ -64,6 +64,7 @@ import {
   ChevronDown,
   CircleDot,
   Code,
+  Combine,
   createIcons,
   Crosshair,
   Download,
@@ -148,6 +149,7 @@ export const editorIcons = {
   ChevronDown,
   CircleDot,
   Code,
+  Combine,
   Crosshair,
   Download,
   Eraser,
@@ -342,6 +344,7 @@ export class MeshEditorApp {
     centerAllPivots: () => this.service.centerAllMeshPivots(),
     bakeTransform: () => this.service.bakeSelectedTransform(),
     separateLooseParts: () => this.service.separateSelectedLooseParts(),
+    mergeMeshes: () => this.service.mergeSelectedMeshes(),
     separateSubmeshes: () => this.service.separateSelectedSubMeshes(),
     copyMesh: () => this.service.copySelected(),
     pasteMesh: () => this.service.pasteAtCursor(),
@@ -942,6 +945,10 @@ export class MeshEditorApp {
     document.getElementById('btnExtractSubmesh')?.addEventListener('click', () => {
       this.closeAllDropdowns();
       this.service.separateSelectedLooseParts();
+    });
+    document.getElementById('btnMergeMeshes')?.addEventListener('click', () => {
+      this.closeAllDropdowns();
+      this.service.mergeSelectedMeshes();
     });
     document.getElementById('btnGroup')?.addEventListener('click', () => {
       this.closeAllDropdowns();
@@ -2077,6 +2084,7 @@ export class MeshEditorApp {
     fActions.add(this.meshParams, 'centerOrigin').name('Center Pivot');
     fActions.add(this.meshParams, 'bakeTransform').name('Bake Transform');
     fActions.add(this.meshParams, 'separateLooseParts').name('Separate Loose Parts');
+    fActions.add(this.meshParams, 'mergeMeshes').name('Merge Meshes');
     fActions.open();
 
     // 3. Material Properties GUI

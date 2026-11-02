@@ -1526,6 +1526,122 @@ export class MeshEditorService {
     return separatedMeshes;
   }
 
+  public mergeSelectedMeshes(): Mesh | null {
+    const selected =
+      this.selectedNodes.length > 0
+        ? [...this.selectedNodes]
+        : this.selectedMesh
+        ? [this.selectedMesh]
+        : [];
+
+    const meshesToMerge: Mesh[] = [];
+    const affectedGroups: TransformNode[] = [];
+
+    for (const node of selected) {
+      if (this.isGroupNode(node)) {
+        if (!affectedGroups.includes(node)) affectedGroups.push(node);
+        for (const cm of node.getChildMeshes()) {
+          if (cm instanceof Mesh && !this.isEditorHelper(cm) && !cm.isDisposed() && cm.getTotalVertices() > 0) {
+            if (!meshesToMerge.includes(cm)) meshesToMerge.push(cm);
+          }
+        }
+      } else if (node instanceof Mesh && !this.isEditorHelper(node) && !node.isDisposed() && node.getTotalVertices() > 0) {
+        if (!meshesToMerge.includes(node)) meshesToMerge.push(node);
+      }
+    }
+
+    if (meshesToMerge.length < 2) {
+      this.events.onToast?.('Please select at least 2 meshes to merge.', 'warning');
+      return null;
+    }
+
+    this.events.onStatusChanged?.('Merging meshes...', true);
+    this.clearSelectionProxy();
+
+    for (const m of meshesToMerge) {
+      m.computeWorldMatrix(true);
+    }
+
+    // Merge meshes into a single mesh; multiMultiMaterials preserves individual materials as subMeshes
+    const merged = Mesh.MergeMeshes(
+      meshesToMerge,
+      false,
+      true,
+      undefined,
+      false,
+      true
+    );
+
+    if (!merged) {
+      this.events.onStatusChanged?.('Ready', false);
+      this.events.onToast?.('Failed to merge meshes.', 'error');
+      return null;
+    }
+
+    const baseName = meshesToMerge[0].name.replace(/_merged(_\d+)?$/, '');
+    merged.name = `${baseName}_merged`;
+    this.centerMeshPivot(merged);
+    this.importedMeshes.push(merged);
+
+    // Deselect source meshes before disabling them
+    this.selectNodes([]);
+
+    for (const m of meshesToMerge) {
+      m.setEnabled(false);
+      const idx = this.importedMeshes.indexOf(m);
+      if (idx !== -1) this.importedMeshes.splice(idx, 1);
+    }
+
+    for (const g of affectedGroups) {
+      g.setEnabled(false);
+      const idx = this.groups.indexOf(g);
+      if (idx !== -1) this.groups.splice(idx, 1);
+    }
+
+    this.recordAction({
+      name: `Merge Meshes (${meshesToMerge.length} meshes)`,
+      undo: () => {
+        this.clearSelectionProxy();
+        const idx = this.importedMeshes.indexOf(merged);
+        if (idx !== -1) this.importedMeshes.splice(idx, 1);
+        merged.setEnabled(false);
+
+        for (const m of meshesToMerge) {
+          if (!this.importedMeshes.includes(m)) this.importedMeshes.push(m);
+          m.setEnabled(true);
+        }
+        for (const g of affectedGroups) {
+          g.setEnabled(true);
+          if (!this.groups.includes(g)) this.groups.push(g);
+        }
+        this.selectNodes(meshesToMerge);
+      },
+      redo: () => {
+        this.clearSelectionProxy();
+        for (const m of meshesToMerge) {
+          const idx = this.importedMeshes.indexOf(m);
+          if (idx !== -1) this.importedMeshes.splice(idx, 1);
+          m.setEnabled(false);
+        }
+        for (const g of affectedGroups) {
+          g.setEnabled(false);
+          const idx = this.groups.indexOf(g);
+          if (idx !== -1) this.groups.splice(idx, 1);
+        }
+        if (!this.importedMeshes.includes(merged)) this.importedMeshes.push(merged);
+        merged.setEnabled(true);
+        this.selectMesh(merged);
+      },
+    });
+
+    this.selectMesh(merged);
+    this.updateStats();
+    this.events.onStatusChanged?.('Ready', false);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Merged ${meshesToMerge.length} meshes into "${merged.name}"!`, 'success');
+    return merged;
+  }
+
   public separateSelectedSubMeshes(): Mesh[] {
     if (!this.selectedMesh) {
       this.events.onToast?.('Please select a mesh with submeshes to separate.', 'warning');
