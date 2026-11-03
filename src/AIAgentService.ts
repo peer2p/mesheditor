@@ -60,6 +60,7 @@ export const DEFAULT_AI_AGENT_CONFIG: AIAgentEndpointConfig = {
   minPolygons: 200,
   maxPolygons: 5000,
   createTextures: true,
+  createNormalMaps: true,
 };
 
 export interface EndpointPreset {
@@ -242,6 +243,8 @@ export class AIAgentService {
           typeof parsed.maxPolygons === 'number' ? parsed.maxPolygons : DEFAULT_AI_AGENT_CONFIG.maxPolygons,
         createTextures:
           typeof parsed.createTextures === 'boolean' ? parsed.createTextures : DEFAULT_AI_AGENT_CONFIG.createTextures,
+        createNormalMaps:
+          typeof parsed.createNormalMaps === 'boolean' ? parsed.createNormalMaps : DEFAULT_AI_AGENT_CONFIG.createNormalMaps,
       };
     } catch {
       return {};
@@ -555,9 +558,14 @@ export class AIAgentService {
     const minPoly = typeof this.config.minPolygons === 'number' ? this.config.minPolygons : 200;
     const maxPoly = typeof this.config.maxPolygons === 'number' ? this.config.maxPolygons : 5000;
     const createTextures = this.config.createTextures !== false;
+    const createNormalMaps = this.config.createNormalMaps !== false && createTextures;
+
+    const normalMapRule = createNormalMaps
+      ? ` Normal maps are ENABLED: use \`normalMapUrl\` / \`bumpTextureUrl\` or automatic procedural normal mapping in \`modeler_create_material\` (with \`bumpLevel\`, \`invertNormalMapY\` for DirectX/OpenGL, or \`useParallax\`) to add realistic tactile depth and surface micro-relief.`
+      : ` Normal maps are DISABLED by the user: do not apply bump or normal maps.`;
 
     const textureRule = createTextures
-      ? `3. **Colors & Materials**: Assign appropriate PBR colors (\`color\` / \`albedoColor\`, \`roughness\`, \`metallic\`) or procedural textures (\`proceduralTexture\` in \`modeler_create_material\`) to each created part so the model looks detailed and polished right away.`
+      ? `3. **Colors & Materials**: Assign appropriate PBR colors (\`color\` / \`albedoColor\`, \`roughness\`, \`metallic\`) or procedural textures (\`proceduralTexture\` in \`modeler_create_material\`) to each created part so the model looks detailed and polished right away.${normalMapRule}`
       : `3. **Colors & Materials (Textures DISABLED)**: Texturing is turned OFF by the user. Do NOT generate or apply procedural or image textures (\`proceduralTexture\` / \`textureUrl\`). Use ONLY solid PBR colors (\`color\` / \`albedoColor\`, \`roughness\`, \`metallic\`).`;
 
     return `You are the built-in 3D AI Mesh Agent in **Mesh Editor**.

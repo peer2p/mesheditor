@@ -85,6 +85,7 @@ export interface AIAgentEndpointConfig {
   minPolygons?: number;
   maxPolygons?: number;
   createTextures?: boolean;
+  createNormalMaps?: boolean;
 }
 
 export interface AIAgentSkillDefinition {

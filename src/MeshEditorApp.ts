@@ -391,7 +391,14 @@ export class MeshEditorApp {
     bumpLevel: 1.0,
     invertNormalMapX: false,
     invertNormalMapY: false,
+    useParallax: false,
+    useParallaxOcclusion: false,
+    parallaxScaleBias: 0.05,
     loadBumpTexture: () => this.triggerReplaceBumpTexture(),
+    generateNormalFromDiffuse: () => {
+      this.service.generateNormalMapFromActiveTexture();
+      this.updateMaterialGUI();
+    },
     removeBumpTexture: () => {
       this.service.removeBumpTextureFromSelectedMaterial();
       this.updateMaterialGUI();
@@ -2214,8 +2221,27 @@ export class MeshEditorApp {
       .onChange((v: boolean) => {
         this.service.setInvertNormalMapY(v);
       });
-    fBump.add(this.materialParams, 'loadBumpTexture').name('Load Bump Map...');
-    fBump.add(this.materialParams, 'removeBumpTexture').name('Remove Bump Map');
+    this.materialControllers['useParallax'] = fBump
+      .add(this.materialParams, 'useParallax')
+      .name('Parallax Mapping')
+      .onChange((v: boolean) => {
+        this.service.setUseParallax(v);
+      });
+    this.materialControllers['useParallaxOcclusion'] = fBump
+      .add(this.materialParams, 'useParallaxOcclusion')
+      .name('Parallax Occlusion')
+      .onChange((v: boolean) => {
+        this.service.setUseParallaxOcclusion(v);
+      });
+    this.materialControllers['parallaxScaleBias'] = fBump
+      .add(this.materialParams, 'parallaxScaleBias', 0, 0.2, 0.005)
+      .name('Parallax Depth')
+      .onChange((v: number) => {
+        this.service.setParallaxScaleBias(v);
+      });
+    fBump.add(this.materialParams, 'loadBumpTexture').name('Load Normal Map...');
+    fBump.add(this.materialParams, 'generateNormalFromDiffuse').name('Generate from Texture');
+    fBump.add(this.materialParams, 'removeBumpTexture').name('Remove Normal Map');
     fBump.open();
 
     const fUV = this.guiMaterial.addFolder('UV Mapping & Texture');
@@ -2685,12 +2711,18 @@ export class MeshEditorApp {
       this.materialParams.bumpLevel = bump.level;
       this.materialParams.invertNormalMapX = bump.invertX;
       this.materialParams.invertNormalMapY = bump.invertY;
+      this.materialParams.useParallax = bump.useParallax;
+      this.materialParams.useParallaxOcclusion = bump.useParallaxOcclusion;
+      this.materialParams.parallaxScaleBias = bump.parallaxScaleBias;
     } else {
       this.materialParams.materialName = 'No material';
       this.materialParams.bumpInfo = 'None';
       this.materialParams.bumpLevel = 1.0;
       this.materialParams.invertNormalMapX = false;
       this.materialParams.invertNormalMapY = false;
+      this.materialParams.useParallax = false;
+      this.materialParams.useParallaxOcclusion = false;
+      this.materialParams.parallaxScaleBias = 0.05;
     }
 
     for (const key in this.materialControllers) {
@@ -3913,6 +3945,8 @@ export class MeshEditorApp {
     const maxPolyVal = this.getElement<HTMLElement>('aiMaxPolyVal');
     const createTexturesCheck = this.getElement<HTMLInputElement>('aiCreateTexturesCheck');
     const createTexturesCheckQuick = this.getElement<HTMLInputElement>('aiCreateTexturesCheckQuick');
+    const createNormalMapsCheck = this.getElement<HTMLInputElement>('aiCreateNormalMapsCheck');
+    const createNormalMapsCheckQuick = this.getElement<HTMLInputElement>('aiCreateNormalMapsCheckQuick');
 
     if (chatLog) {
       if (!chatLog.innerHTML.trim()) {
@@ -4016,6 +4050,24 @@ export class MeshEditorApp {
       syncTextures(!!createTexturesCheckQuick.checked);
     });
 
+    const initialNormalMaps = initialConfig.createNormalMaps !== false;
+    if (createNormalMapsCheck) createNormalMapsCheck.checked = initialNormalMaps;
+    if (createNormalMapsCheckQuick) createNormalMapsCheckQuick.checked = initialNormalMaps;
+
+    const syncNormalMaps = (enabled: boolean) => {
+      if (createNormalMapsCheck) createNormalMapsCheck.checked = enabled;
+      if (createNormalMapsCheckQuick) createNormalMapsCheckQuick.checked = enabled;
+      this.service.aiAgent.saveConfig({ createNormalMaps: enabled });
+      updateEndpointBadge();
+    };
+
+    createNormalMapsCheck?.addEventListener('change', () => {
+      syncNormalMaps(!!createNormalMapsCheck.checked);
+    });
+    createNormalMapsCheckQuick?.addEventListener('change', () => {
+      syncNormalMaps(!!createNormalMapsCheckQuick.checked);
+    });
+
     updateEndpointBadge();
     this.renderAISkills();
 
@@ -4092,9 +4144,13 @@ export class MeshEditorApp {
       const minVal = minPolyInput ? Math.max(50, Number(minPolyInput.value) || 200) : 200;
       const maxVal = maxPolyInput ? Math.max(minVal, Number(maxPolyInput.value) || 5000) : 5000;
       const createTex = createTexturesCheck ? !!createTexturesCheck.checked : true;
+      const createNorm = createNormalMapsCheck ? !!createNormalMapsCheck.checked : true;
 
       if (createTexturesCheckQuick && createTexturesCheck) {
         createTexturesCheckQuick.checked = createTexturesCheck.checked;
+      }
+      if (createNormalMapsCheckQuick && createNormalMapsCheck) {
+        createNormalMapsCheckQuick.checked = createNormalMapsCheck.checked;
       }
 
       this.service.aiAgent.saveConfig({
@@ -4104,11 +4160,12 @@ export class MeshEditorApp {
         minPolygons: minVal,
         maxPolygons: maxVal,
         createTextures: createTex,
+        createNormalMaps: createNorm,
       });
       updateEndpointBadge();
       if (settingsStatus) settingsStatus.textContent = 'Saved ✓';
       this.toggleAISettings(false);
-      this.showToast(`AI settings saved (${minVal.toLocaleString()}–${maxVal.toLocaleString()} polys, textures ${createTex ? 'on' : 'off'}).`, 'success');
+      this.showToast(`AI settings saved (${minVal.toLocaleString()}–${maxVal.toLocaleString()} polys, textures ${createTex ? 'on' : 'off'}, normal maps ${createNorm ? 'on' : 'off'}).`, 'success');
     });
 
     // Quick prompt chips
@@ -5087,8 +5144,8 @@ export class MeshEditorApp {
 
         const btnBump = document.createElement('button');
         btnBump.className = 'tool-btn-xs';
-        btnBump.title = 'Apply as Bump / Normal Map to selected mesh material';
-        btnBump.innerHTML = '<i class="app-icon" data-lucide="layers"></i> Bump';
+        btnBump.title = 'Apply as Normal / Bump Map to selected mesh material';
+        btnBump.innerHTML = '<i class="app-icon" data-lucide="layers"></i> Normal';
         btnBump.addEventListener('click', (e) => {
           e.stopPropagation();
           this.service.applyBumpTextureToSelectedMaterial(tex.url, tex.name);

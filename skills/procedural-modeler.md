@@ -156,6 +156,36 @@ Models without image generation tools can achieve stunning, seamless textures us
    - **Gold / Brass**: `albedoColor: "#ffd700"`, `roughness: 0.2`, `metallic: 0.95`.
    - Always run `modeler_auto_uv_mapping` with `scale: 1.0` to `2.0` on boolean or modified meshes to eliminate texture stretching across corners.
 
+### C. Normal Maps & Micro-Surface Relief
+
+Normal mapping simulates fine geometric crevices, pores, grooves, bevels, and bumps without adding real polygons:
+
+1. **How Babylon.js Handles Normal Maps**:
+   - Babylon.js applies normal maps via `material.bumpTexture = new Texture(...)`.
+   - **DirectX vs. OpenGL**: Babylon.js uses **DirectX** format normal maps by default (Y-down). If a normal map was authored for OpenGL (Y-up, standard glTF format), set `invertNormalMapY: true` in `modeler_create_material` or on the material.
+   - **Intensity / Level**: Set `bumpLevel` (0.0 to 5.0, default 1.0) to control bump strength.
+
+2. **Automatic Procedural Normal Maps**:
+   - When `proceduralTexture` is passed to `modeler_create_material` and normal maps are enabled, Mesh Editor automatically computes a mathematical tangent-space normal map matching the diffuse pattern (wood grain, stone relief, mortar crevices on bricks, tile grout, sand ripples).
+   - The surface height field is automatically packed into the normal texture's alpha channel.
+
+3. **Parallax Mapping & Parallax Occlusion**:
+   - When height data is present in the normal map's alpha channel, enable parallax mapping with `useParallax: true` (or `useParallaxOcclusion: true` for deep relief) and `parallaxScaleBias: 0.05` to create realistic parallax depth shifts as the camera moves.
+
+4. **Applying AI-Generated or Custom Normal Maps**:
+   - Pass an image URL or base64 data URI to `normalMapUrl` (or `bumpTextureUrl`) in `modeler_create_material`:
+   ```json
+   {
+     "materialName": "CobblestoneMat",
+     "textureUrl": "https://.../cobblestone_diffuse.png",
+     "normalMapUrl": "https://.../cobblestone_normal.png",
+     "bumpLevel": 1.5,
+     "invertNormalMapY": false,
+     "useParallax": true,
+     "parallaxScaleBias": 0.04
+   }
+   ```
+
 ## Best Practices & Guidelines
 
 1. **Clean up intermediate meshes**:

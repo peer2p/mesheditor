@@ -1397,7 +1397,7 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
 }
 
 .modal-content {
-  width: 580px;
+  width: 80vw;
   max-width: 90vw;
   background: var(--bg-header);
   border: 1px solid var(--border-color);
@@ -1466,7 +1466,7 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
 }
 
 .help-table td:first-child {
-  width: 140px;
+  width: 25vw;
 }
 
 .modal-footer {
@@ -2594,7 +2594,6 @@ progress.loading-spinner:indeterminate {
    ========================================================================= */
 .ai-settings-panel {
   padding: 12px 14px;
-  background: rgba(13, 17, 23, 0.98);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -2763,7 +2762,6 @@ progress.loading-spinner:indeterminate {
   gap: 6px;
   padding: 8px;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.1);
   max-height: none !important;
   overflow: visible !important;

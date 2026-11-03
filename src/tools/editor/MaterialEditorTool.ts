@@ -26,7 +26,8 @@ export class MaterialEditorTool extends AbstractEditorTool {
   <li><strong>Metallic & Roughness:</strong> Sliders spanning mirror-smooth polished chrome to matte rough ceramics.</li>
   <li><strong>Alpha & Transparency:</strong> Opacity slider supporting transparent glass, plastics, and translucent overlays.</li>
   <li><strong>Emissive Glow:</strong> Self-illuminating color for lamps, neon signs, and glowing sci-fi elements.</li>
-  <li><strong>Bump & Normal Mapping:</strong> Simulates detailed surface micro-relief and creases with adjustable intensity and DirectX/OpenGL normal inversion (Invert X / Invert Y).</li>
+  <li><strong>Bump & Normal Mapping:</strong> Simulates detailed surface micro-relief and creases with adjustable intensity, DirectX/OpenGL normal inversion (Invert X / Invert Y), Parallax Mapping, and Parallax Occlusion.</li>
+  <li><strong>Generate Normal from Texture:</strong> Automatically extracts a tangent-space normal map with depth-encoded alpha channel directly from the active diffuse/albedo texture.</li>
 </ul>
 
 <h4><i class="app-icon" data-lucide="grid"></i> UV Projection & Textures</h4>

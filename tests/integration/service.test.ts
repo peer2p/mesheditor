@@ -655,11 +655,21 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
       service.setBumpLevel(2.5);
       service.setInvertNormalMapX(true);
       service.setInvertNormalMapY(true);
+      service.setUseParallax(true);
+      service.setUseParallaxOcclusion(true);
+      service.setParallaxScaleBias(0.08);
 
       bumpInfo = service.getMaterialBumpInfo();
       expect(bumpInfo.level).toBe(2.5);
       expect(bumpInfo.invertX).toBe(true);
       expect(bumpInfo.invertY).toBe(true);
+      expect(bumpInfo.useParallax).toBe(true);
+      expect(bumpInfo.useParallaxOcclusion).toBe(true);
+      expect(bumpInfo.parallaxScaleBias).toBe(0.08);
+
+      const normalApplied = service.applyNormalMapToSelectedMaterial(dummyNormalDataUrl, 'wall_norm.png');
+      expect(normalApplied).toBe(true);
+      expect(service.getMaterialBumpInfo().name).toBe('wall_norm.png');
 
       const removed = service.removeBumpTextureFromSelectedMaterial();
       expect(removed).toBe(true);

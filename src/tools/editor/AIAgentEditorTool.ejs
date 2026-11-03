@@ -141,6 +141,14 @@
               <div class="ai-slider-subtext">AI creates PBR textures when checked, otherwise solid PBR colors are used.</div>
             </div>
 
+            <div class="ai-form-group">
+              <label class="ai-checkbox-label" for="aiCreateNormalMapsCheck" style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="aiCreateNormalMapsCheck" checked />
+                <span><strong>Create Normal Maps</strong></span>
+              </label>
+              <div class="ai-slider-subtext">AI generates normal/bump maps for surface depth and relief when checked.</div>
+            </div>
+
             <div class="ai-settings-actions" style="display: flex; gap: 8px;">
               <button type="button" class="tool-btn" id="btnCancelAISettings" style="flex: 1;">
                 <span class="btn-icon"><i class="app-icon" data-lucide="arrow-left"></i></span>
@@ -163,6 +171,10 @@
               <label class="ai-checkbox-label" title="Generate procedural and seamless textures on created meshes">
                 <input type="checkbox" id="aiCreateTexturesCheckQuick" checked />
                 <span>Textures</span>
+              </label>
+              <label class="ai-checkbox-label" title="Generate normal/bump maps for surface micro-relief and depth">
+                <input type="checkbox" id="aiCreateNormalMapsCheckQuick" checked />
+                <span>Normal Maps</span>
               </label>
               <label class="ai-checkbox-label" title="Send a screenshot of the current 3D viewport to the vision model">
                 <input type="checkbox" id="aiIncludeViewportCheck" />

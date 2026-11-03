@@ -48,6 +48,7 @@ import {
   EmbeddedTextureInfo,
 } from './voxel';
 import { PathExtrusionController } from './pathExtrusion';
+import { generateNormalMapFromCanvas } from './tools/textureUtils';
 import {
   ModelCompressor,
   ModelCompressorOptions,
@@ -4654,13 +4655,22 @@ export class MeshEditorService {
     return true;
   }
 
+  public applyNormalMapToSelectedMaterial(fileOrUrl: File | string, name?: string): boolean {
+    const res = this.applyBumpTextureToSelectedMaterial(fileOrUrl, name);
+    if (res) {
+      const selMat = this.getSelectedMaterial();
+      this.events.onToast?.(`Applied normal map to material "${selMat?.name || 'selected'}"`, 'success');
+    }
+    return res;
+  }
+
   public removeBumpTextureFromSelectedMaterial(): boolean {
     const selMat = this.getSelectedMaterial();
     if (!selMat) return false;
     if (selMat instanceof PBRMaterial || selMat instanceof StandardMaterial) {
       selMat.bumpTexture = null;
       this.events.onSceneModified?.();
-      this.events.onToast?.(`Removed bump map from material "${selMat.name}"`, 'info');
+      this.events.onToast?.(`Removed normal / bump map from material "${selMat.name}"`, 'info');
       return true;
     }
     return false;
@@ -4693,23 +4703,111 @@ export class MeshEditorService {
     }
   }
 
+  public setUseParallax(enabled: boolean): void {
+    const selMat = this.getSelectedMaterial();
+    if (!selMat) return;
+    if (selMat instanceof PBRMaterial || selMat instanceof StandardMaterial) {
+      selMat.useParallax = enabled;
+      this.events.onSceneModified?.();
+    }
+  }
+
+  public setUseParallaxOcclusion(enabled: boolean): void {
+    const selMat = this.getSelectedMaterial();
+    if (!selMat) return;
+    if (selMat instanceof PBRMaterial || selMat instanceof StandardMaterial) {
+      selMat.useParallaxOcclusion = enabled;
+      if (enabled) {
+        selMat.useParallax = true;
+      }
+      this.events.onSceneModified?.();
+    }
+  }
+
+  public setParallaxScaleBias(scale: number): void {
+    const selMat = this.getSelectedMaterial();
+    if (!selMat) return;
+    if (selMat instanceof PBRMaterial || selMat instanceof StandardMaterial) {
+      selMat.parallaxScaleBias = scale;
+      this.events.onSceneModified?.();
+    }
+  }
+
+  public generateNormalMapFromActiveTexture(strength: number = 2.0): boolean {
+    const selMat = this.getSelectedMaterial();
+    if (!selMat || !(selMat instanceof PBRMaterial || selMat instanceof StandardMaterial)) {
+      this.events.onToast?.('Please select a mesh with a material first', 'warning');
+      return false;
+    }
+    const baseTex = this.getActiveMaterialTexture();
+    if (!baseTex || !baseTex.url) {
+      this.events.onToast?.('No active diffuse/albedo texture found to generate normal map from', 'warning');
+      return false;
+    }
+
+    if (typeof document === 'undefined') return false;
+
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || 256;
+          canvas.height = img.naturalHeight || 256;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const normalUrl = generateNormalMapFromCanvas(canvas, strength, !!selMat.invertNormalMapY);
+          const normName = `${(baseTex.name || 'texture').replace(/\.[^/.]+$/, '')}_normal.png`;
+          this.applyBumpTextureToSelectedMaterial(normalUrl, normName);
+          this.events.onToast?.(`Generated and applied normal map from "${baseTex.name || 'texture'}"`, 'success');
+        } catch (e: any) {
+          this.events.onToast?.(`Failed to generate normal map: ${e.message}`, 'error');
+        }
+      };
+      img.onerror = () => {
+        this.events.onToast?.('Failed to load active texture image for normal map generation', 'error');
+      };
+      img.src = baseTex.url;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public getMaterialBumpInfo(): {
     hasBump: boolean;
     name: string;
     level: number;
     invertX: boolean;
     invertY: boolean;
+    useParallax: boolean;
+    useParallaxOcclusion: boolean;
+    parallaxScaleBias: number;
   } {
     const selMat = this.getSelectedMaterial();
     if (!selMat || !(selMat instanceof PBRMaterial || selMat instanceof StandardMaterial)) {
-      return { hasBump: false, name: 'None', level: 1.0, invertX: false, invertY: false };
+      return {
+        hasBump: false,
+        name: 'None',
+        level: 1.0,
+        invertX: false,
+        invertY: false,
+        useParallax: false,
+        useParallaxOcclusion: false,
+        parallaxScaleBias: 0.05,
+      };
     }
     const hasBump = !!selMat.bumpTexture;
     const name = selMat.bumpTexture?.name || 'None';
     const level = selMat.bumpTexture?.level ?? 1.0;
     const invertX = !!selMat.invertNormalMapX;
     const invertY = !!selMat.invertNormalMapY;
-    return { hasBump, name, level, invertX, invertY };
+    const useParallax = !!selMat.useParallax;
+    const useParallaxOcclusion = !!selMat.useParallaxOcclusion;
+    const parallaxScaleBias = typeof selMat.parallaxScaleBias === 'number' ? selMat.parallaxScaleBias : 0.05;
+    return { hasBump, name, level, invertX, invertY, useParallax, useParallaxOcclusion, parallaxScaleBias };
   }
 
   public setTextureAlpha(enabled: boolean): void {

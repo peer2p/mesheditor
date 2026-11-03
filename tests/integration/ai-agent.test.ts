@@ -610,11 +610,13 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       expect(defaultCfg.minPolygons).toBe(200);
       expect(defaultCfg.maxPolygons).toBe(5000);
       expect(defaultCfg.createTextures).toBe(true);
+      expect(defaultCfg.createNormalMaps).toBe(true);
 
       // Verify default system prompt reflects constraints
       const defaultPrompt = app.service.aiAgent.buildSystemPrompt();
       expect(defaultPrompt).toContain('200 to 5,000 triangles');
       expect(defaultPrompt).toContain('Colors & Materials');
+      expect(defaultPrompt).toContain('Normal maps are ENABLED');
 
       // Verify UI controls exist in DOM
       const minPolyInput = container.querySelector('#aiMinPolyInput') as HTMLInputElement | null;
@@ -623,6 +625,8 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       const maxPolyVal = container.querySelector('#aiMaxPolyVal') as HTMLElement | null;
       const createTexturesCheck = container.querySelector('#aiCreateTexturesCheck') as HTMLInputElement | null;
       const createTexturesCheckQuick = container.querySelector('#aiCreateTexturesCheckQuick') as HTMLInputElement | null;
+      const createNormalMapsCheck = container.querySelector('#aiCreateNormalMapsCheck') as HTMLInputElement | null;
+      const createNormalMapsCheckQuick = container.querySelector('#aiCreateNormalMapsCheckQuick') as HTMLInputElement | null;
 
       expect(minPolyInput).not.toBeNull();
       expect(minPolyInput?.value).toBe('200');
@@ -634,6 +638,8 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
 
       expect(createTexturesCheck?.checked).toBe(true);
       expect(createTexturesCheckQuick?.checked).toBe(true);
+      expect(createNormalMapsCheck?.checked).toBe(true);
+      expect(createNormalMapsCheckQuick?.checked).toBe(true);
 
       // Change sliders and save settings
       minPolyInput!.value = '400';
@@ -645,6 +651,7 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       expect(maxPolyVal?.textContent).toBe('8,000');
 
       createTexturesCheck!.checked = false;
+      createNormalMapsCheck!.checked = false;
       const btnSave = container.querySelector('#btnSaveAISettings') as HTMLButtonElement | null;
       btnSave?.click();
 
@@ -653,6 +660,7 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       expect(updatedCfg.minPolygons).toBe(400);
       expect(updatedCfg.maxPolygons).toBe(8000);
       expect(updatedCfg.createTextures).toBe(false);
+      expect(updatedCfg.createNormalMaps).toBe(false);
 
       // Check updated prompt
       const updatedPrompt = app.service.aiAgent.buildSystemPrompt();
@@ -664,6 +672,11 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       createTexturesCheckQuick?.click();
       expect(app.service.aiAgent.getConfig().createTextures).toBe(true);
       expect(createTexturesCheck?.checked).toBe(true);
+
+      expect(createNormalMapsCheckQuick?.checked).toBe(false);
+      createNormalMapsCheckQuick?.click();
+      expect(app.service.aiAgent.getConfig().createNormalMaps).toBe(true);
+      expect(createNormalMapsCheck?.checked).toBe(true);
 
       app.dispose();
       container.remove();

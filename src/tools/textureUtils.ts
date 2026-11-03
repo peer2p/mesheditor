@@ -20,6 +20,16 @@ export interface ProceduralTextureOptions {
   scale?: number;
 }
 
+export interface ProceduralNormalMapOptions {
+  type: ProceduralTextureType;
+  scale?: number;
+  strength?: number;
+  invertY?: boolean;
+}
+
+export const FALLBACK_FLAT_NORMAL_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP4z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
 function hexToRgb(hex: string): [number, number, number] {
   const clean = (hex || '#888888').replace(/^#/, '');
   const full =
@@ -51,6 +61,98 @@ function smoothNoise(x: number, y: number): number {
   const c = pseudoNoise(ix, iy + 1);
   const d = pseudoNoise(ix + 1, iy + 1);
   return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
+}
+
+export function sampleProceduralHeight(
+  type: ProceduralTextureType,
+  x: number,
+  y: number,
+  size: number,
+  scale: number
+): number {
+  const nx = (x / size) * scale;
+  const ny = (y / size) * scale;
+
+  switch (type) {
+    case 'wood': {
+      const n = smoothNoise(nx * 8, ny * 2) * 0.35;
+      return 0.5 + 0.5 * Math.sin((nx * 18 + n * 6) * Math.PI * 2);
+    }
+    case 'sand': {
+      const grain = pseudoNoise(x, y) * 0.45;
+      const wave = smoothNoise(nx * 8, ny * 4) * 0.35;
+      const ripple = 0.5 + 0.5 * Math.sin((nx * 14 + wave * 3) * Math.PI * 2);
+      return Math.min(1, Math.max(0, grain * 0.5 + ripple * 0.3 + wave * 0.2));
+    }
+    case 'tiles': {
+      const count = Math.max(2, Math.round(6 * scale));
+      const step = size / count;
+      const border = 3;
+      const isGrout = x % step < border || y % step < border;
+      const n = (smoothNoise(x * 0.1, y * 0.1) - 0.5) * 0.1;
+      return isGrout ? 1.0 : Math.min(1, Math.max(0, 0.2 + n));
+    }
+    case 'grass': {
+      const n1 = smoothNoise(nx * 16, ny * 16) * 0.5;
+      const n2 = smoothNoise(nx * 32, ny * 32) * 0.3;
+      const blades = pseudoNoise(x, y) * 0.2;
+      return Math.min(1, Math.max(0, n1 + n2 + blades));
+    }
+    case 'fabric': {
+      const freq = Math.max(4, Math.round(30 * scale));
+      const wx = Math.sin((x / size) * freq * Math.PI * 2);
+      const wy = Math.sin((y / size) * freq * Math.PI * 2);
+      return 0.5 + 0.25 * wx - 0.25 * wy;
+    }
+    case 'stone':
+    case 'noise': {
+      const n1 = smoothNoise(nx * 12, ny * 12) * 0.6;
+      const n2 = smoothNoise(nx * 28, ny * 28) * 0.3;
+      const n3 = pseudoNoise(x, y) * 0.1;
+      return Math.min(1, Math.max(0, n1 + n2 + n3));
+    }
+    case 'marble': {
+      const turb =
+        smoothNoise(nx * 6, ny * 6) * 0.5 +
+        smoothNoise(nx * 12, ny * 12) * 0.25 +
+        smoothNoise(nx * 24, ny * 24) * 0.125;
+      return Math.pow(0.5 + 0.5 * Math.sin((nx * 6 + ny * 4 + turb * 5) * Math.PI), 0.65);
+    }
+    case 'brick': {
+      const rows = Math.round(8 * scale);
+      const cols = Math.round(4 * scale);
+      const rowH = size / rows;
+      const colW = size / cols;
+      const rowIdx = Math.floor(y / rowH);
+      const offsetX = (rowIdx % 2) * (colW * 0.5);
+      const localY = y % rowH;
+      const localX = (x + offsetX) % colW;
+      const mortar = localY < 3 || localX < 3;
+      const n = (smoothNoise(x * 0.15, y * 0.15) - 0.5) * 0.18;
+      return mortar ? 1.0 : Math.min(0.85, Math.max(0, 0.15 + n));
+    }
+    case 'metal': {
+      const streak = smoothNoise(x * 0.03, y * 0.8) * 0.6 + pseudoNoise(0, y) * 0.25;
+      const spec = 0.5 + 0.5 * Math.sin((nx * 2 + ny * 0.5) * Math.PI * 2);
+      return Math.min(1, Math.max(0, streak * 0.6 + spec * 0.4));
+    }
+    case 'checker': {
+      const cells = Math.max(2, Math.round(8 * scale));
+      const cx = Math.floor((x / size) * cells);
+      const cy = Math.floor((y / size) * cells);
+      return (cx + cy) % 2 === 0 ? 0 : 1;
+    }
+    case 'grid': {
+      const cells = Math.max(2, Math.round(8 * scale));
+      const cellSize = size / cells;
+      const isLine = x % cellSize < 2 || y % cellSize < 2;
+      return isLine ? 1 : 0;
+    }
+    case 'gradient':
+    default: {
+      return y / (size - 1);
+    }
+  }
 }
 
 export function generateProceduralTextureDataUrl(opts: ProceduralTextureOptions): string {
@@ -95,103 +197,7 @@ export function generateProceduralTextureDataUrl(opts: ProceduralTextureOptions)
 
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
-        let t = 0.5;
-        const nx = (x / size) * scale;
-        const ny = (y / size) * scale;
-
-        switch (opts.type) {
-          case 'wood': {
-            const n = smoothNoise(nx * 8, ny * 2) * 0.35;
-            t = 0.5 + 0.5 * Math.sin((nx * 18 + n * 6) * Math.PI * 2);
-            break;
-          }
-          case 'sand': {
-            const grain = pseudoNoise(x, y) * 0.45;
-            const wave = smoothNoise(nx * 8, ny * 4) * 0.35;
-            const ripple = 0.5 + 0.5 * Math.sin((nx * 14 + wave * 3) * Math.PI * 2);
-            t = Math.min(1, Math.max(0, grain * 0.5 + ripple * 0.3 + wave * 0.2));
-            break;
-          }
-          case 'tiles': {
-            const count = Math.max(2, Math.round(6 * scale));
-            const step = size / count;
-            const border = 3;
-            const isGrout = x % step < border || y % step < border;
-            const n = (smoothNoise(x * 0.1, y * 0.1) - 0.5) * 0.1;
-            t = isGrout ? 1.0 : Math.min(1, Math.max(0, 0.2 + n));
-            break;
-          }
-          case 'grass': {
-            const n1 = smoothNoise(nx * 16, ny * 16) * 0.5;
-            const n2 = smoothNoise(nx * 32, ny * 32) * 0.3;
-            const blades = pseudoNoise(x, y) * 0.2;
-            t = Math.min(1, Math.max(0, n1 + n2 + blades));
-            break;
-          }
-          case 'fabric': {
-            const freq = Math.max(4, Math.round(30 * scale));
-            const wx = Math.sin((x / size) * freq * Math.PI * 2);
-            const wy = Math.sin((y / size) * freq * Math.PI * 2);
-            t = 0.5 + 0.25 * wx - 0.25 * wy;
-            break;
-          }
-          case 'stone':
-          case 'noise': {
-            const n1 = smoothNoise(nx * 12, ny * 12) * 0.6;
-            const n2 = smoothNoise(nx * 28, ny * 28) * 0.3;
-            const n3 = pseudoNoise(x, y) * 0.1;
-            t = Math.min(1, Math.max(0, n1 + n2 + n3));
-            break;
-          }
-          case 'marble': {
-            const turb =
-              smoothNoise(nx * 6, ny * 6) * 0.5 +
-              smoothNoise(nx * 12, ny * 12) * 0.25 +
-              smoothNoise(nx * 24, ny * 24) * 0.125;
-            t = Math.pow(0.5 + 0.5 * Math.sin((nx * 6 + ny * 4 + turb * 5) * Math.PI), 0.65);
-            break;
-          }
-          case 'brick': {
-            const rows = Math.round(8 * scale);
-            const cols = Math.round(4 * scale);
-            const rowH = size / rows;
-            const colW = size / cols;
-            const rowIdx = Math.floor(y / rowH);
-            const offsetX = (rowIdx % 2) * (colW * 0.5);
-            const localY = y % rowH;
-            const localX = (x + offsetX) % colW;
-            const mortar = localY < 3 || localX < 3;
-            const n = (smoothNoise(x * 0.15, y * 0.15) - 0.5) * 0.18;
-            t = mortar ? 1.0 : Math.min(0.85, Math.max(0, 0.15 + n));
-            break;
-          }
-          case 'metal': {
-            const streak = smoothNoise(x * 0.03, y * 0.8) * 0.6 + pseudoNoise(0, y) * 0.25;
-            const spec = 0.5 + 0.5 * Math.sin((nx * 2 + ny * 0.5) * Math.PI * 2);
-            t = Math.min(1, Math.max(0, streak * 0.6 + spec * 0.4));
-            break;
-          }
-          case 'checker': {
-            const cells = Math.max(2, Math.round(8 * scale));
-            const cx = Math.floor((x / size) * cells);
-            const cy = Math.floor((y / size) * cells);
-            t = (cx + cy) % 2 === 0 ? 0 : 1;
-            break;
-          }
-          case 'grid': {
-            const cells = Math.max(2, Math.round(8 * scale));
-            const cellSize = size / cells;
-            const isLine = x % cellSize < 2 || y % cellSize < 2;
-            t = isLine ? 1 : 0;
-            break;
-          }
-          case 'gradient':
-          default: {
-            t = y / (size - 1);
-            break;
-          }
-        }
-
+        const t = sampleProceduralHeight(opts.type, x, y, size, scale);
         const idx = (y * size + x) * 4;
         data[idx] = Math.round(c1[0] * (1 - t) + c2[0] * t);
         data[idx + 1] = Math.round(c1[1] * (1 - t) + c2[1] * t);
@@ -205,6 +211,149 @@ export function generateProceduralTextureDataUrl(opts: ProceduralTextureOptions)
     return dataUrl && dataUrl.startsWith('data:image') ? dataUrl : FALLBACK_1X1_PNG;
   } catch {
     return FALLBACK_1X1_PNG;
+  }
+}
+
+export function generateProceduralNormalMapDataUrl(opts: ProceduralNormalMapOptions): string {
+  if (typeof document === 'undefined') {
+    return FALLBACK_FLAT_NORMAL_PNG;
+  }
+  try {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return FALLBACK_FLAT_NORMAL_PNG;
+
+    const scale = Math.max(0.25, opts.scale || 1.0);
+    const strength = typeof opts.strength === 'number' ? opts.strength : 2.0;
+    const invertY = !!opts.invertY;
+
+    // 1. Compute heights
+    const heights = new Float32Array(size * size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        heights[y * size + x] = sampleProceduralHeight(opts.type, x, y, size, scale);
+      }
+    }
+
+    // 2. Compute normal map with central differences
+    const imgData = ctx.createImageData(size, size);
+    const data = imgData.data;
+
+    for (let y = 0; y < size; y++) {
+      const yUp = (y - 1 + size) % size;
+      const yDown = (y + 1) % size;
+      for (let x = 0; x < size; x++) {
+        const xLeft = (x - 1 + size) % size;
+        const xRight = (x + 1) % size;
+
+        const hL = heights[y * size + xLeft];
+        const hR = heights[y * size + xRight];
+        const hU = heights[yUp * size + x];
+        const hD = heights[yDown * size + x];
+        const hCenter = heights[y * size + x];
+
+        const dx = (hR - hL) * strength;
+        const dy = (hD - hU) * strength * (invertY ? -1 : 1);
+        const dz = 1.0;
+
+        const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1.0;
+        const nx = -dx / len;
+        const ny = -dy / len;
+        const nz = dz / len;
+
+        const idx = (y * size + x) * 4;
+        data[idx] = Math.round((nx * 0.5 + 0.5) * 255);
+        data[idx + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+        data[idx + 2] = Math.round((nz * 0.5 + 0.5) * 255);
+        // Alpha stores height for Babylon Parallax / Parallax Occlusion Mapping
+        data[idx + 3] = Math.round(Math.min(1, Math.max(0, hCenter)) * 255);
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    const dataUrl = canvas.toDataURL('image/png');
+    return dataUrl && dataUrl.startsWith('data:image') ? dataUrl : FALLBACK_FLAT_NORMAL_PNG;
+  } catch {
+    return FALLBACK_FLAT_NORMAL_PNG;
+  }
+}
+
+export function generateNormalMapFromCanvas(
+  sourceCanvas: HTMLCanvasElement,
+  strength: number = 2.0,
+  invertY: boolean = false
+): string {
+  if (typeof document === 'undefined') {
+    return FALLBACK_FLAT_NORMAL_PNG;
+  }
+  try {
+    const w = sourceCanvas.width;
+    const h = sourceCanvas.height;
+    const srcCtx = sourceCanvas.getContext('2d');
+    if (!srcCtx) return FALLBACK_FLAT_NORMAL_PNG;
+
+    const srcImgData = srcCtx.getImageData(0, 0, w, h);
+    const srcData = srcImgData.data;
+
+    // Convert luminance to height
+    const heights = new Float32Array(w * h);
+    for (let i = 0, len = w * h; i < len; i++) {
+      const idx = i * 4;
+      heights[i] = (srcData[idx] * 0.299 + srcData[idx + 1] * 0.587 + srcData[idx + 2] * 0.114) / 255.0;
+    }
+
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = w;
+    outCanvas.height = h;
+    const outCtx = outCanvas.getContext('2d');
+    if (!outCtx) return FALLBACK_FLAT_NORMAL_PNG;
+
+    const outImgData = outCtx.createImageData(w, h);
+    const outData = outImgData.data;
+
+    for (let y = 0; y < h; y++) {
+      const yUp = (y - 1 + h) % h;
+      const yDown = (y + 1) % h;
+      for (let x = 0; x < w; x++) {
+        const xLeft = (x - 1 + w) % w;
+        const xRight = (x + 1) % w;
+
+        // Sobel filter for smooth gradient
+        const tl = heights[yUp * w + xLeft];
+        const t = heights[yUp * w + x];
+        const tr = heights[yUp * w + xRight];
+        const l = heights[y * w + xLeft];
+        const r = heights[y * w + xRight];
+        const bl = heights[yDown * w + xLeft];
+        const b = heights[yDown * w + x];
+        const br = heights[yDown * w + xRight];
+        const center = heights[y * w + x];
+
+        const dx = (tr + 2 * r + br - (tl + 2 * l + bl)) * (strength / 8);
+        const dy = (bl + 2 * b + br - (tl + 2 * t + tr)) * (strength / 8) * (invertY ? -1 : 1);
+        const dz = 1.0;
+
+        const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1.0;
+        const nx = -dx / len;
+        const ny = -dy / len;
+        const nz = dz / len;
+
+        const idx = (y * w + x) * 4;
+        outData[idx] = Math.round((nx * 0.5 + 0.5) * 255);
+        outData[idx + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+        outData[idx + 2] = Math.round((nz * 0.5 + 0.5) * 255);
+        outData[idx + 3] = Math.round(Math.min(1, Math.max(0, center)) * 255);
+      }
+    }
+
+    outCtx.putImageData(outImgData, 0, 0);
+    const dataUrl = outCanvas.toDataURL('image/png');
+    return dataUrl && dataUrl.startsWith('data:image') ? dataUrl : FALLBACK_FLAT_NORMAL_PNG;
+  } catch {
+    return FALLBACK_FLAT_NORMAL_PNG;
   }
 }
 

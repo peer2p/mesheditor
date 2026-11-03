@@ -1,12 +1,12 @@
 import { Color3, PBRMaterial, Texture } from '@babylonjs/core';
 import { AbstractTool } from '../AbstractTool';
 import { ToolExecutionContext } from '../ToolExecutionContext';
-import { generateProceduralTextureDataUrl } from '../textureUtils';
+import { generateProceduralTextureDataUrl, generateProceduralNormalMapDataUrl } from '../textureUtils';
 
 export class CreateMaterialTool extends AbstractTool {
   public readonly name = 'modeler_create_material';
   public readonly description =
-    'Creates or updates a PBRMaterial with color, roughness, metallic, emissiveColor, alpha, and optional procedural texture (wood, stone, marble, brick, metal, checker, grid, noise, gradient).';
+    'Creates or updates a PBRMaterial with color, roughness, metallic, emissiveColor, alpha, normal maps, and optional procedural texture (wood, stone, marble, brick, metal, checker, grid, noise, gradient).';
 
   public readonly parameters = {
     type: 'object',
@@ -25,9 +25,29 @@ export class CreateMaterialTool extends AbstractTool {
         type: 'string',
         description: 'Optional URL or data:image base64 URI for diffuse/albedo texture (from image generator or web asset).',
       },
+      normalMapUrl: {
+        type: 'string',
+        description: 'Optional URL or data:image base64 URI for normal map texture (alias for bumpTextureUrl).',
+      },
       bumpTextureUrl: {
         type: 'string',
         description: 'Optional URL or data:image base64 URI for normal/bump map texture.',
+      },
+      useParallax: {
+        type: 'boolean',
+        description: 'Enable parallax mapping (uses height encoded in alpha channel of normal map).',
+      },
+      useParallaxOcclusion: {
+        type: 'boolean',
+        description: 'Enable deep parallax occlusion mapping.',
+      },
+      parallaxScaleBias: {
+        type: 'number',
+        description: 'Scale bias for parallax depth (default: 0.05).',
+      },
+      proceduralNormalMap: {
+        type: 'boolean',
+        description: 'Generate or disable automatic procedural normal map when proceduralTexture is used.',
       },
       uScale: { type: 'number', description: 'Horizontal texture tiling multiplier (default: 1.0).' },
       vScale: { type: 'number', description: 'Vertical texture tiling multiplier (default: 1.0).' },
@@ -89,18 +109,26 @@ export class CreateMaterialTool extends AbstractTool {
     if (args.wireframe !== undefined) {
       mat.wireframe = !!args.wireframe;
     }
-    if (args.bumpLevel !== undefined && mat.bumpTexture) {
-      mat.bumpTexture.level = Number(args.bumpLevel);
-    }
     if (args.invertNormalMapX !== undefined) {
       mat.invertNormalMapX = !!args.invertNormalMapX;
     }
     if (args.invertNormalMapY !== undefined) {
       mat.invertNormalMapY = !!args.invertNormalMapY;
     }
+    if (args.useParallax !== undefined) {
+      mat.useParallax = !!args.useParallax;
+    }
+    if (args.useParallaxOcclusion !== undefined) {
+      mat.useParallaxOcclusion = !!args.useParallaxOcclusion;
+      if (mat.useParallaxOcclusion) mat.useParallax = true;
+    }
+    if (args.parallaxScaleBias !== undefined) {
+      mat.parallaxScaleBias = Number(args.parallaxScaleBias);
+    }
     mat.backFaceCulling = false;
 
     const createTexturesEnabled = context.aiAgent?.config?.createTextures !== false;
+    const createNormalMapsEnabled = context.aiAgent?.config?.createNormalMaps !== false && createTexturesEnabled;
 
     if ((args.textureUrl || args.albedoTextureUrl) && createTexturesEnabled) {
       const url = String(args.textureUrl || args.albedoTextureUrl);
@@ -113,12 +141,16 @@ export class CreateMaterialTool extends AbstractTool {
       }
     }
 
-    if (args.bumpTextureUrl && createTexturesEnabled) {
-      const url = String(args.bumpTextureUrl);
+    const rawNormalUrl = args.normalMapUrl || args.bumpTextureUrl;
+    if (rawNormalUrl && createNormalMapsEnabled) {
+      const url = String(rawNormalUrl);
       const tex = new Texture(url, context.scene, false, false);
       tex.uScale = typeof args.uScale === 'number' ? args.uScale : 1;
       tex.vScale = typeof args.vScale === 'number' ? args.vScale : 1;
       mat.bumpTexture = tex;
+      if (args.bumpLevel !== undefined) {
+        tex.level = Number(args.bumpLevel);
+      }
     }
 
     if (args.proceduralTexture && createTexturesEnabled) {
@@ -151,7 +183,29 @@ export class CreateMaterialTool extends AbstractTool {
         if (!args.albedoColor) {
           mat.albedoColor = new Color3(1, 1, 1);
         }
+
+        // Automatically generate matching procedural normal map if enabled and not already provided
+        if (createNormalMapsEnabled && !mat.bumpTexture && args.proceduralNormalMap !== false) {
+          const normalDataUrl = generateProceduralNormalMapDataUrl({
+            type: proc.type,
+            scale: proc.scale,
+            strength: typeof args.bumpLevel === 'number' ? args.bumpLevel * 2.0 : 2.0,
+            invertY: !!args.invertNormalMapY,
+          });
+          const normTex = new Texture(normalDataUrl, context.scene, false, false);
+          normTex.name = `${matName}_${proc.type}_normal.png`;
+          normTex.uScale = tex.uScale;
+          normTex.vScale = tex.vScale;
+          mat.bumpTexture = normTex;
+          if (args.bumpLevel !== undefined) {
+            normTex.level = Number(args.bumpLevel);
+          }
+        }
       }
+    }
+
+    if (args.bumpLevel !== undefined && mat.bumpTexture) {
+      mat.bumpTexture.level = Number(args.bumpLevel);
     }
 
     return JSON.stringify({

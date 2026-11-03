@@ -735,6 +735,47 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       expect(mat.albedoTexture.uScale).toBe(5);
       expect(mat.albedoTexture.vScale).toBe(5);
     });
+
+    it('creates normal map on PBR material with normalMapUrl, parallax mapping, and procedural normal generation', async () => {
+      const fakeNormalUrl =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=';
+
+      const result = await service.aiAgent.executeToolCall('modeler_create_material', {
+        materialName: 'NormalStoneMat',
+        normalMapUrl: fakeNormalUrl,
+        bumpLevel: 1.8,
+        invertNormalMapY: true,
+        useParallax: true,
+        useParallaxOcclusion: true,
+        parallaxScaleBias: 0.06,
+      });
+
+      const parsed = JSON.parse(result);
+      expect(parsed.status).toBe('ok');
+
+      const mat = service.scene.getMaterialByName('NormalStoneMat') as any;
+      expect(mat).toBeDefined();
+      expect(mat.bumpTexture).toBeDefined();
+      expect(mat.bumpTexture.level).toBe(1.8);
+      expect(mat.invertNormalMapY).toBe(true);
+      expect(mat.useParallax).toBe(true);
+      expect(mat.useParallaxOcclusion).toBe(true);
+      expect(mat.parallaxScaleBias).toBe(0.06);
+
+      // Verify procedural normal map generation when proceduralTexture is used
+      const procResult = await service.aiAgent.executeToolCall('modeler_create_material', {
+        materialName: 'ProcBrickMat',
+        proceduralTexture: {
+          type: 'brick',
+          scale: 1.0,
+        },
+      });
+      const parsedProc = JSON.parse(procResult);
+      expect(parsedProc.status).toBe('ok');
+      const procMat = service.scene.getMaterialByName('ProcBrickMat') as any;
+      expect(procMat.bumpTexture).toBeDefined();
+      expect(procMat.bumpTexture.name).toContain('ProcBrickMat_brick_normal');
+    });
   });
 });
 
