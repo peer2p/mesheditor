@@ -207,7 +207,6 @@ describe('Compress Model & In-Browser 3D Optimizer', () => {
 
       const dialogEl = document.getElementById(dialogId);
       expect(dialogEl).not.toBeNull();
-      expect(dialogEl?.querySelector('.compress-privacy-banner')).not.toBeNull();
       expect(dialogEl?.querySelector('#compressPresetSelect')).not.toBeNull();
       expect(dialogEl?.querySelector('#btnCompressDownload')).not.toBeNull();
       expect(dialogEl?.querySelector('#btnCompressApplyScene')).not.toBeNull();

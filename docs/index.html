@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mesh Editor — 3D Model Studio &amp; AI Mesh Manipulation Workbench</title>
+  <meta name="description" content="Mesh Editor is a modern, modular 3D model studio and mesh manipulation workbench. Co-create 3D meshes with the AI of your choice, sculpt with CSG booleans, paint voxels, and deploy across Web, Desktop, and Web Components.">
+  <link rel="icon" type="image/svg+xml" href="app-icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- =========================================================================
+       NAVIGATION BAR
+       ========================================================================= -->
+  <header class="site-header">
+    <div class="container nav-container">
+      <a href="#" class="brand">
+        <img src="app-icon.svg" alt="Mesh Editor Logo" class="brand-icon">
+        <span>Mesh Editor</span>
+        <span class="brand-badge">v1.0</span>
+      </a>
+
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#overview" class="nav-link">Overview</a></li>
+          <li><a href="#ai-copilot" class="nav-link">Human + AI</a></li>
+          <li><a href="#adapters" class="nav-link">Adapters</a></li>
+          <li><a href="#plugin-system" class="nav-link">Plugin System</a></li>
+          <li><a href="#features" class="nav-link">Features</a></li>
+          <li><a href="#workflows" class="nav-link">Workflows</a></li>
+          <li><a href="#roadmap" class="nav-link">Roadmap</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="https://github.com/peer2p/mesheditor" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path><path d="M9 18c-4.51 2-5-2-7-2"></path></svg>
+          <span>GitHub</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- =========================================================================
+         HERO SECTION
+         ========================================================================= -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero-header-center">
+          <h1 class="hero-title">
+            Where Human Artistry Meets <span class="text-gradient">AI Precision.</span>
+          </h1>
+          <p class="hero-subtitle">
+            Mesh Editor is an open, modular 3D model studio and geometric workbench. 
+            Co-sculpt 3D meshes side-by-side with the <strong>AI of your choice</strong>, build with CSG booleans, extrude spline paths, paint voxels, and deploy seamlessly as a <strong>Browser App</strong>, native <strong>Desktop Studio</strong>, or embeddable <strong>Web Component</strong>.
+          </p>
+
+          <div class="hero-cta-group">
+            <a href="./app.html" class="btn btn-primary btn-lg btn-glow">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              <span>Launch Studio (Web)</span>
+            </a>
+            <a href="https://github.com/peer2p/mesheditor/releases" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-lg">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Desktop (macOS / Win / Linux)</span>
+            </a>
+          </div>
+
+          <div class="hero-install-cmd">
+            <span>Embed via NPM:</span>
+            <code>npm install mesheditor</code>
+            <button class="btn-copy-cmd" id="btnCopyNpm" title="Copy to clipboard" aria-label="Copy npm install command">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Hero Screenshot Showcase Window Frame -->
+        <div class="hero-screenshot-wrapper">
+          <div class="hero-screenshot-glow"></div>
+          <div class="hero-screenshot-frame">
+            <div class="hero-window-header">
+              <div class="hero-window-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+              </div>
+              <span class="hero-window-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                Mesh Editor Studio &bull; Human + AI Collaborative Session (Ancient Fluted Pillar)
+              </span>
+              <span class="hero-window-badge">Live Viewport</span>
+            </div>
+            <img src="app-screenshot.jpg" alt="Mesh Editor 3D studio interface showing AI Mesh Agent generating an ancient fluted stone pillar with PBR marble material" class="hero-screenshot-img" loading="eager" fetchpriority="high">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         OVERVIEW: WHAT YOU CAN DO WITH MESH EDITOR (AT A GLANCE)
+         ========================================================================= -->
+    <section id="overview" class="section" style="padding-top: 10px; padding-bottom: 20px;">
+      <div class="container">
+        <div class="app-intro-card">
+          <p class="app-intro-lead">
+            <strong>Mesh Editor</strong> is a focused 3D model studio and geometric workbench for creating game-ready props, 3D printable assets, mechanical parts, stylized voxel art, architectural structures, and web-ready 3D components.
+          </p>
+          <p class="app-intro-sub">
+            Start with simple primitives, drawn Bézier splines, imported geometry, or natural language prompts. Shape your model directly in the viewport, co-sculpt side-by-side with the AI of your choice, carve solids with non-destructive CSG booleans, optimize materials, and export seamlessly to the workflow you need.
+          </p>
+
+          <ul class="overview-bullet-grid">
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Build with primitives &amp; curves:</strong> Create boxes, cylinders, spheres, capsules, and tori, or turn 2D Bézier curve splines and cross-sections into solid 3D geometry, curved pipes, and architectural moldings.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Co-create with the AI of your choice:</strong> Partner with local or cloud AI models (Gemini, Claude, GPT-4o, Ollama, LM Studio) to generate meshes from text prompts, sketches, or viewport vision snapshots within strict polygon budgets.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Combine shapes with CSG2 Booleans:</strong> Combine meshes with editable Union, Subtract, and Intersect Boolean stacks. Adjust operands interactively in the 3D viewport before applying the result.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Shape models with facet &amp; vertex tools:</strong> Transform, Push/Pull, Extrude faces, Inset, Bevel, Knife, normal flipping, subdivision, vertex welding, and soft selection falloffs.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Sculpt and paint with 3D voxels:</strong> Place, erase, and paint block-by-block voxels directly in the viewport with raycast surface snapping, custom RGB color palettes, and variable brush sizes.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Work precisely with units &amp; snapping:</strong> Navigate with Universal Orbit, Pan, and WASD fly-through. Work with project units, grid, vertex snapping, numeric controls, and focus (<kbd>F</kbd>).</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Configure PBR materials &amp; textures:</strong> Assign realistic PBR materials with controls for Albedo, Metallic, Roughness, Normal mapping, Emissive glow, Alpha blending, and UV scale/offset with Poly Haven presets.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Compress &amp; optimize 3D assets:</strong> Reduce file sizes by up to 90% in-browser using Khronos Draco geometry compression, Meshopt decoding, intelligent decimation, and WebP textures.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Organize scene hierarchies:</strong> Group objects (<kbd>⌘G</kbd> / <kbd>⇧⌘G</kbd>), manage parent-child relationships, filter by name in the Outliner, isolate meshes, and lock transforms for articulated props and complex scenes.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Preview animations &amp; timelines:</strong> Play multi-clip skeletal animations, scrub timelines, toggle synchronized looping, and adjust playback speed controls on imported GLTF/GLB models.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Present with studio lighting:</strong> Render your work with HDR environment lighting, real-time reflections, directional shadows, hemispheric illumination, bloom post-processing, and customizable ground grids.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Import &amp; export universal 3D formats:</strong> Import OBJ, STL, PLY, and glTF/GLB geometry. Export textured binary GLB bundles, STL surface meshes for 3D printing, Wavefront OBJ, or PLY point clouds.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Extend with the Plugin SDK:</strong> Add custom dropdown menu items, inject toolbar buttons, hook into lifecycle events, and connect direct export pipelines to Unreal Engine, Unity, Godot, or cloud asset managers.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Deploy across Web, Desktop &amp; Embeds:</strong> Run 100% in your browser with zero installs, use the native macOS, Windows, and Linux desktop app with OS file associations, or embed <code>&lt;mesh-editor&gt;</code> into your own software.</span>
+            </li>
+          </ul>
+
+          <div class="overview-footer-note">
+            <span>Choose GLB, OBJ, or STL export units to match your game engine, Blender, or 3D printing workflow.</span>
+            <div class="overview-footer-badges">
+              <span class="overview-footer-badge">macOS &bull; Windows &bull; Linux Native</span>
+              <span class="overview-footer-badge">Zero-Install Web</span>
+              <span class="overview-footer-badge">&lt;mesh-editor&gt; Web Component</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         STATS & HIGHLIGHTS TICKER
+         ========================================================================= -->
+    <section class="stats-bar">
+      <div class="container stats-grid">
+        <div class="stat-item">
+          <div class="stat-val text-gradient-cyan">100%</div>
+          <div class="stat-label">In-Browser &amp; Zero File Uploads</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-val text-gradient-cyan">BYO-AI</div>
+          <div class="stat-label">OpenAI, Gemini, Ollama, Claude, LM Studio</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-val text-gradient-cyan">3 Adapters</div>
+          <div class="stat-label">Browser, Desktop App &amp; Web Component</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-val text-gradient-cyan">Multi-Format</div>
+          <div class="stat-label">GLB, GLTF, OBJ, STL, PLY, Babylon</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         CORE FOCUS: HUMAN + AI CO-CREATION
+         ========================================================================= -->
+    <section id="ai-copilot" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">Human + AI Collaboration</span>
+          <h2 class="section-title">Co-Create With the AI of Your Choice.</h2>
+          <p class="section-desc">
+            Mesh Editor treats AI not as an unguided black box, but as an interactive, tool-augmented 3D apprentice. 
+            You direct creative vision and shape aesthetics with manual 3D gizmos, while your chosen model executes complex geometric math, CSG subtractions, and procedural materials in real time.
+          </p>
+        </div>
+
+        <div class="ai-feature-card-grid">
+          <!-- Card 1 -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 0 0-8 8c0 3.36 2.08 6.23 5 7.42V20a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-2.58c2.92-1.19 5-4.06 5-7.42a8 8 0 0 0-8-8z"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line><path d="M10 13a2 2 0 0 0 4 0"></path></svg>
+            </div>
+            <h3 class="card-title">Bring Your Own AI (BYO-AI)</h3>
+            <p class="card-desc">
+              Connect to any OpenAI-compatible API endpoint with zero vendor lock-in. Use cloud models like <strong>Gemini 3.8 Flash &amp; Pro</strong>, <strong>Claude Sonnet</strong>, or <strong>GPT-4o</strong>, or run 100% private and offline on your own GPU via <strong>Ollama</strong> and <strong>LM Studio</strong>.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Antigravity Bridge</span>
+              <span class="card-tag">Gemini Flash</span>
+              <span class="card-tag">OpenAI</span>
+              <span class="card-tag">Ollama Local</span>
+              <span class="card-tag">LM Studio</span>
+            </div>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </div>
+            <h3 class="card-title">3D Vision &amp; Image-to-Mesh</h3>
+            <p class="card-desc">
+              Feed the AI visual context. Toggle the <strong>+ 3D View</strong> switch to send an instantaneous snapshot of your active viewport, or attach 2D concept sketches and reference photographs for guided Image-to-Mesh reconstructions.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Viewport Snapping</span>
+              <span class="card-tag">Image Reference</span>
+              <span class="card-tag">Visual Inspection</span>
+            </div>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+            </div>
+            <h3 class="card-title">Strict Geometric Poly Budgets</h3>
+            <p class="card-desc">
+              Control the exact polygon count before generation begins. Set targets anywhere from <strong>200 low-poly primitives</strong> for mobile games up to <strong>1,000,000 polygons</strong> for cinematic assets, ensuring assets fit your game engine performance budget.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Min / Max Sliders</span>
+              <span class="card-tag">Preset Poly Chips</span>
+              <span class="card-tag">Game Ready</span>
+            </div>
+          </div>
+
+          <!-- Card 4 -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+            </div>
+            <h3 class="card-title">Speech-to-Text Voice Commands</h3>
+            <p class="card-desc">
+              Keep both hands on your mouse and keyboard. Tap the microphone icon and speak natural commands like <em>&ldquo;Hollow out the selected cylinder and cut four windows&rdquo;</em> for immediate hands-free 3D execution.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Voice Dictation</span>
+              <span class="card-tag">Hands-Free</span>
+              <span class="card-tag">Instant Parsing</span>
+            </div>
+          </div>
+
+          <!-- Card 5 -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            </div>
+            <h3 class="card-title">Procedural Textures &amp; Normal Maps</h3>
+            <p class="card-desc">
+              The AI automatically textures created meshes with seamless PBR materials, calculates UV coordinates, and computes normal/bump depth maps for micro-surface relief without inflating polygon counts.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">PBR Materials</span>
+              <span class="card-tag">Normal Maps</span>
+              <span class="card-tag">UV Generation</span>
+            </div>
+          </div>
+
+          <!-- Card 6 -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+            </div>
+            <h3 class="card-title">Non-Destructive Undo &amp; Redo</h3>
+            <p class="card-desc">
+              Every operation executed by the AI integrates into the core undo/redo history stack (<kbd>&cmd;Z</kbd> / <kbd>&cmd;&shift;Z</kbd>). Never lose work: iterate fearlessly, revert AI changes, and tweak mesh vertices manually anytime.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Full History Stack</span>
+              <span class="card-tag">Safe Iteration</span>
+              <span class="card-tag">Manual Tweakable</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive AI Co-Pilot Simulation Box -->
+        <div class="ai-showcase-box">
+          <div class="ai-dialog-preview">
+            <div class="ai-dialog-header">
+              <span class="ai-dialog-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"></rect><circle cx="12" cy="5" r="2"></circle><path d="M12 7v4"></path><line x1="8" y1="16" x2="8" y2="16"></line><line x1="16" y1="16" x2="16" y2="16"></line></svg>
+                AI Mesh Agent &bull; Collaborative Session
+              </span>
+              <span class="status-badge-active">Online</span>
+            </div>
+
+            <div class="ai-chip-bar">
+              <span class="ai-chip">Model: gpt-4o / gemini-3.8-flash</span>
+              <span class="ai-chip">Budget: 5,000 Polys</span>
+              <span class="ai-chip">Normal Maps: ON</span>
+            </div>
+
+            <div class="ai-chat-thread">
+              <div class="chat-bubble user">
+                Build an ancient fluted stone pillar with a stepped base and ornate capital.
+              </div>
+              <div class="chat-bubble agent">
+                <strong>Mesh Agent:</strong> Creating classical column assembly with a 3-tier stepped plinth, fluted cylinder shaft, and Ionic volute capital.
+                <div class="chat-tool-execution">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  <span>create_primitive(type: 'cylinder', tessellation: 24, height: 4.5)</span>
+                </div>
+                <div class="chat-tool-execution">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  <span>apply_material(roughness: 0.85, normalMap: 'fluted_stone_relief')</span>
+                </div>
+              </div>
+              <div class="chat-bubble user">
+                Hollow out the column core and cut an arched entry at the bottom for game player passage.
+              </div>
+              <div class="chat-bubble agent">
+                <strong>Mesh Agent:</strong> Executing CSG2 boolean subtraction to hollow interior cavity and carve the arched archway.
+                <div class="chat-tool-execution">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  <span>execute_csg_boolean(operation: 'subtract', target: 'Pillar_Main')</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ai-preview-viewport">
+            <div class="viewport-overlay-controls">
+              <span class="viewport-tag">FPS: 60</span>
+              <span class="viewport-tag">Vertices: 26,358</span>
+              <span class="viewport-tag">PBR Shader: Active</span>
+            </div>
+
+            <!-- 3D Holographic CSS Stage (Inspired by App Loading Indicators) -->
+            <div class="me-loader-ambient-glow" style="width: 280px; height: 280px;"></div>
+
+            <div class="me-mesh-stage" style="margin-top: 20px; margin-bottom: 20px;">
+              <!-- Tri-Axis Orbit Rings -->
+              <div class="me-orbit-ring me-orbit-ring-1"></div>
+              <div class="me-orbit-ring me-orbit-ring-2"></div>
+              <div class="me-orbit-ring me-orbit-ring-3"></div>
+
+              <!-- Central 3D Wireframe Mesh Cube & Core -->
+              <div class="me-3d-scene">
+                <div class="me-3d-mesh-assembly">
+                  <div class="me-mesh-face me-face-front"><span></span></div>
+                  <div class="me-mesh-face me-face-back"><span></span></div>
+                  <div class="me-mesh-face me-face-right"><span></span></div>
+                  <div class="me-mesh-face me-face-left"><span></span></div>
+                  <div class="me-mesh-face me-face-top"><span></span></div>
+                  <div class="me-mesh-face me-face-bottom"><span></span></div>
+
+                  <div class="me-inner-octahedron">
+                    <div class="me-octa-plane me-octa-1"></div>
+                    <div class="me-octa-plane me-octa-2"></div>
+                    <div class="me-octa-plane me-octa-3"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Perspective Holographic Ground Grid & Laser Scanner -->
+              <div class="me-ground-holo-grid">
+                <div class="me-laser-scan"></div>
+              </div>
+            </div>
+
+            <div class="visual-card-footer" style="width: 100%; max-width: 300px;">
+              <div class="visual-card-title-row">
+                <span class="visual-card-title" style="font-size: 12.5px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+                  Babylon.js v9.29 &bull; Real-Time CSG2
+                </span>
+                <span class="status-badge-active">Active</span>
+              </div>
+              <div class="shimmer-progress-bar">
+                <div class="shimmer-progress-fill"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         ADAPTER ARCHITECTURE
+         ========================================================================= -->
+    <section id="adapters" class="section" style="background: rgba(16, 21, 30, 0.4);">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">Platform Adapter Architecture</span>
+          <h2 class="section-title">One 3D Engine. Three Powerful Target Adapters.</h2>
+          <p class="section-desc">
+            Mesh Editor is engineered on a strictly decoupled <strong>Platform Adapter Architecture</strong>. 
+            The core 3D engine operates on pure canvas, geometry arrays, and memory blobs, completely agnostic of host environment, native APIs, or operating system boundaries.
+          </p>
+        </div>
+
+        <div class="adapters-grid">
+          <!-- 1. Browser Adapter -->
+          <div class="adapter-card">
+            <div class="adapter-header">
+              <div class="adapter-icon">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+              </div>
+              <div>
+                <h3 class="adapter-title">Browser Platform</h3>
+                <span class="adapter-sub">BrowserPlatformAdapter</span>
+              </div>
+            </div>
+            <p class="card-desc">
+              Zero installation required. Launch instantly in Chrome, Firefox, Safari, or Edge. Runs 100% client-side via hardware-accelerated WebGL2 and WebGPU.
+            </p>
+            <ul class="adapter-list">
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Instant HTML5 drag-and-drop 3D file loading</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Client-side binary glTF/GLB Blob streaming</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Full privacy: 3D models never touch any external server</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Offline support via local browser memory caches</span>
+              </li>
+            </ul>
+            <a href="./app.html" class="btn btn-primary" style="margin-top: auto;">Open Web App</a>
+          </div>
+
+          <!-- 2. Electron Desktop Adapter -->
+          <div class="adapter-card">
+            <div class="adapter-header">
+              <div class="adapter-icon">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+              </div>
+              <div>
+                <h3 class="adapter-title">Desktop Studio</h3>
+                <span class="adapter-sub">ElectronPlatformAdapter</span>
+              </div>
+            </div>
+            <p class="card-desc">
+              High-performance native desktop application available for macOS, Windows, and Linux. Built with hardware-accelerated GPU pipelines and OS integration.
+            </p>
+            <ul class="adapter-list">
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Native OS file dialogs (showOpenDialog, showSaveDialog)</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Native macOS menu bar &amp; Windows/Linux app menus</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>File associations: double-click .glb, .obj, .stl files</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Multi-window support with isolated 3D viewports</span>
+              </li>
+            </ul>
+            <a href="https://github.com/peer2p/mesheditor/releases" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="margin-top: auto;">Download Installer</a>
+          </div>
+
+          <!-- 3. Host App Adapter & Web Component -->
+          <div class="adapter-card">
+            <div class="adapter-header">
+              <div class="adapter-icon">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+              </div>
+              <div>
+                <h3 class="adapter-title">Host App &amp; Component</h3>
+                <span class="adapter-sub">HostAppAdapter &bull; &lt;mesh-editor&gt;</span>
+              </div>
+            </div>
+            <p class="card-desc">
+              Embed the complete 3D modeling suite directly into your existing web applications, CMS platforms, level editors, or React/Vue/Angular products.
+            </p>
+            <ul class="adapter-list">
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Standard Web Component: &lt;mesh-editor src=&quot;...&quot;&gt;</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Custom save &amp; export callbacks wired to host backends</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Bi-directional event bus (onMeshSelected, onStatusChanged)</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Zero styling leakage via Shadow DOM or scoped containers</span>
+              </li>
+            </ul>
+            <a href="#plugin-system" class="btn btn-secondary" style="margin-top: auto;">Explore SDK</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         MODULAR PLUGIN SYSTEM
+         ========================================================================= -->
+    <section id="plugin-system" class="section">
+      <div class="container">
+        <div class="plugin-section-grid">
+          <div>
+            <span class="section-tag">Extensibility &amp; Integrations</span>
+            <h2 class="section-title">Extend the Studio. Integrate Your Workflow.</h2>
+            <p class="section-desc" style="margin-bottom: 20px;">
+              Whether you are building custom game studio pipelines, connecting to enterprise cloud asset managers, or creating specialized procedural algorithms, Mesh Editor's <strong>Plugin Architecture</strong> gives you clean, decoupled hooks into every layer.
+            </p>
+
+            <ul class="adapter-list" style="margin-bottom: 28px;">
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Custom Menus:</strong> Register items into File, Actions, Tools, or View dropdowns.</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Toolbar Actions:</strong> Inject branded buttons and quick toggles into the UI.</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Full 3D Engine Access:</strong> Direct control of Babylon.js Scene, Meshes, Gizmos &amp; Lights.</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Game Engine Bridges:</strong> Direct one-click exports to Unreal Engine, Unity, or Godot.</span>
+              </li>
+            </ul>
+
+            <div style="display: flex; gap: 12px;">
+              <a href="https://github.com/peer2p/mesheditor#modular-tool-architecture" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+                Plugin API Documentation
+              </a>
+            </div>
+          </div>
+
+          <!-- Code Window -->
+          <div class="code-window">
+            <div class="code-header">
+              <div class="code-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+              </div>
+              <span class="code-title">MyCustomStudioPlugin.ts</span>
+              <span style="font-size: 11px; color: var(--accent-hover);">TypeScript</span>
+            </div>
+            <pre class="code-body"><code><span class="code-kw">import</span> { MeshEditorPlugin, MeshEditorPluginContext } <span class="code-kw">from</span> <span class="code-str">'mesheditor'</span>;
+
+<span class="code-kw">export class</span> <span class="code-obj">GameAssetSyncPlugin</span> <span class="code-kw">implements</span> <span class="code-obj">MeshEditorPlugin</span> {
+  <span class="code-kw">readonly</span> name = <span class="code-str">'game_asset_sync'</span>;
+  <span class="code-kw">readonly</span> version = <span class="code-str">'1.0.0'</span>;
+
+  <span class="code-fn">initialize</span>(ctx: <span class="code-obj">MeshEditorPluginContext</span>) {
+    <span class="code-cm">// Register custom item into File dropdown</span>
+    ctx.<span class="code-fn">registerFileMenuItem</span>({
+      id: <span class="code-str">'menuSyncGameAssets'</span>,
+      label: <span class="code-str">'Push to Unreal Engine...'</span>,
+      icon: <span class="code-str">'upload-cloud'</span>,
+      shortcut: <span class="code-str">'⌘U'</span>,
+      onClick: <span class="code-kw">async</span> () => {
+        <span class="code-kw">const</span> glbBlob = <span class="code-kw">await</span> ctx.<span class="code-fn">exportModel</span>();
+        <span class="code-kw">await</span> <span class="code-fn">fetch</span>(<span class="code-str">'http://localhost:8080/sync'</span>, {
+          method: <span class="code-str">'POST'</span>,
+          body: glbBlob
+        });
+        ctx.<span class="code-fn">showToast</span>(<span class="code-str">'Pushed to Unreal Engine!'</span>, <span class="code-str">'success'</span>);
+      }
+    });
+  }
+}</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         COMPREHENSIVE FEATURE MATRIX (DENRIM FORGE INSPIRATION)
+         ========================================================================= -->
+    <section id="features" class="section" style="background: rgba(16, 21, 30, 0.4);">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">Complete Feature Breakdown</span>
+          <h2 class="section-title">Everything You Need to Craft Game-Ready 3D Meshes.</h2>
+          <p class="section-desc">
+            From procedural geometric primitives to complex CSG boolean stacks, UV texturing, and in-browser compression: 
+            Mesh Editor gives artists and developers precision control over every face, vertex, and normal.
+          </p>
+        </div>
+
+        <div class="features-breakdown-grid">
+          <!-- Feature 1 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+            </div>
+            <h4 class="feature-box-title">Primitives &amp; Shapes</h4>
+            <p class="feature-box-desc">
+              Build with boxes, cylinders, spheres, capsules, tori, tubes, polyhedra, and convert 2D SVG paths into solid 3D geometry.
+            </p>
+          </div>
+
+          <!-- Feature 2 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="7"></circle><circle cx="15" cy="15" r="7"></circle></svg>
+            </div>
+            <h4 class="feature-box-title">Interactive CSG2 Booleans</h4>
+            <p class="feature-box-desc">
+              Combine meshes with non-destructive Union, Subtract, and Intersect operations. Adjust operands in real-time before baking results.
+            </p>
+          </div>
+
+          <!-- Feature 3 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path></svg>
+            </div>
+            <h4 class="feature-box-title">Facet &amp; Vertex Sculpting</h4>
+            <p class="feature-box-desc">
+              Manipulate vertices directly with Push/Pull, Extrude, Inset, Bevel, Knife, normal flipping, soft selection falloff, and loop cuts.
+            </p>
+          </div>
+
+          <!-- Feature 4 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            </div>
+            <h4 class="feature-box-title">Voxel Painter</h4>
+            <p class="feature-box-desc">
+              Sculpt and paint block by block in 3D space with raycast surface snapping, custom RGB palettes, and variable brush radius sizes.
+            </p>
+          </div>
+
+          <!-- Feature 5 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4c0 8.8 7.2 16 16 16"></path><path d="M4 14c0 3.3 2.7 6 6 6"></path></svg>
+            </div>
+            <h4 class="feature-box-title">Path &amp; Spline Extrusion</h4>
+            <p class="feature-box-desc">
+              Draw interactive 2D Bézier curve splines and extrude customized 2D cross-sections into 3D curved pipes, tunnels, and architectural trims.
+            </p>
+          </div>
+
+          <!-- Feature 6 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="m4.93 4.93 4.24 4.24"></path><path d="m14.83 9.17 4.24-4.24"></path><path d="m14.83 14.83 4.24 4.24"></path><path d="m9.17 14.83-4.24 4.24"></path></svg>
+            </div>
+            <h4 class="feature-box-title">PBR Materials &amp; Textures</h4>
+            <p class="feature-box-desc">
+              Configure Roughness, Metallic, Albedo, Normal mapping, Emissive glow, Alpha blending, and UV coordinate tiling with Poly Haven support.
+            </p>
+          </div>
+
+          <!-- Feature 7 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+            </div>
+            <h4 class="feature-box-title">Draco &amp; Meshopt Compression</h4>
+            <p class="feature-box-desc">
+              Reduce 3D model asset sizes by up to 90% in-browser using Khronos Draco geometry compression, Meshopt decoding, and WebP textures.
+            </p>
+          </div>
+
+          <!-- Feature 8 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            </div>
+            <h4 class="feature-box-title">Animation Player</h4>
+            <p class="feature-box-desc">
+              Scrub timelines, preview multi-clip animations, toggle synchronized looping, and adjust playback speed controls on imported GLB/GLTF assets.
+            </p>
+          </div>
+
+          <!-- Feature 9 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18"></path><path d="M3 12h18"></path></svg>
+            </div>
+            <h4 class="feature-box-title">Precision Gizmos &amp; Snapping</h4>
+            <p class="feature-box-desc">
+              Move, Rotate, Scale, and Bounding Box gizmos with numeric coordinate inputs, vertex snapping, and customizable grid increments.
+            </p>
+          </div>
+
+          <!-- Feature 10 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            </div>
+            <h4 class="feature-box-title">Studio HDR Lighting</h4>
+            <p class="feature-box-desc">
+              Present models with real-time HDR environment reflections, directional shadows, hemispheric lighting, bloom post-processing, and ground shadows.
+            </p>
+          </div>
+
+          <!-- Feature 11 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            </div>
+            <h4 class="feature-box-title">Hierarchical Outliner</h4>
+            <p class="feature-box-desc">
+              Organize models into groups and parent-child scene trees. Filter by name, toggle visibility, isolate objects, and lock transforms.
+            </p>
+          </div>
+
+          <!-- Feature 12 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </div>
+            <h4 class="feature-box-title">Universal 3D Export</h4>
+            <p class="feature-box-desc">
+              Import and export GLB, GLTF, OBJ, STL, PLY, and Babylon scenes with automatic companion buffer resolution and embedded texture packaging.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         WORKFLOWS & USE CASES
+         ========================================================================= -->
+    <section id="workflows" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">Tailored Workflows</span>
+          <h2 class="section-title">Built for Creators Across the Industry.</h2>
+          <p class="section-desc">
+            Whether preparing optimized game assets, 3D printing functional parts, or creating interactive e-commerce product configurators: Mesh Editor accelerates your pipeline.
+          </p>
+        </div>
+
+        <div class="ai-feature-card-grid">
+          <div class="feature-card">
+            <h3 class="card-title">Game Developers &amp; Indies</h3>
+            <p class="card-desc">
+              Prototype level geometry and game props rapidly. Generate low-poly assets with your local AI, clean non-manifold geometry, compress with Draco into binary GLB, and import directly into Unity, Unreal Engine, or Godot.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <h3 class="card-title">3D Printing &amp; Prototyping</h3>
+            <p class="card-desc">
+              Construct watertight solids using CSG2 boolean subtraction. Export clean STL or OBJ files with metric unit scaling, verified normals, and inspected manifold topology ready for Cura, PrusaSlicer, or Bambu Studio.
+            </p>
+          </div>
+
+          <div class="feature-card">
+            <h3 class="card-title">Web &amp; E-Commerce Teams</h3>
+            <p class="card-desc">
+              Embed <code>&lt;mesh-editor&gt;</code> into internal web tools and portals. Allow non-technical team members to inspect, texture, re-color, and compress 3D product catalog models directly inside your internal dashboards.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         ROADMAP: NEXT STEPS
+         ========================================================================= -->
+    <section id="roadmap" class="section" style="background: rgba(16, 21, 30, 0.4);">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">Development Roadmap</span>
+          <h2 class="section-title">Next Steps &amp; Upcoming Milestones.</h2>
+          <p class="section-desc">
+            We are actively expanding Mesh Editor into a complete end-to-end character and asset creation suite. Here is our near-term development roadmap.
+          </p>
+        </div>
+
+        <div class="roadmap-grid">
+          <!-- Step 1 -->
+          <div class="roadmap-card">
+            <span class="roadmap-badge badge-in-progress">In Progress</span>
+            <div class="roadmap-step-num">Milestone 01</div>
+            <h3 class="roadmap-title">1. Bugfixing &amp; Stabilization</h3>
+            <p class="roadmap-desc">
+              Continuous stabilization of core geometric operations, hardening non-manifold CSG boolean edge cases, fine-tuning WebGL memory reclamation during intense multi-mesh sessions, and cross-browser performance benchmarks.
+            </p>
+            <ul class="roadmap-items">
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>CSG2 intersection robustness on co-planar faces</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Zero-leak GPU texture buffer disposal</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Enhanced touch &amp; tablet trackpad gestures</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="roadmap-card">
+            <span class="roadmap-badge badge-upcoming">Upcoming</span>
+            <div class="roadmap-step-num">Milestone 02</div>
+            <h3 class="roadmap-title">2. Skeletons &amp; Rigging</h3>
+            <p class="roadmap-desc">
+              Comprehensive skeletal structure creation and bone rigging system. Add joint hierarchies, visualize bone chains directly in the 3D viewport, configure Inverse Kinematics (IK), and bind meshes with automatic vertex weight painting.
+            </p>
+            <ul class="roadmap-items">
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Interactive 3D bone &amp; joint hierarchy builder</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Inverse Kinematics (IK) solver handles</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Interactive vertex weight brush &amp; skin binding</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="roadmap-card">
+            <span class="roadmap-badge badge-upcoming">Upcoming</span>
+            <div class="roadmap-step-num">Milestone 03</div>
+            <h3 class="roadmap-title">3. Animation Editing</h3>
+            <p class="roadmap-desc">
+              Full-featured skeletal and transform animation authoring environment. Keyframe timeline, dope sheet, curve interpolation (B&eacute;zier, linear, step), pose library, and multi-track clip sequencing for GLB export.
+            </p>
+            <ul class="roadmap-items">
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Keyframe timeline with dope sheet &amp; curve editor</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Pose library &amp; bone transform keying</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Non-linear animation clip tracks &amp; blending</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         CALL TO ACTION BANNER
+         ========================================================================= -->
+    <div class="container">
+      <div class="cta-banner">
+        <h2 class="cta-banner-title">Start Creating 3D Models in Seconds.</h2>
+        <p class="cta-banner-sub">
+          No credit card. No account required. Open the standalone web studio right now, or download the native desktop app for macOS, Windows, and Linux.
+        </p>
+        <div style="display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;">
+          <a href="./app.html" class="btn btn-primary btn-lg btn-glow">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>Launch Studio Online</span>
+          </a>
+          <a href="https://github.com/peer2p/mesheditor/releases" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-lg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>Download Desktop Installer</span>
+          </a>
+          <a href="https://github.com/peer2p/mesheditor" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-lg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"></path><path d="M9 18c-4.51 2-5-2-7-2"></path></svg>
+            <span>View Source on GitHub</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- =========================================================================
+       FOOTER
+       ========================================================================= -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <img src="app-icon.svg" alt="Mesh Editor Icon" style="width: 28px; height: 28px;">
+          <span style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Mesh Editor</span>
+        </div>
+        <div style="display: flex; gap: 24px;">
+          <a href="#ai-copilot" class="nav-link">Human + AI</a>
+          <a href="#adapters" class="nav-link">Adapters</a>
+          <a href="#plugin-system" class="nav-link">Plugin SDK</a>
+          <a href="#roadmap" class="nav-link">Roadmap</a>
+          <a href="https://github.com/peer2p/mesheditor" target="_blank" rel="noopener noreferrer" class="nav-link">GitHub</a>
+        </div>
+      </div>
+      <div class="footer-copy">
+        <span>&copy; 2026 Daniel Peer. Released under the ISC License. Built with Babylon.js &amp; TypeScript.</span>
+        <span>Independent 3D Open Source Studio</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Interactive JavaScript for Copy Commands & Smooth Toggles -->
+  <script>
+    document.getElementById('btnCopyNpm').addEventListener('click', function() {
+      navigator.clipboard.writeText('npm install mesheditor').then(() => {
+        this.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        setTimeout(() => {
+          this.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+        }, 2000);
+      });
+    });
+  </script>
+</body>
+</html>
+

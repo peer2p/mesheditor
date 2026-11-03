@@ -33,8 +33,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Standalone Web Application (dist/)
-        run: npm run build
+      - name: Build Standalone Web Application & Prepare GitHub Pages
+        run: npm run build:pages
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
