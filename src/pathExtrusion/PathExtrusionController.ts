@@ -111,6 +111,7 @@ export class PathExtrusionController {
   }
 
   public setActive(active: boolean): void {
+    if (this.isActive === active) return;
     this.isActive = active;
     if (active) {
       if (this.service.voxelPainter?.isActive) {
@@ -122,7 +123,11 @@ export class PathExtrusionController {
     } else {
       this.cleanupObservers();
       this.clearMarkers();
-      this.service.gizmoManager.attachToMesh(null);
+      if (this.service.selectedNodes.length > 0) {
+        this.service.refreshGizmoAttachment();
+      } else {
+        this.service.gizmoManager.attachToMesh(null);
+      }
     }
     this.onStateChanged?.();
   }

@@ -334,4 +334,64 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
     btnMerge?.click();
     expect(mergeCalled).toBe(true);
   });
+
+  it('switches gizmos via toolbar buttons without deselecting meshes and displays updated help modal with snapping and selection', () => {
+    app = new MeshEditorApp({
+      container,
+      engine,
+    });
+
+    const box = app.service.createPrimitive({
+      shape: 'Box',
+      name: 'AppGizmoBox',
+      size: 1,
+      width: 1,
+      height: 1,
+      depth: 1,
+      subdivisions: 1,
+      tessellation: 16,
+      color: '#ff5500',
+    });
+    app.service.selectNodes([box]);
+    expect(app.service.selectedNodes).toEqual([box]);
+
+    const btnRotate = container.querySelector('#btnGizmoRotate') as HTMLButtonElement;
+    const btnTranslate = container.querySelector('#btnGizmoTranslate') as HTMLButtonElement;
+    const btnScale = container.querySelector('#btnGizmoScale') as HTMLButtonElement;
+    const btnBounds = container.querySelector('#btnGizmoBounds') as HTMLButtonElement;
+
+    // Switch to Rotate via UI button
+    btnRotate.click();
+    expect(btnRotate.classList.contains('active')).toBe(true);
+    expect(btnTranslate.classList.contains('active')).toBe(false);
+    expect(app.service.selectedNodes).toEqual([box]);
+    expect(app.service.gizmoManager.rotationGizmoEnabled).toBe(true);
+    expect(app.service.gizmoManager.positionGizmoEnabled).toBe(false);
+
+    // Switch to Scale via UI button
+    btnScale.click();
+    expect(btnScale.classList.contains('active')).toBe(true);
+    expect(app.service.selectedNodes).toEqual([box]);
+    expect(app.service.gizmoManager.scaleGizmoEnabled).toBe(true);
+
+    // Switch to Bounds via UI button
+    btnBounds.click();
+    expect(btnBounds.classList.contains('active')).toBe(true);
+    expect(app.service.selectedNodes).toEqual([box]);
+
+    // Switch back to Translate
+    btnTranslate.click();
+    expect(btnTranslate.classList.contains('active')).toBe(true);
+    expect(app.service.selectedNodes).toEqual([box]);
+
+    // Verify Help Modal updated contents
+    const helpModal = container.querySelector('#helpModal') as HTMLElement;
+    expect(helpModal).not.toBeNull();
+    const helpText = helpModal.textContent || '';
+    expect(helpText).toContain('Mouse Controls & Selection');
+    expect(helpText).toContain('Marquee / rectangle box select');
+    expect(helpText).toContain('Shift+Click / Cmd+Click');
+    expect(helpText).toContain('Snap movement to Move Grid (default: 0.1) or rotation to angle steps (default: 5°)');
+    expect(helpText).toContain('Multi-Selection & Scene Tree');
+  });
 });

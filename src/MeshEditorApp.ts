@@ -914,17 +914,14 @@ export class MeshEditorApp {
       btnScale?.classList.toggle('active', mode === 'scale');
       btnBounds?.classList.toggle('active', mode === 'bounds');
 
-      this.service.gizmoManager.positionGizmoEnabled = mode === 'translate';
-      this.service.gizmoManager.rotationGizmoEnabled = mode === 'rotate';
-      this.service.gizmoManager.scaleGizmoEnabled = mode === 'scale';
-      this.service.gizmoManager.boundingBoxGizmoEnabled = mode === 'bounds';
-
       // Switching to standard transform gizmos deactivates exclusive 3D tools without closing their dialogs
       for (const tool of this.editorTools) {
-        if (tool.isExclusive3DTool) {
+        if (tool.isExclusive3DTool && tool.isActive?.(this)) {
           tool.onDeactivate?.(this);
         }
       }
+
+      this.service.setGizmoMode(mode);
       this.updatePanelButtonStates();
     };
 
@@ -2025,6 +2022,14 @@ export class MeshEditorApp {
       .add(this.service.sceneParams, 'cameraSpeed', 0.1, 2.0, 0.05)
       .name('Camera Speed')
       .onChange((v) => this.service.setCameraSpeed(v));
+    this.guiScene
+      .add(this.service.sceneParams, 'translateSnap', 0.01, 50.0, 0.05)
+      .name('Move Snap')
+      .onChange((v) => this.service.setTranslateSnap(v));
+    this.guiScene
+      .add(this.service.sceneParams, 'rotateSnap', 1, 90, 1)
+      .name('Rotate Snap (°)')
+      .onChange((v) => this.service.setRotateSnap(v));
 
     // 2. Mesh Properties GUI
     const containerMesh = document.getElementById('gui-mesh-container') || document.getElementById('gui-container-mesh');
@@ -3243,6 +3248,10 @@ export class MeshEditorApp {
       // Prevent repetitive rapid firing when keys are held down
       if (e.repeat) return;
 
+      if (e.key === 'Meta' || e.key === 'Control' || e.metaKey || e.ctrlKey) {
+        this.service.setSnapModifierActive(true);
+      }
+
       // Undo / Redo
       if ((e.metaKey || e.ctrlKey) && key === 'z') {
         e.preventDefault();
@@ -3348,6 +3357,9 @@ export class MeshEditorApp {
       }
 
       const key = e.key.toLowerCase();
+      if (e.key === 'Meta' || e.key === 'Control' || (!e.metaKey && !e.ctrlKey)) {
+        this.service.setSnapModifierActive(false);
+      }
       if (isNavigationKey(key, e) && document.activeElement !== this.canvas && e.target !== this.canvas) {
         const forwardEvent = new KeyboardEvent(e.type, {
           key: e.key,
@@ -3359,6 +3371,10 @@ export class MeshEditorApp {
         });
         this.canvas?.dispatchEvent(forwardEvent);
       }
+    });
+
+    window.addEventListener('blur', () => {
+      this.service.setSnapModifierActive(false);
     });
   }
 

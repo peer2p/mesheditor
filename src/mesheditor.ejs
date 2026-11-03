@@ -388,32 +388,37 @@
           </div>
           <div class="modal-body">
             <div class="help-section">
-              <h4><i class="app-icon" data-lucide="mouse"></i> Mouse Controls</h4>
+              <h4><i class="app-icon" data-lucide="mouse"></i> Mouse Controls & Selection</h4>
               <table class="help-table">
                 <tr>
                   <td>Left Click</td>
                   <td>Select mesh or facet & drag transform gizmos</td>
                 </tr>
                 <tr>
-                  <td>Right Click (Hold)</td>
+                  <td>Shift+Click / Cmd+Click</td>
+                  <td>Toggle selection / multi-select individual meshes</td>
+                </tr>
+                <tr>
+                  <td>Click & Drag (Viewport)</td>
+                  <td>Marquee / rectangle box select multiple meshes (Shift/Cmd for additive)</td>
+                </tr>
+                <tr>
+                  <td>Click on Ground / Empty Space</td>
+                  <td>Clear selection (unless Shift or Cmd is held)</td>
+                </tr>
+                <tr>
+                  <td>Right Click (Hold & Drag)</td>
                   <td>Orbit & rotate camera freely in 3D</td>
                 </tr>
-                <tr>
-                  <td>Mouse Wheel</td>
-                  <td>Zoom in & out</td>
-                </tr>
-                <tr>
-                  <td>Middle Click / Shift+Right</td>
-                  <td>Pan camera sideways or vertically</td>
-                </tr>
+                
               </table>
             </div>
 
             <div class="help-section">
-              <h4><i class="app-icon" data-lucide="keyboard"></i> Keyboard Shortcuts</h4>
+              <h4><i class="app-icon" data-lucide="keyboard"></i> Keyboard Shortcuts & Snapping</h4>
               <table class="help-table">
                 <tr>
-                  <td><span class="shortcut-tag">W, A, S, D</span></td>
+                  <td><span class="shortcut-tag">W, A, S, D</span> / <span class="shortcut-tag">Arrows</span></td>
                   <td>Fly camera through the 3D scene (no gizmo conflict)</td>
                 </tr>
                 <tr>
@@ -433,20 +438,36 @@
                   <td>Activate Bounds (Bounding Box) gizmo</td>
                 </tr>
                 <tr>
+                  <td><span class="shortcut-tag">Cmd / Ctrl</span> (Hold while dragging)</td>
+                  <td>Snap movement to Move Grid (default: 0.1) or rotation to angle steps (default: 5°)</td>
+                </tr>
+                <tr>
                   <td><span class="shortcut-tag">F</span></td>
-                  <td>Focus camera on selected object</td>
+                  <td>Focus camera on selected object(s)</td>
+                </tr>
+                <tr>
+                  <td><span class="shortcut-tag">Cmd+Z / Ctrl+Z</span></td>
+                  <td>Undo last action</td>
+                </tr>
+                <tr>
+                  <td><span class="shortcut-tag">Cmd+Shift+Z / Cmd+Y</span></td>
+                  <td>Redo action</td>
+                </tr>
+                <tr>
+                  <td><span class="shortcut-tag">Cmd+G / Ctrl+G</span></td>
+                  <td>Group selected meshes (Shift+Cmd+G to ungroup)</td>
                 </tr>
                 <tr>
                   <td><span class="shortcut-tag">Cmd+C / Ctrl+C</span></td>
-                  <td>Copy selected mesh</td>
+                  <td>Copy selected mesh(es)</td>
                 </tr>
                 <tr>
                   <td><span class="shortcut-tag">Cmd+V / Ctrl+V</span></td>
-                  <td>Paste copied mesh at 3D cursor position</td>
+                  <td>Paste copied mesh(es) at 3D cursor position</td>
                 </tr>
                 <tr>
                   <td><span class="shortcut-tag">Cmd+D / Ctrl+D</span></td>
-                  <td>Duplicate selected mesh</td>
+                  <td>Duplicate selected mesh(es)</td>
                 </tr>
                 <tr>
                   <td><span class="shortcut-tag">Cmd+E / Ctrl+E</span></td>
@@ -454,21 +475,32 @@
                 </tr>
                 <tr>
                   <td><span class="shortcut-tag">Del / Backspace</span></td>
-                  <td>Delete selected mesh or facet</td>
+                  <td>Delete selected mesh(es) or facet</td>
+                </tr>
+                <tr>
+                  <td><span class="shortcut-tag">Escape</span></td>
+                  <td>Cancel active tool / deselect / close dialogs</td>
                 </tr>
               </table>
             </div>
 
             <div class="help-section">
-              <h4><i class="app-icon" data-lucide="sparkles"></i> AI Model Editing Tips</h4>
+              <h4><i class="app-icon" data-lucide="layers"></i> Multi-Selection & Scene Tree</h4>
               <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5">
-                • <strong>Separate Loose Parts:</strong> AI models often merge all pieces into one mesh. Click "Separate" to instantly split
-                disconnected parts into individual selectable objects!<br />
-                • <strong>Merge Meshes:</strong> Combine multiple selected meshes into a single object while preserving all materials.<br />
-                • <strong>Center Pivot:</strong> Click "Center Pivot" if gizmos appear offset from the visual object.<br />
-                • <strong>Pick & Place:</strong> In the Tools menu, choose "Create Mesh..." and click on any surface to spawn new meshes
-                directly in 3D.<br />
-                • <strong>Auto-Saved Windows:</strong> Window positions, sizes, and open states are saved automatically.
+                • <strong>Unified Multi-Transform:</strong> When multiple meshes are selected, a bounding proxy gizmo moves, rotates, and scales all items together with undo/redo support.<br />
+                • <strong>Outliner Tree Selection:</strong> Click any mesh in the Scene Outliner to select it. Use <span class="shortcut-tag" style="font-size:10px">Cmd/Ctrl+Click</span> to toggle multi-selection or <span class="shortcut-tag" style="font-size:10px">Shift+Click</span> for range selection.<br />
+                • <strong>Gizmo Switching:</strong> Switch gizmos (Move, Rotate, Scale, Bounds) at any time without losing your current selection.
+              </p>
+            </div>
+
+            <div class="help-section">
+              <h4><i class="app-icon" data-lucide="sparkles"></i> 3D Modeling & AI Workflow Tips</h4>
+              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5">
+                • <strong>Separate Loose Parts:</strong> AI-generated meshes often merge all pieces into one mesh. Click "Separate" to split disconnected parts into distinct objects.<br />
+                • <strong>Merge Meshes:</strong> Combine multiple selected meshes into a single unified object while preserving all material channels.<br />
+                • <strong>Center Pivot:</strong> Click "Center Pivot" if gizmos appear offset from the mesh visual geometry.<br />
+                • <strong>Pick & Place:</strong> In the Tools menu, choose "Create Mesh" and click on any surface to spawn new primitives precisely in 3D.<br />
+                • <strong>Snapping Increments:</strong> Open the "Scene & Environment" tool to adjust Move Snap distance (units) and Rotate Snap angle (degrees).
               </p>
             </div>
           </div>

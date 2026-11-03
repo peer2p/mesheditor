@@ -14,11 +14,11 @@ export class SceneEnvironmentEditorTool extends AbstractEditorTool {
   public readonly order = 11;
   public readonly defaultOpen = true;
   public readonly description =
-    'Adjust scene background color, ground grid, ambient lighting, sunlight intensity, and camera speed.';
+    'Adjust scene background color, ground grid, ambient lighting, sunlight intensity, camera speed, and transform grid snapping.';
 
   public readonly helpText = `
 <h4><i class="app-icon" data-lucide="info"></i> Overview</h4>
-<p>The <strong>Scene & Environment</strong> panel manages world lighting, sky background color, camera navigation speed, and ground grid reference markers.</p>
+<p>The <strong>Scene & Environment</strong> panel manages world lighting, sky background color, camera navigation speed, ground grid reference markers, and transform grid snapping.</p>
 
 <h4><i class="app-icon" data-lucide="sun"></i> Environment Settings</h4>
 <ul>
@@ -27,6 +27,12 @@ export class SceneEnvironmentEditorTool extends AbstractEditorTool {
   <li><strong>Ambient Lighting:</strong> Hemispheric ambient light brightness for overall scene visibility.</li>
   <li><strong>Sun Light:</strong> Directional sunlight key light intensity for sharp cast shadows and specular highlights.</li>
   <li><strong>Camera Speed:</strong> Multiplier for orbit camera zoom, pan, and rotation responsiveness.</li>
+</ul>
+
+<h4><i class="app-icon" data-lucide="grid"></i> Transform Snapping (Command Key)</h4>
+<ul>
+  <li><strong>Move Snap:</strong> Grid increment in units for translating meshes when holding the Command (or Ctrl) key (default: 0.1).</li>
+  <li><strong>Rotate Snap:</strong> Angle increment in degrees for rotating meshes when holding the Command (or Ctrl) key (default: 5°).</li>
 </ul>
 `.trim();
 }

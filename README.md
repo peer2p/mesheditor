@@ -70,7 +70,6 @@ electron/
 | :---------------------- | :----------------------------------------------------------- |
 | **Right Click + Drag**  | Free look / Orbit camera around scene                        |
 | **Left Click**          | Select mesh, click vertices/facets, manipulate gizmo handles |
-| **Mouse Wheel**         | Zoom in / Zoom out                                           |
 | **Middle Click + Drag** | Pan camera view                                              |
 
 ### Keyboard Navigation
@@ -124,24 +123,54 @@ Follow these steps to build and register a new tool in the Mesh Editor:
 Create `src/tools/editor/MyCustomEditorTool.ejs` to define the floating dialog markup:
 
 ```html
-<div id="dialog-my-custom-tool" class="floating-dialog" style="top: 100px; left: 348px; width: 340px; display: none">
+<div
+  id="dialog-my-custom-tool"
+  class="floating-dialog"
+  style="top: 100px; left: 348px; width: 340px; display: none"
+>
   <div class="dialog-header">
-    <span class="dialog-title"><i class="app-icon" data-lucide="wand-2"></i> Custom Tool</span>
+    <span class="dialog-title"
+      ><i class="app-icon" data-lucide="wand-2"></i> Custom Tool</span
+    >
     <div class="dialog-actions">
-      <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
-      <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
-      <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+      <button
+        class="dialog-btn btn-help"
+        title="Help & Tool Guide"
+        aria-label="Help"
+      >
+        <i class="app-icon" data-lucide="help-circle"></i>
+      </button>
+      <button class="dialog-btn btn-min" title="Minimize">
+        <i class="app-icon" data-lucide="minus"></i>
+      </button>
+      <button class="dialog-btn btn-close" title="Close">
+        <i class="app-icon" data-lucide="x"></i>
+      </button>
     </div>
   </div>
   <div class="dialog-body my-custom-tool-body" style="padding: 10px">
-    <p style="margin-bottom: 8px; font-size: 12px; color: var(--text-secondary)">
+    <p
+      style="margin-bottom: 8px; font-size: 12px; color: var(--text-secondary)"
+    >
       Parametric procedural generator for custom geometries.
     </p>
     <div class="form-group" style="margin-bottom: 8px">
       <label for="customParam" style="font-size: 11px">Size Parameter:</label>
-      <input type="number" id="customParam" class="form-input-sm" value="1.0" min="0.1" max="10.0" step="0.5" />
+      <input
+        type="number"
+        id="customParam"
+        class="form-input-sm"
+        value="1.0"
+        min="0.1"
+        max="10.0"
+        step="0.5"
+      />
     </div>
-    <button class="btn btn-primary btn-sm" id="btnMyCustomAction" style="width: 100%">
+    <button
+      class="btn btn-primary btn-sm"
+      id="btnMyCustomAction"
+      style="width: 100%"
+    >
       <i class="app-icon" data-lucide="play"></i> Run Operation
     </button>
   </div>
@@ -156,20 +185,21 @@ Create `src/tools/editor/MyCustomEditorTool.ejs` to define the floating dialog m
 Create `src/tools/editor/MyCustomEditorTool.ts` extending `AbstractEditorTool`:
 
 ```typescript
-import { AbstractEditorTool } from './AbstractEditorTool';
+import { AbstractEditorTool } from "./AbstractEditorTool";
 
 export class MyCustomEditorTool extends AbstractEditorTool {
-  public readonly name = 'my_custom_tool';
-  public readonly dialogId = 'dialog-my-custom-tool';
-  public readonly triggerButtonId = 'btnToggleMyCustomTool';
-  public readonly toolbarButtonId = 'btnToolbarMyCustomTool'; // Optional quick-access toolbar button
-  public readonly menuId = 'menuTools';
-  public readonly menuLabel = 'Custom Tool';
-  public readonly icon = 'wand-2'; // Lucide icon identifier
+  public readonly name = "my_custom_tool";
+  public readonly dialogId = "dialog-my-custom-tool";
+  public readonly triggerButtonId = "btnToggleMyCustomTool";
+  public readonly toolbarButtonId = "btnToolbarMyCustomTool"; // Optional quick-access toolbar button
+  public readonly menuId = "menuTools";
+  public readonly menuLabel = "Custom Tool";
+  public readonly icon = "wand-2"; // Lucide icon identifier
   public readonly order = 15;
   public readonly isExclusive3DTool = false; // Set to true if the tool takes exclusive control of 3D canvas clicks
   public readonly defaultOpen = false;
-  public readonly description = 'Parametric procedural generator for custom geometries.';
+  public readonly description =
+    "Parametric procedural generator for custom geometries.";
 
   public readonly helpText = `
 <h4><i class="app-icon" data-lucide="info"></i> Overview</h4>
@@ -189,11 +219,11 @@ export class MyCustomEditorTool extends AbstractEditorTool {
 `.trim();
 
   public onOpen(app: any): void {
-    app.showToast('Custom Tool activated.', 'info');
-    const btn = document.getElementById('btnMyCustomAction');
+    app.showToast("Custom Tool activated.", "info");
+    const btn = document.getElementById("btnMyCustomAction");
     if (btn) {
       btn.onclick = () => {
-        app.showToast('Custom action executed!', 'success');
+        app.showToast("Custom action executed!", "success");
       };
     }
   }
@@ -222,12 +252,11 @@ Add the EJS partial include inside `#stackpanelRightSidebar` in `src/mesheditor.
 
 ```html
 <div id="stackpanelRightSidebar" class="stackpanel-sidebar">
-  ...
-  <%- include('./tools/editor/MyCustomEditorTool.ejs') %>
+  ... <%- include('./tools/editor/MyCustomEditorTool.ejs') %>
 </div>
 ```
 
-*(Note: Even if omitted from `mesheditor.ejs`, `tool.renderView()` automatically mounts the dialog into `#stackpanelRightSidebar` when opened).*
+_(Note: Even if omitted from `mesheditor.ejs`, `tool.renderView()` automatically mounts the dialog into `#stackpanelRightSidebar` when opened)._
 
 #### Step 4: Register in `src/tools/editor/index.ts`
 
@@ -374,13 +403,13 @@ When `initialize(context)` is called, the editor provides a rich context with th
 Here is a complete example of creating a custom plugin that adds a menu item and downloads an analytics report:
 
 ```typescript
-import { MeshEditorPlugin, MeshEditorPluginContext } from './mesheditor';
+import { MeshEditorPlugin, MeshEditorPluginContext } from "./mesheditor";
 
 export class CustomMeshAnalyzerPlugin implements MeshEditorPlugin {
-  public readonly id = 'my-analyzer-plugin';
-  public readonly name = 'Mesh Polygon Analyzer';
-  public readonly version = '1.0.0';
-  public readonly description = 'Analyzes scene complexity and polygon count';
+  public readonly id = "my-analyzer-plugin";
+  public readonly name = "Mesh Polygon Analyzer";
+  public readonly version = "1.0.0";
+  public readonly description = "Analyzes scene complexity and polygon count";
 
   private context!: MeshEditorPluginContext;
 
@@ -389,18 +418,18 @@ export class CustomMeshAnalyzerPlugin implements MeshEditorPlugin {
 
     // Register into the Tools dropdown menu
     context.registerToolMenuItem({
-      id: 'menuToolAnalyzeMesh',
-      label: 'Analyze Polygons',
-      icon: 'activity',
+      id: "menuToolAnalyzeMesh",
+      label: "Analyze Polygons",
+      icon: "activity",
       onClick: () => this.analyze(),
     });
 
     // Register a shortcut in the Actions dropdown menu
     context.registerActionMenuItem({
-      id: 'menuActionQuickAnalyze',
-      label: 'Quick Complexity Check',
-      icon: 'zap',
-      shortcut: '⌥C',
+      id: "menuActionQuickAnalyze",
+      label: "Quick Complexity Check",
+      icon: "zap",
+      shortcut: "⌥C",
       onClick: () => this.analyze(),
     });
   }
@@ -416,7 +445,10 @@ export class CustomMeshAnalyzerPlugin implements MeshEditorPlugin {
       }
     }
 
-    this.context.showToast(`Scene analysis: ${meshCount} meshes, ${(totalIndices / 3).toLocaleString()} triangles.`, 'info');
+    this.context.showToast(
+      `Scene analysis: ${meshCount} meshes, ${(totalIndices / 3).toLocaleString()} triangles.`,
+      "info",
+    );
   }
 
   public dispose(): void {
@@ -432,7 +464,7 @@ export class CustomMeshAnalyzerPlugin implements MeshEditorPlugin {
 ### Standalone Bootstrap (Vanilla / Any Project)
 
 ```typescript
-import { MeshEditorApp } from './mesheditor';
+import { MeshEditorApp } from "./mesheditor";
 
 const app = new MeshEditorApp();
 // Ready! Runs completely standalone with built-in primitives, CSG sculpting,
@@ -442,8 +474,8 @@ const app = new MeshEditorApp();
 ### Adding Project Plugins
 
 ```typescript
-import { MeshEditorApp } from './mesheditor';
-import { AssetLibraryPlugin, SaveAssetPlugin } from './plugins/mesheditor';
+import { MeshEditorApp } from "./mesheditor";
+import { AssetLibraryPlugin, SaveAssetPlugin } from "./plugins/mesheditor";
 
 async function bootstrap() {
   const app = new MeshEditorApp();
@@ -460,23 +492,23 @@ bootstrap();
 
 ## Build Commands Overview (`package.json`)
 
-| Target Platform | Command | Description / Output |
-| :--- | :--- | :--- |
-| **Standalone Web (Dev)** | `npm run dev` | Starts the Webpack Dev Server on `http://localhost:8080` |
-| **Standalone Web (Prod)** | `npm run build` | Builds the standalone web application into `dist/` |
-| **NPM Library & Web Component** | `npm run build:lib` | Builds ESM + `.d.ts` (`dist-lib/esm/`), UMD with `@babylonjs/*` as `peerDependencies` (`dist-lib/index.umd.js`), and a standalone bundle (`dist-lib/standalone/mesheditor-element.bundle.js`) |
-| **Desktop App (Dev Mode)** | `npm run desktop:dev` | Launches Electron connected to the local dev server (`http://localhost:8080`) |
-| **Desktop App (Local Start)** | `npm run desktop:start` | Builds `dist/` and starts the Electron desktop app (`electron/main.js`) |
-| **macOS App (`.dmg` / `.zip`)** | `npm run desktop:build:mac` | Packages the macOS app (`arm64` & `x64`) via `electron-builder.yml` into `release/` |
-| **Windows App (`.exe`)** | `npm run desktop:build:win` | Packages the Windows NSIS installer & portable `.exe` into `release/` |
-| **Linux App (`.AppImage` / `.deb`)** | `npm run desktop:build:linux` | Packages the Linux `AppImage` and Debian `.deb` package into `release/` |
-| **All Desktop Platforms** | `npm run desktop:build:all` | Packages macOS, Windows, and Linux builds in one run into `release/` |
-| **Integration Tests (Headless 3D)** | `npm test` / `npm run test:integration` | Runs fast Vitest + Babylon.js `NullEngine` integration tests (`tests/integration/`) |
-| **Integration Tests (Watch)** | `npm run test:watch` | Runs Vitest in interactive watch mode |
-| **End-to-End Tests (Browser)** | `npm run test:e2e` | Starts the dev server and runs Playwright Chromium E2E tests (`tests/e2e/`) |
-| **Full Test Suite** | `npm run test:all` | Runs all integration tests followed by all Playwright E2E tests |
-| **Sync Tool View Templates** | `npm run sync:templates` | Synchronizes decentralized `.ejs` tool views into `toolViews.ts` and updates `src/template.ts` |
-| **Clean Build Artifacts** | `npm run clean` | Removes `dist/`, `dist-lib/`, and `release/` |
+| Target Platform                      | Command                                 | Description / Output                                                                                                                                                                          |
+| :----------------------------------- | :-------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Standalone Web (Dev)**             | `npm run dev`                           | Starts the Webpack Dev Server on `http://localhost:8080`                                                                                                                                      |
+| **Standalone Web (Prod)**            | `npm run build`                         | Builds the standalone web application into `dist/`                                                                                                                                            |
+| **NPM Library & Web Component**      | `npm run build:lib`                     | Builds ESM + `.d.ts` (`dist-lib/esm/`), UMD with `@babylonjs/*` as `peerDependencies` (`dist-lib/index.umd.js`), and a standalone bundle (`dist-lib/standalone/mesheditor-element.bundle.js`) |
+| **Desktop App (Dev Mode)**           | `npm run desktop:dev`                   | Launches Electron connected to the local dev server (`http://localhost:8080`)                                                                                                                 |
+| **Desktop App (Local Start)**        | `npm run desktop:start`                 | Builds `dist/` and starts the Electron desktop app (`electron/main.js`)                                                                                                                       |
+| **macOS App (`.dmg` / `.zip`)**      | `npm run desktop:build:mac`             | Packages the macOS app (`arm64` & `x64`) via `electron-builder.yml` into `release/`                                                                                                           |
+| **Windows App (`.exe`)**             | `npm run desktop:build:win`             | Packages the Windows NSIS installer & portable `.exe` into `release/`                                                                                                                         |
+| **Linux App (`.AppImage` / `.deb`)** | `npm run desktop:build:linux`           | Packages the Linux `AppImage` and Debian `.deb` package into `release/`                                                                                                                       |
+| **All Desktop Platforms**            | `npm run desktop:build:all`             | Packages macOS, Windows, and Linux builds in one run into `release/`                                                                                                                          |
+| **Integration Tests (Headless 3D)**  | `npm test` / `npm run test:integration` | Runs fast Vitest + Babylon.js `NullEngine` integration tests (`tests/integration/`)                                                                                                           |
+| **Integration Tests (Watch)**        | `npm run test:watch`                    | Runs Vitest in interactive watch mode                                                                                                                                                         |
+| **End-to-End Tests (Browser)**       | `npm run test:e2e`                      | Starts the dev server and runs Playwright Chromium E2E tests (`tests/e2e/`)                                                                                                                   |
+| **Full Test Suite**                  | `npm run test:all`                      | Runs all integration tests followed by all Playwright E2E tests                                                                                                                               |
+| **Sync Tool View Templates**         | `npm run sync:templates`                | Synchronizes decentralized `.ejs` tool views into `toolViews.ts` and updates `src/template.ts`                                                                                                |
+| **Clean Build Artifacts**            | `npm run clean`                         | Removes `dist/`, `dist-lib/`, and `release/`                                                                                                                                                  |
 
 ---
 
@@ -503,7 +535,7 @@ npm run build:lib
 #### A) Using as a Web Component (`<mesh-editor>`)
 
 ```typescript
-import 'mesheditor';
+import "mesheditor";
 ```
 
 ```html
@@ -519,15 +551,15 @@ import 'mesheditor';
 </div>
 
 <script type="module">
-  const editor = document.getElementById('myEditor');
+  const editor = document.getElementById("myEditor");
 
   // Listen to exported / saved models from the editor
-  editor.addEventListener('model-saved', (e) => {
+  editor.addEventListener("model-saved", (e) => {
     const { blob, filename } = e.detail;
-    console.log('Saved GLB blob from editor:', filename, blob);
+    console.log("Saved GLB blob from editor:", filename, blob);
   });
 
-  editor.addEventListener('model-exported', (e) => {
+  editor.addEventListener("model-exported", (e) => {
     const { blob, filename, format } = e.detail;
     console.log(`Exported ${format}:`, filename, blob);
   });
@@ -541,17 +573,17 @@ import 'mesheditor';
 #### B) Using `MeshEditorApp` & `HostAppAdapter` Programmatically
 
 ```typescript
-import { MeshEditorApp, HostAppAdapter } from 'mesheditor';
+import { MeshEditorApp, HostAppAdapter } from "mesheditor";
 
 const app = new MeshEditorApp({
-  container: document.getElementById('editor-mount')!,
-  layoutMode: 'stackpanel',
+  container: document.getElementById("editor-mount")!,
+  layoutMode: "stackpanel",
   adapter: new HostAppAdapter({
-    saveButtonLabel: 'Save to Game',
+    saveButtonLabel: "Save to Game",
     suppressBrowserDownload: true,
     onSaveToHost: async (blob, filename) => {
       // Upload or store the GLB blob in your host application
-      console.log('Received GLB from MeshEditor:', filename, blob.size);
+      console.log("Received GLB from MeshEditor:", filename, blob.size);
     },
   }),
 });
@@ -562,6 +594,7 @@ const app = new MeshEditorApp({
 ### 3. Desktop App (macOS, Windows, Linux via Electron)
 
 The project includes a full **Electron Desktop Adapter** (`electron/main.js`, `electron/preload.js`, `ElectronPlatformAdapter`) providing:
+
 - Native OS File Open & Import dialogs (including automatic companion `.bin` & texture resolution for `.gltf` files)
 - Native OS File Save dialogs (`⌘S` / `Ctrl+S`) writing directly to the local filesystem
 - Native macOS / Windows / Linux Application Menu Bar with keyboard shortcuts
@@ -631,10 +664,10 @@ The core [`MeshEditorService`](src/MeshEditorService.ts) and [`MeshEditorApp`](s
 While `NullEngine` verifies 3D logic at high speed, **Stage 2 (`tests/e2e/editor.spec.ts`)** launches the compiled application in a real Chromium browser with WebGL enabled (`playwright.config.ts`) to verify end-to-end user workflows:
 
 1. **Application Boot & Web Component Registration**: Verifies zero console/page errors on startup, active WebGL scene initialization, and `<mesh-editor>` Custom Element registration.
-2. **UI Primitive Creation Workflow**: Opens *Tools → Create Mesh*, triggers *Spawn at Origin* inside the `dat.GUI` panel, and verifies live updates in the Scene Objects outliner and polygon/mesh counters.
-3. **Interactive Delete & Undo/Redo**: Deletes a selected mesh through *Actions → Delete Selected* and restores/re-deletes it via the top toolbar *Undo* (`#btnUndo`) and *Redo* (`#btnRedo`) buttons.
-4. **Layout & Gizmo Switching**: Toggles between *Floating* and *Stackpanel* layout modes and switches active transformation gizmos (*Move*, *Rotate*, *Scale*).
-5. **Modal Dialogs**: Opens and closes the *Help & Keyboard Shortcuts* modal.
+2. **UI Primitive Creation Workflow**: Opens _Tools → Create Mesh_, triggers _Spawn at Origin_ inside the `dat.GUI` panel, and verifies live updates in the Scene Objects outliner and polygon/mesh counters.
+3. **Interactive Delete & Undo/Redo**: Deletes a selected mesh through _Actions → Delete Selected_ and restores/re-deletes it via the top toolbar _Undo_ (`#btnUndo`) and _Redo_ (`#btnRedo`) buttons.
+4. **Layout & Gizmo Switching**: Toggles between _Floating_ and _Stackpanel_ layout modes and switches active transformation gizmos (_Move_, _Rotate_, _Scale_).
+5. **Modal Dialogs**: Opens and closes the _Help & Keyboard Shortcuts_ modal.
 
 ### Running the Tests
 
@@ -658,11 +691,11 @@ npm run test:all
 
 Three GitHub Actions workflows are included for automated building, testing, and multi-platform distribution:
 
-| Workflow | File | Trigger | Description |
-| :--- | :--- | :--- | :--- |
-| **CI — Build & Verify Targets** | [`.github/workflows/ci.yml`](file:///Users/dpeer/Sites/games/mesheditor/.github/workflows/ci.yml) | Push / PR on `main`, `master`, `develop` | Runs `type-check`, executes the `Vitest` integration test suite (`npm run test:integration`), builds the Standalone Web App (`dist/`) and the NPM Library & `<mesh-editor>` Web Component (`dist-lib/` + `.tgz`), and uploads build artifacts. |
+| Workflow                             | File                                                                                                        | Trigger                                         | Description                                                                                                                                                                                                                                                                                    |
+| :----------------------------------- | :---------------------------------------------------------------------------------------------------------- | :---------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CI — Build & Verify Targets**      | [`.github/workflows/ci.yml`](file:///Users/dpeer/Sites/games/mesheditor/.github/workflows/ci.yml)           | Push / PR on `main`, `master`, `develop`        | Runs `type-check`, executes the `Vitest` integration test suite (`npm run test:integration`), builds the Standalone Web App (`dist/`) and the NPM Library & `<mesh-editor>` Web Component (`dist-lib/` + `.tgz`), and uploads build artifacts.                                                 |
 | **Release & Distribute All Targets** | [`.github/workflows/release.yml`](file:///Users/dpeer/Sites/games/mesheditor/.github/workflows/release.yml) | Tag `v*.*.*` (e.g. `v1.0.0`) or Manual Dispatch | Builds **macOS** (`.dmg` & `.zip` for `arm64`/`x64`), **Windows** (`.exe` NSIS & Portable), **Linux** (`.AppImage` & `.deb`), **Standalone Web** (`.zip`), and **NPM Library / Web Component** (`.tgz` & `.zip`), generates `SHA256SUMS.txt`, and publishes everything to **GitHub Releases**. |
-| **Deploy to GitHub Pages** | [`.github/workflows/pages.yml`](file:///Users/dpeer/Sites/games/mesheditor/.github/workflows/pages.yml) | Push on `main` / `master` or Manual Dispatch | Automatically deploys the Standalone Web App (`dist/`) to **GitHub Pages**. |
+| **Deploy to GitHub Pages**           | [`.github/workflows/pages.yml`](file:///Users/dpeer/Sites/games/mesheditor/.github/workflows/pages.yml)     | Push on `main` / `master` or Manual Dispatch    | Automatically deploys the Standalone Web App (`dist/`) to **GitHub Pages**.                                                                                                                                                                                                                    |
 
 ### Creating a New GitHub Release
 
@@ -681,9 +714,7 @@ The CSS stylesheet is maintained in `mesheditor.css` and copied to the build roo
 
 ```javascript
 new CopyWebpackPlugin({
-  patterns: [
-    { from: 'src/mesheditor.css', to: 'mesheditor.css' },
-  ],
+  patterns: [{ from: "src/mesheditor.css", to: "mesheditor.css" }],
 });
 ```
 

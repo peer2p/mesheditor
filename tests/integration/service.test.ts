@@ -822,5 +822,87 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
       expect(selectedNodeNames).toContain(boxA.name);
       expect(selectedNodeNames).not.toContain(boxB.name);
     });
+
+    it('preserves selected mesh and multi-selection proxy when switching gizmo modes', () => {
+      const box1 = service.createPrimitive(defaultPrimitiveConfig({ name: 'GizmoMesh1' }));
+      const box2 = service.createPrimitive(defaultPrimitiveConfig({ name: 'GizmoMesh2' }));
+
+      // 1. Single selection
+      service.selectNodes([box1]);
+      expect(service.selectedNodes).toEqual([box1]);
+      expect(service.gizmoManager.gizmos.positionGizmo?.attachedNode).toBe(box1);
+
+      // Switch to Rotate
+      service.setGizmoMode('rotate');
+      expect(service.selectedNodes).toEqual([box1]);
+      expect(service.selectedMesh).toBe(box1);
+      expect(service.gizmoManager.rotationGizmoEnabled).toBe(true);
+      expect(service.gizmoManager.positionGizmoEnabled).toBe(false);
+      expect(service.gizmoManager.gizmos.rotationGizmo?.attachedNode).toBe(box1);
+
+      // Switch to Scale
+      service.setGizmoMode('scale');
+      expect(service.selectedNodes).toEqual([box1]);
+      expect(service.gizmoManager.scaleGizmoEnabled).toBe(true);
+      expect(service.gizmoManager.gizmos.scaleGizmo?.attachedNode).toBe(box1);
+
+      // Switch to Bounds
+      service.setGizmoMode('bounds');
+      expect(service.selectedNodes).toEqual([box1]);
+      expect(service.gizmoManager.boundingBoxGizmoEnabled).toBe(true);
+
+      // 2. Multi-selection
+      service.selectNodes([box1, box2]);
+      expect(service.selectedNodes.length).toBe(2);
+      expect(service.selectionProxyActive).toBe(true);
+      const proxy = service.selectionProxyNode;
+      expect(proxy).not.toBeNull();
+
+      service.setGizmoMode('translate');
+      expect(service.selectedNodes.length).toBe(2);
+      expect(service.gizmoManager.positionGizmoEnabled).toBe(true);
+      expect(service.gizmoManager.gizmos.positionGizmo?.attachedNode).toBe(proxy);
+
+      service.setGizmoMode('rotate');
+      expect(service.selectedNodes.length).toBe(2);
+      expect(service.gizmoManager.rotationGizmoEnabled).toBe(true);
+      expect(service.gizmoManager.gizmos.rotationGizmo?.attachedNode).toBe(proxy);
+    });
+
+    it('manages translate and rotate snapping with modifier key and scene tool settings', () => {
+      // Default snapping values
+      expect(service.sceneParams.translateSnap).toBe(0.1);
+      expect(service.sceneParams.rotateSnap).toBe(5);
+
+      service.setGizmoMode('translate');
+      expect(service.gizmoManager.gizmos.positionGizmo?.snapDistance).toBe(0);
+
+      // Activate snap modifier (e.g. Command/Meta or Ctrl key held)
+      service.setSnapModifierActive(true);
+      expect(service.isSnapModifierActive).toBe(true);
+      expect(service.gizmoManager.gizmos.positionGizmo?.snapDistance).toBe(0.1);
+
+      // Configure translate snap to 0.2 via scene tool
+      service.setTranslateSnap(0.2);
+      expect(service.sceneParams.translateSnap).toBe(0.2);
+      expect(service.gizmoManager.gizmos.positionGizmo?.snapDistance).toBe(0.2);
+
+      // Switch to rotate gizmo with snap modifier active
+      service.setGizmoMode('rotate');
+      const expectedDefaultRad = (5 * Math.PI) / 180;
+      expect(service.gizmoManager.gizmos.rotationGizmo?.snapDistance).toBeCloseTo(expectedDefaultRad, 5);
+
+      // Configure rotate snap to 15 degrees via scene tool
+      service.setRotateSnap(15);
+      expect(service.sceneParams.rotateSnap).toBe(15);
+      const expected15Rad = (15 * Math.PI) / 180;
+      expect(service.gizmoManager.gizmos.rotationGizmo?.snapDistance).toBeCloseTo(expected15Rad, 5);
+
+      // Release snap modifier
+      service.setSnapModifierActive(false);
+      expect(service.isSnapModifierActive).toBe(false);
+      expect(service.gizmoManager.gizmos.rotationGizmo?.snapDistance).toBe(0);
+      expect(service.gizmoManager.gizmos.positionGizmo?.snapDistance).toBe(0);
+    });
   });
 });

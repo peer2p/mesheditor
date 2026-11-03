@@ -94,8 +94,8 @@ export class MeshEditorService {
   public groups: TransformNode[] = [];
   private groupCounter: number = 0;
   private lastClickedNode: TransformNode | null = null;
-  private selectionProxyNode: Nullable<TransformNode> = null;
-  private selectionProxyActive: boolean = false;
+  public selectionProxyNode: Nullable<TransformNode> = null;
+  public selectionProxyActive: boolean = false;
   private selectionProxyMap: Map<TransformNode, Nullable<any>> = new Map();
   public clipboardNodes: TransformNode[] = [];
   public selectedMesh: Mesh | null = null;
@@ -161,7 +161,12 @@ export class MeshEditorService {
     ambientLight: 1.0,
     sunLight: 1.2,
     cameraSpeed: 0.4,
+    translateSnap: 0.1,
+    rotateSnap: 5,
   };
+  public isSnapModifierActive: boolean = false;
+  public gizmoMode: 'translate' | 'rotate' | 'scale' | 'bounds' = 'translate';
+  public ensureGizmoDragEvents: () => void = () => {};
 
   public exportParams: ExportOptions = {
     format: 'glb',
@@ -490,57 +495,67 @@ export class MeshEditorService {
     };
 
     // Attach drag start/end hooks
-    const setupGizmoDragEvents = (gizmo: any, name: string) => {
-      if (!gizmo) return;
-      ['xGizmo', 'yGizmo', 'zGizmo', 'uniformGizmo', 'planeGizmo'].forEach((partName) => {
-        const part = (gizmo as any)[partName];
-        if (part && part.dragBehavior) {
-          part.dragBehavior.onDragStartObservable.add(() => {
-            this.isGizmoDragging = true;
-            if (
-              name === 'Move' &&
-              this.facetEditorActive &&
-              this.facetEditMode === 'vertex' &&
-              this.selectedVertexIndex !== null &&
-              this.vertexGizmoNode
-            ) {
-              this.onVertexDragStart();
-            } else {
-              capturePreDrag();
-            }
-          });
-          if (name === 'Move') {
-            part.dragBehavior.onDragObservable.add(() => {
+    this.ensureGizmoDragEvents = () => {
+      if (!this.gizmoManager || !this.gizmoManager.gizmos) return;
+      const gizmoConfigs: Array<{ gizmo: any; name: string }> = [
+        { gizmo: this.gizmoManager.gizmos.positionGizmo, name: 'Move' },
+        { gizmo: this.gizmoManager.gizmos.rotationGizmo, name: 'Rotate' },
+        { gizmo: this.gizmoManager.gizmos.scaleGizmo, name: 'Scale' },
+        { gizmo: this.gizmoManager.gizmos.boundingBoxGizmo, name: 'Bounds' },
+      ];
+
+      for (const { gizmo, name } of gizmoConfigs) {
+        if (!gizmo) continue;
+        ['xGizmo', 'yGizmo', 'zGizmo', 'uniformGizmo', 'planeGizmo', 'xPlaneGizmo', 'yPlaneGizmo', 'zPlaneGizmo'].forEach((partName) => {
+          const part = (gizmo as any)[partName];
+          if (part && part.dragBehavior && !(part.dragBehavior as any)._editorDragHooked) {
+            (part.dragBehavior as any)._editorDragHooked = true;
+            part.dragBehavior.onDragStartObservable.add(() => {
+              this.isGizmoDragging = true;
+              this.updateGizmoSnapping();
               if (
+                name === 'Move' &&
                 this.facetEditorActive &&
                 this.facetEditMode === 'vertex' &&
                 this.selectedVertexIndex !== null &&
                 this.vertexGizmoNode
               ) {
-                this.handleVertexGizmoDrag();
+                this.onVertexDragStart();
+              } else {
+                capturePreDrag();
+              }
+            });
+            if (name === 'Move') {
+              part.dragBehavior.onDragObservable.add(() => {
+                if (
+                  this.facetEditorActive &&
+                  this.facetEditMode === 'vertex' &&
+                  this.selectedVertexIndex !== null &&
+                  this.vertexGizmoNode
+                ) {
+                  this.handleVertexGizmoDrag();
+                }
+              });
+            }
+            part.dragBehavior.onDragEndObservable.add(() => {
+              this.isGizmoDragging = false;
+              if (
+                name === 'Move' &&
+                this.facetEditorActive &&
+                this.facetEditMode === 'vertex' &&
+                this.selectedVertexIndex !== null
+              ) {
+                this.onVertexDragEnd();
+              } else {
+                commitPostDrag(name);
               }
             });
           }
-          part.dragBehavior.onDragEndObservable.add(() => {
-            this.isGizmoDragging = false;
-            if (
-              name === 'Move' &&
-              this.facetEditorActive &&
-              this.facetEditMode === 'vertex' &&
-              this.selectedVertexIndex !== null
-            ) {
-              this.onVertexDragEnd();
-            } else {
-              commitPostDrag(name);
-            }
-          });
-        }
-      });
+        });
+      }
     };
 
-    setupGizmoDragEvents(this.gizmoManager.gizmos.positionGizmo, 'Move');
-    setupGizmoDragEvents(this.gizmoManager.gizmos.rotationGizmo, 'Rotate');
-    setupGizmoDragEvents(this.gizmoManager.gizmos.scaleGizmo, 'Scale');
+    this.ensureGizmoDragEvents();
 
     // Pointer Picking for Mesh Selection & Facet Editing
     let pointerDownPos = { x: 0, y: 0 };
@@ -551,6 +566,12 @@ export class MeshEditorService {
         this.lastPointerY = this.scene.pointerY;
 
         const evt = pointerInfo.event as MouseEvent;
+        if (evt) {
+          const isSnapKey = !!(evt.metaKey || evt.ctrlKey);
+          if (this.isSnapModifierActive !== isSnapKey) {
+            this.setSnapModifierActive(isSnapKey);
+          }
+        }
         const isLeftButton = evt ? evt.button === 0 : true;
         const pick = pointerInfo.pickInfo;
         const isGizmoHit = this.isGizmoMesh(pick?.pickedMesh);
@@ -578,6 +599,14 @@ export class MeshEditorService {
         this.lastPointerX = this.scene.pointerX;
         this.lastPointerY = this.scene.pointerY;
 
+        const evt = pointerInfo.event as MouseEvent;
+        if (evt) {
+          const isSnapKey = !!(evt.metaKey || evt.ctrlKey);
+          if (this.isSnapModifierActive !== isSnapKey) {
+            this.setSnapModifierActive(isSnapKey);
+          }
+        }
+
         if (this.isMarqueeCandidate && !this.isAnyGizmoDragging()) {
           const dist = Math.hypot(
             this.scene.pointerX - this.marqueeStartPointer.x,
@@ -585,7 +614,6 @@ export class MeshEditorService {
           );
           if (dist > 6) {
             this.isMarqueeActive = true;
-            const evt = pointerInfo.event as MouseEvent;
             this.updateMarqueeVisual(
               this.marqueeStartClient.x,
               this.marqueeStartClient.y,
@@ -597,6 +625,14 @@ export class MeshEditorService {
       } else if (pointerInfo.type === PointerEventTypes.POINTERUP) {
         this.lastPointerX = this.scene.pointerX;
         this.lastPointerY = this.scene.pointerY;
+
+        const evt = pointerInfo.event as MouseEvent;
+        if (evt) {
+          const isSnapKey = !!(evt.metaKey || evt.ctrlKey);
+          if (this.isSnapModifierActive !== isSnapKey) {
+            this.setSnapModifierActive(isSnapKey);
+          }
+        }
 
         const wasMarquee = this.isMarqueeActive;
         const startPointer = { ...this.marqueeStartPointer };
@@ -626,8 +662,6 @@ export class MeshEditorService {
           return;
         }
 
-        const evt = pointerInfo.event as MouseEvent;
-
         // If a marquee selection rectangle was dragged (> 6px)
         if (wasMarquee && dist > 6) {
           const minX = Math.min(startPointer.x, this.scene.pointerX);
@@ -646,6 +680,9 @@ export class MeshEditorService {
 
         if (pick && pick.hit && pick.pickedMesh) {
           const mesh = pick.pickedMesh as Mesh;
+          if (this.isGizmoMesh(mesh)) {
+            return;
+          }
           if (this.isEditorHelper(mesh) || mesh === this.gridMesh) {
             if (!evt || (!evt.shiftKey && !evt.metaKey && !evt.ctrlKey)) {
               this.selectNodes([]);
@@ -704,15 +741,17 @@ export class MeshEditorService {
   public isGizmoMesh(mesh: Nullable<AbstractMesh | TransformNode>): boolean {
     if (!mesh) return false;
     if (mesh === this.gridMesh || mesh === this.facetHighlightMesh) return false;
+    if (this.selectedNodes.includes(mesh as any)) return false;
     let curr: Nullable<any> = mesh;
     while (curr) {
+      if (curr === this.selectionProxyNode) {
+        return false;
+      }
       const name = curr.name || '';
       if (
         name.toLowerCase().includes('gizmo') ||
-        name.startsWith('editor_') ||
         name.startsWith('Lines') ||
         curr.metadata?.isGizmo ||
-        curr.metadata?.isEditorHelper ||
         curr._isGizmo
       ) {
         return true;
@@ -6618,6 +6657,72 @@ export class MeshEditorService {
   public setCameraSpeed(val: number): void {
     this.sceneParams.cameraSpeed = val;
     this.camera.speed = val;
+  }
+
+  public setTranslateSnap(val: number): void {
+    this.sceneParams.translateSnap = Math.max(0.001, Number(val) || 0.1);
+    if (this.isSnapModifierActive) {
+      this.updateGizmoSnapping(true);
+    }
+  }
+
+  public setRotateSnap(val: number): void {
+    this.sceneParams.rotateSnap = Math.max(0.1, Number(val) || 5);
+    if (this.isSnapModifierActive) {
+      this.updateGizmoSnapping(true);
+    }
+  }
+
+  public setSnapModifierActive(active: boolean): void {
+    if (this.isSnapModifierActive === active) return;
+    this.isSnapModifierActive = active;
+    this.updateGizmoSnapping(active);
+  }
+
+  public updateGizmoSnapping(snappingActive?: boolean): void {
+    const isSnap = snappingActive !== undefined ? snappingActive : this.isSnapModifierActive;
+    if (this.gizmoManager?.gizmos?.positionGizmo) {
+      this.gizmoManager.gizmos.positionGizmo.snapDistance = isSnap ? (this.sceneParams.translateSnap || 0.1) : 0;
+    }
+    if (this.gizmoManager?.gizmos?.rotationGizmo) {
+      const snapDeg = this.sceneParams.rotateSnap || 5;
+      this.gizmoManager.gizmos.rotationGizmo.snapDistance = isSnap ? ((snapDeg * Math.PI) / 180) : 0;
+    }
+  }
+
+  public setGizmoMode(mode: 'translate' | 'rotate' | 'scale' | 'bounds'): void {
+    this.gizmoMode = mode;
+    this.gizmoManager.positionGizmoEnabled = mode === 'translate';
+    this.gizmoManager.rotationGizmoEnabled = mode === 'rotate';
+    this.gizmoManager.scaleGizmoEnabled = mode === 'scale';
+    this.gizmoManager.boundingBoxGizmoEnabled = mode === 'bounds';
+
+    this.ensureGizmoDragEvents();
+    this.updateGizmoSnapping();
+    this.refreshGizmoAttachment();
+  }
+
+  public refreshGizmoAttachment(): void {
+    if (this.selectedNodes.length === 0) {
+      this.gizmoManager.attachToNode(null);
+    } else if (this.selectedNodes.length === 1) {
+      const single = this.selectedNodes[0];
+      if (this.facetEditorActive && this.facetEditMode === 'vertex') {
+        if (this.selectedVertexIndex !== null) {
+          this.attachVertexGizmo();
+        } else {
+          this.gizmoManager.attachToNode(null);
+        }
+      } else {
+        this.gizmoManager.attachToNode(single);
+      }
+    } else {
+      if (!this.selectionProxyActive || !this.selectionProxyNode || this.selectionProxyNode.isDisposed()) {
+        this.setupSelectionProxy();
+      } else {
+        this.gizmoManager.attachToNode(this.selectionProxyNode);
+      }
+    }
   }
 
   public updateGridForModel(radius: number): void {
