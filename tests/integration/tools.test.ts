@@ -19,6 +19,7 @@ import {
   TextureOptimizerEditorTool,
   CompressModelEditorTool,
   VoxelPainterEditorTool,
+  SculptEditorTool,
   PathExtrusionEditorTool,
   AIAgentEditorTool,
   MeshPropertiesEditorTool,
@@ -102,11 +103,11 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
   });
 
   describe('2. ToolRegistry Management', () => {
-    it('initializes default registry with all 25 built-in modeling tools', () => {
+    it('initializes default registry with all 27 built-in modeling tools', () => {
       const registry = createDefaultToolRegistry();
       const allTools = registry.getAll();
 
-      expect(allTools.length).toBe(25);
+      expect(allTools.length).toBe(27);
       expect(registry.has('modeler_get_scene_info')).toBe(true);
       expect(registry.has('modeler_create_primitive')).toBe(true);
       expect(registry.has('modeler_extrude_polygon')).toBe(true);
@@ -132,9 +133,11 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       expect(registry.has('modeler_facet_inset')).toBe(true);
       expect(registry.has('modeler_facet_arc')).toBe(true);
       expect(registry.has('modeler_facet_cut_through')).toBe(true);
+      expect(registry.has('modeler_spawn_base_mesh')).toBe(true);
+      expect(registry.has('modeler_retopologize_mesh')).toBe(true);
 
       const openAiDefs = registry.getOpenAITools();
-      expect(openAiDefs.length).toBe(25);
+      expect(openAiDefs.length).toBe(27);
       expect(openAiDefs.every((d) => d.type === 'function' && typeof d.function.name === 'string')).toBe(true);
     });
 
@@ -251,15 +254,16 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
   });
 
   describe('4. Tool Abstraction, In-App Help Guides & Dialog Wiring', () => {
-    it('provides unified ToolInterface metadata and comprehensive English help text for all 13 editor tools', () => {
+    it('provides unified ToolInterface metadata and comprehensive English help text for all 14 editor tools', () => {
       const editorTools = getBuiltinEditorTools();
-      expect(editorTools.length).toBe(13);
+      expect(editorTools.length).toBe(14);
 
       const requiredTools = [
         'scene_outliner',
         'create_primitive',
         'csg_sculpting',
         'facet_editor',
+        'sculpt_retopo',
         'texture_optimizer',
         'compress_model',
         'voxel_painter',
@@ -415,7 +419,7 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
 
     it('instantiates all decentralized editor tool classes with self-contained configurations and help guides', () => {
       const tools = createBuiltinEditorTools();
-      expect(tools.length).toBe(13);
+      expect(tools.length).toBe(14);
 
       const outliner = new OutlinerEditorTool();
       expect(outliner.name).toBe('scene_outliner');
@@ -435,6 +439,11 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       const facet = new FacetEditorTool();
       expect(facet.name).toBe('facet_editor');
       expect(facet.dialogId).toBe('dialog-facet');
+
+      const sculpt = new SculptEditorTool();
+      expect(sculpt.name).toBe('sculpt_retopo');
+      expect(sculpt.dialogId).toBe('dialog-sculpt');
+      expect(sculpt.helpText).toContain('Figure Sculpt & Retopo');
 
       const tex = new TextureOptimizerEditorTool();
       expect(tex.name).toBe('texture_optimizer');

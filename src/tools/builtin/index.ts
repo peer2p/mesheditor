@@ -23,4 +23,6 @@ export * from './FacetExtrudeTool';
 export * from './FacetInsetTool';
 export * from './FacetArcTool';
 export * from './FacetCutThroughTool';
+export * from './SpawnBaseMeshTool';
+export * from './RetopologizeMeshTool';
 

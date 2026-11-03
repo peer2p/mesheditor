@@ -26,6 +26,8 @@ import {
   FacetInsetTool,
   FacetArcTool,
   FacetCutThroughTool,
+  SpawnBaseMeshTool,
+  RetopologizeMeshTool,
 } from './builtin';
 
 /**
@@ -135,6 +137,8 @@ export function createDefaultToolRegistry(): ToolRegistry {
     new FacetInsetTool(),
     new FacetArcTool(),
     new FacetCutThroughTool(),
+    new SpawnBaseMeshTool(),
+    new RetopologizeMeshTool(),
   ]);
 }
 

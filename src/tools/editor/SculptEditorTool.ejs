@@ -1,0 +1,141 @@
+<div id="dialog-sculpt" class="floating-dialog" style="top: 140px; right: 16px; width: 340px; display: none">
+  <div class="dialog-header">
+    <span class="dialog-title"><i class="app-icon" data-lucide="sparkles"></i> Figure Sculpt &amp; Retopo</span>
+    <div class="dialog-actions">
+      <button class="dialog-btn btn-help" title="Help &amp; Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+      <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+      <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+    </div>
+  </div>
+  <div class="dialog-body sculpt-tool-body">
+    <!-- Base Mesh Generators -->
+    <div class="tool-control-group">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="user-check"></i> Anatomical Base Meshes</div>
+      <div class="tool-sublabel">Spawn proportioned blockouts with joint loops</div>
+      <div class="sculpt-grid-2">
+        <button id="btnSpawnHumanoidBase" class="sculpt-btn" title="Loomis 8-Head Humanoid Mannequin (Heroic 1.80m)">
+          <i class="app-icon" data-lucide="user"></i> Humanoid
+        </button>
+        <button id="btnSpawnChibiBase" class="sculpt-btn" title="Stylized / Cartoon 3.5-Head Character (Mario, Dwarf, Toon Mascot)">
+          <i class="app-icon" data-lucide="smile"></i> Chibi / Toon
+        </button>
+        <button id="btnSpawnCreatureBase" class="sculpt-btn" title="Organic Stylized Creature / Chibi Demon (Soft Continuous Contours, Horns, Wings, Pitchfork)">
+          <i class="app-icon" data-lucide="sparkles"></i> Organic Demon
+        </button>
+        <button id="btnSpawnQuadrupedBase" class="sculpt-btn" title="Animal / Creature with Digitigrade Leg Mechanics">
+          <i class="app-icon" data-lucide="paw-print"></i> Quadruped
+        </button>
+        <button id="btnSpawnHeadBust" class="sculpt-btn" title="Head &amp; Facial Plane Bust with Eye Sockets &amp; Jaw">
+          <i class="app-icon" data-lucide="user-check"></i> Head Bust
+        </button>
+        <button id="btnSpawnSculptSphere" class="sculpt-btn" title="Dense Digital Clay Sphere for Freeform Sculpting">
+          <i class="app-icon" data-lucide="circle"></i> Clay Sphere
+        </button>
+      </div>
+      <div class="tool-row" style="margin-top: 6px;">
+        <span class="tool-label">Mesh Style</span>
+        <select id="selectSculptStyle" class="tool-select" style="flex: 1;">
+          <option value="organic" selected>Organic (Soft Contours)</option>
+          <option value="mannequin">Mannequin (Rigid Joints)</option>
+        </select>
+      </div>
+      <div class="tool-row" style="margin-top: 6px;">
+        <span class="tool-label">Resting Pose</span>
+        <select id="selectSculptPose" class="tool-select" style="flex: 1;">
+          <option value="t_pose" selected>T-Pose (Outstretched)</option>
+          <option value="a_pose">A-Pose (45° Angle)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Sculpting Brushes -->
+    <div class="tool-control-group">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="brush"></i> Sculpting Brush</div>
+      <div class="sculpt-grid-3">
+        <button class="sculpt-btn btn-sculpt-brush active" data-brush="clay" title="Add or carve surface clay along normals">Clay</button>
+        <button class="sculpt-btn btn-sculpt-brush" data-brush="grab" title="Pull geometry smoothly along mouse drag (Primary forms)">Grab</button>
+        <button class="sculpt-btn btn-sculpt-brush" data-brush="smooth" title="Laplacian smoothing to relax wrinkles and bumps">Smooth</button>
+        <button class="sculpt-btn btn-sculpt-brush" data-brush="flatten" title="Project vertices onto contact plane for bone planes">Flatten</button>
+        <button class="sculpt-btn btn-sculpt-brush" data-brush="inflate" title="Expand or contract volume along vertex normals">Inflate</button>
+        <button class="sculpt-btn btn-sculpt-brush" data-brush="pinch" title="Pinch vertices towards center for sharp creases">Pinch</button>
+      </div>
+    </div>
+
+    <!-- Brush Settings -->
+    <div class="tool-control-group">
+      <div class="sculpt-slider-row">
+        <div class="sculpt-slider-header">
+          <span class="sculpt-slider-label">Brush Radius</span>
+          <span id="sculptRadiusValue" class="sculpt-slider-val">0.35</span>
+        </div>
+        <input type="range" id="sliderSculptRadius" min="0.05" max="1.50" step="0.02" value="0.35" class="tool-range">
+      </div>
+
+      <div class="sculpt-slider-row">
+        <div class="sculpt-slider-header">
+          <span class="sculpt-slider-label">Brush Strength</span>
+          <span id="sculptStrengthValue" class="sculpt-slider-val">0.50</span>
+        </div>
+        <input type="range" id="sliderSculptStrength" min="0.05" max="1.00" step="0.05" value="0.50" class="tool-range">
+      </div>
+
+      <div class="sculpt-options-row">
+        <label class="sculpt-checkbox-label">
+          <input type="checkbox" id="chkSculptSymmetry" checked>
+          <span><strong>X-Symmetry</strong></span>
+        </label>
+        <label class="sculpt-checkbox-label" title="Or hold Alt / Ctrl while sculpting">
+          <input type="checkbox" id="chkSculptInvert">
+          <span>Invert (<kbd>Alt</kbd>)</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Game-Ready Retopology -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="layers"></i> Game-Ready Retopology</div>
+      <div class="tool-sublabel">Decimate sculpt into clean, performance-friendly game mesh</div>
+
+      <div class="tool-row" style="margin-top: 4px;">
+        <span class="tool-label">Target Budget</span>
+        <select id="selectRetopoPreset" class="tool-select" style="flex: 1;">
+          <option value="4000">Mobile / WebGL (~4,000)</option>
+          <option value="15000" selected>Standard Game (~15,000)</option>
+          <option value="32000">Hero Asset (~32,000)</option>
+          <option value="custom">Custom Faces</option>
+        </select>
+      </div>
+
+      <div class="tool-row" style="margin-top: 4px;">
+        <span class="tool-label">Target Faces</span>
+        <input type="number" id="numRetopoTargetFaces" class="tool-input" min="500" max="100000" step="500" value="15000" style="flex: 1;">
+      </div>
+
+      <button type="button" id="btnExecuteRetopology" class="tool-btn tool-btn-primary btn-block" style="width: 100%; height: 32px; margin-top: 6px;">
+        <i class="app-icon" data-lucide="check-circle-2"></i> Retopologize to Game Mesh
+      </button>
+    </div>
+
+    <!-- Topology Health & Stats -->
+    <div class="sculpt-stats-card">
+      <div class="sculpt-stats-row">
+        <span style="color: #8b949e;">Active Mesh:</span>
+        <span id="sculptMeshName" style="color: #58a6ff; font-weight: 600;">None</span>
+      </div>
+      <div class="sculpt-stats-row">
+        <span style="color: #8b949e;">Triangles:</span>
+        <span id="sculptTriCount" style="color: #f0f6fc; font-weight: 600; font-family: monospace;">0</span>
+      </div>
+      <div class="sculpt-stats-row">
+        <span style="color: #8b949e;">Vertices:</span>
+        <span id="sculptVertCount" style="color: #f0f6fc; font-family: monospace;">0</span>
+      </div>
+      <div class="sculpt-stats-row">
+        <span style="color: #8b949e;">Game Readiness:</span>
+        <span id="sculptGameBadge" class="sculpt-badge-pill" style="background: rgba(35, 134, 54, 0.2); color: #3fb950; border: 1px solid rgba(63, 185, 80, 0.3);">
+          Ready
+        </span>
+      </div>
+    </div>
+  </div>
+</div>

@@ -9,7 +9,7 @@ export class CSGEditorTool extends AbstractEditorTool {
   public readonly dialogId = 'dialog-csg';
   public readonly triggerButtonId = 'btnToggleCSG';
   public readonly menuId = 'menuTools';
-  public readonly menuLabel = 'Sculpting';
+  public readonly menuLabel = 'Constructive Solid Geometry';
   public readonly icon = 'shapes';
   public readonly order = 3;
   public readonly defaultOpen = true;

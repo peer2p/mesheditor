@@ -15,6 +15,7 @@ import {
   ModelCompressorOptions,
   ModelCompressorStats,
 } from './compression/ModelCompressor';
+import { SculptBrushType } from './sculpting/SculptController';
 
 export interface MeshEditorAppOptions {
   /**
@@ -69,6 +70,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  Circle,
   CircleDot,
   Code,
   Combine,
@@ -109,6 +111,7 @@ import {
   Palette,
   Paintbrush,
   PanelRight,
+  PawPrint,
   Pipette,
   Plus,
   PlusCircle,
@@ -125,6 +128,7 @@ import {
   Shapes,
   Shield,
   ShieldCheck,
+  Smile,
   Sparkles,
   Square,
   SquareDashed,
@@ -136,6 +140,8 @@ import {
   Undo2,
   Upload,
   UploadCloud,
+  User,
+  UserCheck,
   Waves,
   Wrench,
   X,
@@ -159,6 +165,7 @@ export const editorIcons = {
   Check,
   CheckCircle2,
   ChevronDown,
+  Circle,
   CircleDot,
   Code,
   Combine,
@@ -198,6 +205,7 @@ export const editorIcons = {
   Palette,
   Paintbrush,
   PanelRight,
+  PawPrint,
   Pipette,
   Plus,
   PlusCircle,
@@ -214,6 +222,7 @@ export const editorIcons = {
   Shapes,
   Shield,
   ShieldCheck,
+  Smile,
   Sparkles,
   Square,
   SquareDashed,
@@ -225,6 +234,8 @@ export const editorIcons = {
   Undo2,
   Upload,
   UploadCloud,
+  User,
+  UserCheck,
   Waves,
   Wrench,
   X,
@@ -578,6 +589,7 @@ export class MeshEditorApp {
         this.updateMaterialGUI();
         this.updateOutliner();
         this.updateCSGGUI();
+        this.updateSculptUI();
         const statsSelection = this.getElement<HTMLElement>('statsSelection');
         if (statsSelection) {
           statsSelection.textContent = activeMesh
@@ -592,6 +604,7 @@ export class MeshEditorApp {
         this.updateOutliner();
         this.updateMeshGUI();
         this.updateCSGGUI();
+        this.updateSculptUI();
         options.events?.onSceneModified?.();
       },
       onHistoryChanged: (canUndo, canRedo) => {
@@ -1070,6 +1083,7 @@ export class MeshEditorApp {
     this.initEmbeddedTexturesUI();
     this.initPathExtrusionUI();
     this.initCompressModelUI();
+    this.initSculptUI();
 
     // Restore saved window layout and active tools from localStorage
     this.restoreDialogLayout();
@@ -1447,6 +1461,7 @@ export class MeshEditorApp {
           this.setupFloatingDialog(dialog);
           if (id === 'dialog-compress-model') {
             this.initCompressModelUI();
+    this.initSculptUI();
           }
         }
       }
@@ -2332,7 +2347,7 @@ export class MeshEditorApp {
 
     this.updateCreateShapeVisibility(this.createParams.shape);
 
-    // 5. CSG2 Boolean Sculpting GUI
+    // 5. Constructive Solid Geometryg GUI
     const containerCSG = document.getElementById('gui-csg-container') || document.getElementById('gui-container-csg');
     this.guiCSG = new dat.GUI({ autoPlace: false, width: 310 });
     containerCSG?.appendChild(this.guiCSG.domElement);
@@ -5862,5 +5877,229 @@ export class MeshEditorApp {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  /* =========================================================================
+     FIGURE SCULPT & RETOPOLOGY TOOL UI
+     ========================================================================= */
+  public openSculptTool(): void {
+    this.service.sculptController.setActive(true);
+    this.updateSculptUI();
+  }
+
+  public closeSculptTool(): void {
+    this.service.sculptController.setActive(false);
+  }
+
+  public initSculptUI(): void {
+    const dialog = this.getElement('dialog-sculpt');
+    if (!dialog) return;
+
+    // Hook model modification
+    this.service.sculptController.onMeshModified = () => {
+      this.updateSculptUI();
+    };
+
+    // Clicking anywhere in the sculpt dialog reactivates sculpt mode if it was dormant
+    dialog.addEventListener('click', () => {
+      if (!this.service.sculptController.isActive) {
+        this.service.sculptController.setActive(true);
+        this.updatePanelButtonStates();
+      }
+    });
+
+    // Brush selection pills
+    const brushButtons = dialog.querySelectorAll<HTMLButtonElement>('.btn-sculpt-brush');
+    brushButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        brushButtons.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const brush = (btn.dataset.brush || 'clay') as SculptBrushType;
+        this.service.sculptController.setBrushType(brush);
+        this.service.sculptController.setActive(true);
+        this.updatePanelButtonStates();
+      });
+    });
+
+    // Radius controls
+    const sliderRadius = this.getElement<HTMLInputElement>('sliderSculptRadius');
+    const valRadius = this.getElement('sculptRadiusValue');
+    if (sliderRadius) {
+      sliderRadius.addEventListener('input', () => {
+        const val = parseFloat(sliderRadius.value);
+        if (valRadius) valRadius.textContent = val.toFixed(2);
+        this.service.sculptController.setRadius(val);
+      });
+    }
+
+    // Strength controls
+    const sliderStrength = this.getElement<HTMLInputElement>('sliderSculptStrength');
+    const valStrength = this.getElement('sculptStrengthValue');
+    if (sliderStrength) {
+      sliderStrength.addEventListener('input', () => {
+        const val = parseFloat(sliderStrength.value);
+        if (valStrength) valStrength.textContent = val.toFixed(2);
+        this.service.sculptController.setStrength(val);
+      });
+    }
+
+    // Symmetry & Invert checkboxes
+    const chkSymmetry = this.getElement<HTMLInputElement>('chkSculptSymmetry');
+    if (chkSymmetry) {
+      chkSymmetry.addEventListener('change', () => {
+        this.service.sculptController.setSymmetry(chkSymmetry.checked);
+      });
+    }
+    const chkInvert = this.getElement<HTMLInputElement>('chkSculptInvert');
+    if (chkInvert) {
+      chkInvert.addEventListener('change', () => {
+        this.service.sculptController.setInvert(chkInvert.checked);
+      });
+    }
+
+    // Base Mesh Spawners
+    const getSelectedPose = (): 't_pose' | 'a_pose' => {
+      const selectPose = this.getElement<HTMLSelectElement>('selectSculptPose');
+      return selectPose?.value === 'a_pose' ? 'a_pose' : 't_pose';
+    };
+
+    const getSelectedStyle = (): 'organic' | 'mannequin' => {
+      const selectStyle = this.getElement<HTMLSelectElement>('selectSculptStyle');
+      return selectStyle?.value === 'mannequin' ? 'mannequin' : 'organic';
+    };
+
+    this.getElement('btnSpawnHumanoidBase')?.addEventListener('click', () => {
+      const pose = getSelectedPose();
+      const style = getSelectedStyle();
+      const mesh = this.service.sculptController.spawnHumanoidBaseMesh({ pose, style });
+      this.service.sculptController.setActive(true);
+      this.showToast(`Spawned Humanoid Base Mesh "${mesh.name}" (8-Head ${pose === 't_pose' ? 'T-Pose' : 'A-Pose'}).`, 'success');
+      this.updateSculptUI();
+      this.updatePanelButtonStates();
+    });
+
+    this.getElement('btnSpawnChibiBase')?.addEventListener('click', () => {
+      const pose = getSelectedPose();
+      const style = getSelectedStyle();
+      const mesh = this.service.sculptController.spawnChibiBaseMesh({ pose, style });
+      this.service.sculptController.setActive(true);
+      this.showToast(`Spawned Chibi / Toon Base Mesh "${mesh.name}" (3.5-Head ${pose === 't_pose' ? 'T-Pose' : 'A-Pose'}, ${style}).`, 'success');
+      this.updateSculptUI();
+      this.updatePanelButtonStates();
+    });
+
+    this.getElement('btnSpawnCreatureBase')?.addEventListener('click', () => {
+      const mesh = this.service.sculptController.spawnOrganicCreatureBaseMesh();
+      this.service.sculptController.setActive(true);
+      this.showToast(`Spawned Organic Creature / Demon Base Mesh "${mesh.name}" (Soft Continuous Contours).`, 'success');
+      this.updateSculptUI();
+      this.updatePanelButtonStates();
+    });
+
+    this.getElement('btnSpawnQuadrupedBase')?.addEventListener('click', () => {
+      const mesh = this.service.sculptController.spawnQuadrupedBaseMesh();
+      this.service.sculptController.setActive(true);
+      this.showToast(`Spawned Quadruped Base Mesh "${mesh.name}" (Digitigrade locomotion).`, 'success');
+      this.updateSculptUI();
+      this.updatePanelButtonStates();
+    });
+
+    this.getElement('btnSpawnHeadBust')?.addEventListener('click', () => {
+      const mesh = this.service.sculptController.spawnHeadBust();
+      this.service.sculptController.setActive(true);
+      this.showToast(`Spawned Head & Facial Plane Bust "${mesh.name}".`, 'success');
+      this.updateSculptUI();
+      this.updatePanelButtonStates();
+    });
+
+    this.getElement('btnSpawnSculptSphere')?.addEventListener('click', () => {
+      const mesh = this.service.sculptController.spawnSculptSphere();
+      this.service.sculptController.setActive(true);
+      this.showToast(`Spawned Digital Clay Sphere "${mesh.name}".`, 'success');
+      this.updateSculptUI();
+      this.updatePanelButtonStates();
+    });
+
+    // Retopology presets & execution
+    const selectPreset = this.getElement<HTMLSelectElement>('selectRetopoPreset');
+    const numTargetFaces = this.getElement<HTMLInputElement>('numRetopoTargetFaces');
+    if (selectPreset && numTargetFaces) {
+      selectPreset.addEventListener('change', () => {
+        if (selectPreset.value !== 'custom') {
+          numTargetFaces.value = selectPreset.value;
+        }
+      });
+    }
+
+    this.getElement('btnExecuteRetopology')?.addEventListener('click', async () => {
+      const targetMesh = this.service.selectedMesh;
+      if (!targetMesh) {
+        this.showToast('Please select a 3D mesh in the viewport to retopologize.', 'warning');
+        return;
+      }
+
+      const targetFaces = parseInt(numTargetFaces?.value || '15000', 10);
+      try {
+        this.showToast('Retopologizing mesh with Quadric Error Metrics...', 'info');
+        const analysis = await this.service.sculptController.retopologizeMesh(targetMesh, targetFaces);
+        this.showToast(
+          `Retopologized "${targetMesh.name}" to ${analysis.triangleCount} triangles (${analysis.gameReadiness}).`,
+          'success'
+        );
+        this.updateSculptUI();
+      } catch (err: any) {
+        this.showToast(`Retopology failed: ${err.message || err}`, 'error');
+      }
+    });
+
+    this.updateSculptUI();
+  }
+
+  public updateSculptUI(): void {
+    const dialog = this.getElement('dialog-sculpt');
+    if (!dialog) return;
+
+    const targetMesh = this.service.selectedMesh || (this.service.importedMeshes[0] as Mesh);
+    const nameEl = this.getElement('sculptMeshName');
+    const triEl = this.getElement('sculptTriCount');
+    const vertEl = this.getElement('sculptVertCount');
+    const badgeEl = this.getElement('sculptGameBadge');
+
+    if (!targetMesh) {
+      if (nameEl) nameEl.textContent = 'None';
+      if (triEl) triEl.textContent = '0';
+      if (vertEl) vertEl.textContent = '0';
+      if (badgeEl) {
+        badgeEl.textContent = 'No Mesh';
+        badgeEl.className = 'badge badge-secondary';
+      }
+      return;
+    }
+
+    const analysis = this.service.sculptController.analyzeTopology(targetMesh);
+    if (nameEl) nameEl.textContent = targetMesh.name;
+    if (triEl) triEl.textContent = analysis.triangleCount.toLocaleString();
+    if (vertEl) vertEl.textContent = analysis.vertexCount.toLocaleString();
+    if (badgeEl) {
+      badgeEl.textContent = analysis.gameReadiness;
+      badgeEl.style.background =
+        analysis.gameReadinessClass === 'success'
+          ? 'rgba(35, 134, 54, 0.2)'
+          : analysis.gameReadinessClass === 'warning'
+            ? 'rgba(210, 153, 34, 0.2)'
+            : 'rgba(248, 81, 73, 0.2)';
+      badgeEl.style.color =
+        analysis.gameReadinessClass === 'success'
+          ? '#3fb950'
+          : analysis.gameReadinessClass === 'warning'
+            ? '#d29922'
+            : '#f85149';
+      badgeEl.style.border =
+        analysis.gameReadinessClass === 'success'
+          ? '1px solid rgba(63, 185, 80, 0.3)'
+          : analysis.gameReadinessClass === 'warning'
+            ? '1px solid rgba(210, 153, 34, 0.3)'
+            : '1px solid rgba(248, 81, 73, 0.3)';
+    }
   }
 }

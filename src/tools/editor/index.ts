@@ -13,6 +13,7 @@ import { SceneEnvironmentEditorTool } from './SceneEnvironmentEditorTool';
 import { TextureOptimizerEditorTool } from './TextureOptimizerEditorTool';
 import { CompressModelEditorTool } from './CompressModelEditorTool';
 import { VoxelPainterEditorTool } from './VoxelPainterEditorTool';
+import { SculptEditorTool } from './SculptEditorTool';
 import { TOOL_VIEWS, getToolViewTemplate } from './toolViews';
 
 export {
@@ -30,6 +31,7 @@ export {
   TextureOptimizerEditorTool,
   CompressModelEditorTool,
   VoxelPainterEditorTool,
+  SculptEditorTool,
   TOOL_VIEWS,
   getToolViewTemplate,
 };
@@ -43,6 +45,7 @@ export function createBuiltinEditorTools(): ToolInterface[] {
     new CreatePrimitiveEditorTool(),
     new CSGEditorTool(),
     new FacetEditorTool(),
+    new SculptEditorTool(),
     new TextureOptimizerEditorTool(),
     new CompressModelEditorTool(),
     new VoxelPainterEditorTool(),

@@ -14,6 +14,7 @@ const TOOLS = [
   { className: 'CreatePrimitiveEditorTool', file: 'CreatePrimitiveEditorTool.ejs', id: 'dialog-create-primitive' },
   { className: 'CSGEditorTool', file: 'CSGEditorTool.ejs', id: 'dialog-csg' },
   { className: 'FacetEditorTool', file: 'FacetEditorTool.ejs', id: 'dialog-facet' },
+  { className: 'SculptEditorTool', file: 'SculptEditorTool.ejs', id: 'dialog-sculpt' },
   { className: 'SceneEnvironmentEditorTool', file: 'SceneEnvironmentEditorTool.ejs', id: 'dialog-scene' },
   { className: 'MeshPropertiesEditorTool', file: 'MeshPropertiesEditorTool.ejs', id: 'dialog-mesh' },
   { className: 'MaterialEditorTool', file: 'MaterialEditorTool.ejs', id: 'dialog-material' },

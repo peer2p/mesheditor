@@ -48,6 +48,7 @@ import {
   EmbeddedTextureInfo,
 } from './voxel';
 import { PathExtrusionController } from './pathExtrusion';
+import { SculptController } from './sculpting/SculptController';
 import { generateNormalMapFromCanvas } from './tools/textureUtils';
 import {
   ModelCompressor,
@@ -84,6 +85,7 @@ export class MeshEditorService {
   public textureAtlasManager: TextureAtlasManager;
   public voxelPainter: VoxelPainterController;
   public pathExtrusion: PathExtrusionController;
+  public sculptController: SculptController;
   public get pathWays(): PathExtrusionController {
     return this.pathExtrusion;
   }
@@ -190,6 +192,7 @@ export class MeshEditorService {
     this.textureAtlasManager.createProceduralTerrainAtlas('Default Terrain Atlas');
     this.voxelPainter = new VoxelPainterController(this, this.textureAtlasManager);
     this.pathExtrusion = new PathExtrusionController(this);
+    this.sculptController = new SculptController(this);
     const defaultAtlas = this.textureAtlasManager.getAtlases()[0];
     if (defaultAtlas) {
       this.voxelPainter.useTextureAtlas(defaultAtlas.id);
@@ -370,6 +373,7 @@ export class MeshEditorService {
       this.loaderObserver = null;
     }
     this.voxelPainter?.dispose();
+    this.sculptController?.dispose();
     if (this.engine) {
       this.engine.dispose();
     }
@@ -583,7 +587,8 @@ export class MeshEditorService {
           !this.isPlaceModeActive &&
           !this.facetEditorActive &&
           !this.voxelPainter?.isActive &&
-          !this.pathExtrusion?.isActive
+          !this.pathExtrusion?.isActive &&
+          !this.isSculptModeActive()
         ) {
           this.isMarqueeCandidate = true;
           this.isMarqueeActive = false;
@@ -608,7 +613,7 @@ export class MeshEditorService {
           }
         }
 
-        if (this.isMarqueeCandidate && !this.isAnyGizmoDragging()) {
+        if (this.isMarqueeCandidate && !this.isAnyGizmoDragging() && !this.isSculptModeActive()) {
           const dist = Math.hypot(
             this.scene.pointerX - this.marqueeStartPointer.x,
             this.scene.pointerY - this.marqueeStartPointer.y
@@ -658,8 +663,8 @@ export class MeshEditorService {
           return;
         }
 
-        // If voxel painter or path extrusion tool is active, ignore default mesh selection
-        if (this.voxelPainter?.isActive || this.pathExtrusion?.isActive) {
+        // If voxel painter, path extrusion or sculpt tool is active, ignore default mesh selection
+        if (this.voxelPainter?.isActive || this.pathExtrusion?.isActive || this.isSculptModeActive()) {
           return;
         }
 
@@ -734,6 +739,26 @@ export class MeshEditorService {
       for (const partName of ['xGizmo', 'yGizmo', 'zGizmo', 'uniformGizmo', 'planeGizmo']) {
         const part = (g as any)[partName];
         if (part?.dragBehavior?.dragging) return true;
+      }
+    }
+    return false;
+  }
+
+  public isSculptModeActive(): boolean {
+    if (!this.sculptController) return false;
+    if (this.sculptController.isActive) return true;
+    if (typeof document !== 'undefined') {
+      const sculptDialog = document.getElementById('dialog-sculpt');
+      if (
+        sculptDialog &&
+        sculptDialog.style.display !== 'none' &&
+        !sculptDialog.classList.contains('minimized') &&
+        !this.voxelPainter?.isActive &&
+        !this.pathExtrusion?.isActive &&
+        !this.facetEditorActive
+      ) {
+        this.sculptController.setActive(true);
+        return true;
       }
     }
     return false;
@@ -1034,6 +1059,21 @@ export class MeshEditorService {
     } else {
       this.selectNodes([]);
     }
+  }
+
+  public addMesh(mesh: Mesh): void {
+    mesh.isPickable = true;
+    if (mesh.material) {
+      mesh.material.backFaceCulling = false;
+    }
+    if (!this.importedMeshes.includes(mesh)) {
+      this.importedMeshes.push(mesh);
+    }
+    mesh.computeWorldMatrix(true);
+    mesh.refreshBoundingInfo();
+    this.selectMesh(mesh);
+    this.updateStats();
+    this.events.onSceneModified?.();
   }
 
   public toggleNodeSelection(node: TransformNode): void {
@@ -2464,7 +2504,7 @@ export class MeshEditorService {
     this.updateStats();
     this.events.onStatusChanged?.('Ready', false);
     this.events.onSceneModified?.();
-    this.events.onToast?.(`Sculpt ${op} successful: Created "${resultMesh.name}"!`, 'success');
+    this.events.onToast?.(`Constructive Solid Geometry ${op} successful: Created "${resultMesh.name}"!`, 'success');
 
     return resultMesh;
   }
@@ -2477,7 +2517,7 @@ export class MeshEditorService {
 
     const meshes = this.selectedNodes.filter((n): n is Mesh => n instanceof Mesh && !this.isEditorHelper(n));
     if (meshes.length < 2) {
-      this.events.onToast?.('Sculpting requires at least 2 valid meshes.', 'warning');
+      this.events.onToast?.('Constructive Solid Geometry requires at least 2 valid meshes.', 'warning');
       return null;
     }
 

@@ -91,7 +91,7 @@ describe('AI Mesh Agent (Text-to-Mesh, Image-to-Mesh & Mesh Update) Integration 
       );
     });
 
-    it('includes built-in Babylon.js procedural-modeler, voxel-painter, mesh-updater, and image-to-mesh skills', () => {
+    it('includes built-in Babylon.js procedural-modeler, voxel-painter, mesh-updater, image-to-mesh, and figure-sculptor skills', () => {
       const skills = service.aiAgent.getSkills();
       expect(skills.length).toBe(BUILT_IN_AGENT_SKILLS.length);
       expect(skills.map((s) => s.id)).toEqual([
@@ -99,6 +99,7 @@ describe('AI Mesh Agent (Text-to-Mesh, Image-to-Mesh & Mesh Update) Integration 
         'voxel-painter',
         'mesh-updater',
         'image-to-mesh',
+        'figure-sculptor',
       ]);
 
       const sysPrompt = service.aiAgent.buildSystemPrompt();
@@ -106,6 +107,7 @@ describe('AI Mesh Agent (Text-to-Mesh, Image-to-Mesh & Mesh Update) Integration 
       expect(sysPrompt).toContain('Voxel & Block Modeler');
       expect(sysPrompt).toContain('Mesh Updater & Scene Sculptor');
       expect(sysPrompt).toContain('Image to 3D Mesh Vision Analyzer');
+      expect(sysPrompt).toContain('Figure Sculptor & Game Retopology');
 
       // Disable voxel-painter and verify system prompt updates
       service.aiAgent.setSkillEnabled('voxel-painter', false);
