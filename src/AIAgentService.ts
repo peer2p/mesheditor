@@ -1183,32 +1183,59 @@ ${textureRule}
 
     const fetchFn = this.customFetch || globalThis.fetch.bind(globalThis);
     let res: Response;
+    const timeoutMs = 180000; // 3-minute safety limit to prevent indefinite hanging
+    const timeoutController = new AbortController();
+    const timer = setTimeout(() => {
+      timeoutController.abort(new Error('Endpoint request timed out after 180 seconds.'));
+    }, timeoutMs);
+
+    // Combine caller signal with timeout controller
+    let effectiveSignal = timeoutController.signal;
+    if (signal) {
+      if (signal.aborted) {
+        clearTimeout(timer);
+        throw new Error('Generation cancelled by user.');
+      }
+      signal.addEventListener('abort', () => timeoutController.abort(), { once: true });
+    }
+
     try {
       res = await fetchFn(url, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
-        signal,
+        signal: effectiveSignal,
       });
       if (res.status === 404 && url.startsWith('/api/antigravity/v1')) {
         res = await fetchFn(url.replace(/^\/api\/antigravity\/v1/, 'http://localhost:8787/v1'), {
           method: 'POST',
           headers,
           body: JSON.stringify(body),
-          signal,
+          signal: effectiveSignal,
         });
       }
-    } catch (err) {
-      if (url.startsWith('/api/antigravity/v1')) {
-        res = await fetchFn(url.replace(/^\/api\/antigravity\/v1/, 'http://localhost:8787/v1'), {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body),
-          signal,
-        });
+    } catch (err: any) {
+      if (url.startsWith('/api/antigravity/v1') && !effectiveSignal.aborted) {
+        try {
+          res = await fetchFn(url.replace(/^\/api\/antigravity\/v1/, 'http://localhost:8787/v1'), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
+            signal: effectiveSignal,
+          });
+        } catch {
+          clearTimeout(timer);
+          throw err;
+        }
       } else {
+        clearTimeout(timer);
+        if (err?.name === 'AbortError' && !signal?.aborted) {
+          throw new Error('Endpoint request timed out after 180 seconds. The model or bridge did not respond in time.');
+        }
         throw err;
       }
+    } finally {
+      clearTimeout(timer);
     }
 
     if (!res.ok) {

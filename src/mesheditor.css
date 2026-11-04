@@ -1,6 +1,7 @@
 :root,
 mesh-editor,
 #app-container {
+  color-scheme: dark;
   --bg-primary: #0f1218;
   --bg-panel: rgba(22, 27, 34, 0.92);
   --bg-header: rgba(30, 37, 48, 0.95);
@@ -31,12 +32,95 @@ mesh-editor,
 
 html,
 body {
+  color-scheme: dark;
   width: 100%;
   height: 100%;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
+}
+
+/* Unified Dark Theme Checkbox Styling */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: #161b22;
+  outline: none;
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  vertical-align: middle;
+  flex-shrink: 0;
+  transition: all 0.15s ease-in-out;
+  position: relative;
+  margin: 0;
+}
+
+input[type="checkbox"]:hover {
+  border-color: var(--accent-color, #58a6ff);
+  background: #21262d;
+}
+
+input[type="checkbox"]:checked {
+  background: var(--accent-active, #1f6feb);
+  border-color: var(--accent-active, #1f6feb);
+}
+
+input[type="checkbox"]:checked::before {
+  content: "";
+  width: 7px;
+  height: 4px;
+  border-left: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+  transform: rotate(-45deg) translate(0.5px, -0.5px);
+}
+
+input[type="checkbox"]:focus-visible {
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.4);
+}
+
+input[type="checkbox"]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Custom Dark Scrollbars for Textareas and Text Inputs */
+textarea,
+.tool-textarea,
+.ai-prompt-textarea {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+textarea::-webkit-scrollbar,
+.tool-textarea::-webkit-scrollbar,
+.ai-prompt-textarea::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+textarea::-webkit-scrollbar-track,
+.tool-textarea::-webkit-scrollbar-track,
+.ai-prompt-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+textarea::-webkit-scrollbar-thumb,
+.tool-textarea::-webkit-scrollbar-thumb,
+.ai-prompt-textarea::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 3px;
+}
+
+textarea::-webkit-scrollbar-thumb:hover,
+.tool-textarea::-webkit-scrollbar-thumb:hover,
+.ai-prompt-textarea::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.38);
 }
 
 mesh-editor {
@@ -2958,6 +3042,151 @@ progress.loading-spinner:indeterminate {
   line-height: 1.4;
   word-break: break-word;
   user-select: text;
+  position: relative;
+}
+
+/* AI Message Header & Copy Button */
+.ai-msg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 4px;
+  user-select: none;
+}
+
+.ai-msg-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-secondary);
+}
+
+.ai-msg-user .ai-msg-role {
+  color: var(--accent-hover, #79c0ff);
+}
+
+.ai-msg-assistant .ai-msg-role {
+  color: var(--success-color, #3fb950);
+}
+
+.ai-msg-header-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-msg-timer {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.ai-msg-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1;
+  transition: all 0.15s ease-in-out;
+  opacity: 0.65;
+}
+
+.ai-msg:hover .ai-msg-copy-btn,
+.ai-msg-copy-btn:focus-visible {
+  opacity: 1;
+}
+
+.ai-msg-copy-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ai-msg-copy-btn.is-copied {
+  color: #3fb950 !important;
+  border-color: rgba(63, 185, 80, 0.4) !important;
+  background: rgba(63, 185, 80, 0.15) !important;
+  opacity: 1 !important;
+}
+
+/* AI Active Skills Badge Bar */
+.ai-active-skills-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding: 3px 6px;
+  background: rgba(88, 166, 255, 0.08);
+  border: 1px solid rgba(88, 166, 255, 0.2);
+  border-radius: 5px;
+  font-size: 9.5px;
+}
+
+.ai-skills-pill-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--accent-hover, #79c0ff);
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.ai-skill-pill {
+  display: inline-block;
+  padding: 1px 5px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #c9d1d9;
+}
+
+/* AI Thinking Status Box */
+.ai-thinking-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px dashed rgba(88, 166, 255, 0.35);
+  border-radius: 5px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: #c9d1d9;
+  transition: all 0.2s ease;
+}
+
+.ai-thinking-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(88, 166, 255, 0.3);
+  border-top-color: var(--accent-color, #58a6ff);
+  border-radius: 50%;
+  animation: ai-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ai-step-duration {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  margin-left: auto;
 }
 
 .ai-msg-user {

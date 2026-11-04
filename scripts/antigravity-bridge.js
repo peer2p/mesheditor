@@ -102,10 +102,11 @@ function normalizeAgyModel(requestedModel) {
 }
 
 /**
- * Runs a command and captures stdout/stderr.
+ * Runs a command and captures stdout/stderr with a timeout.
  */
 function execProcess(bin, args, options = {}) {
   return new Promise((resolve, reject) => {
+    const timeoutMs = options.timeoutMs || 180000; // 3 minutes timeout
     const child = spawn(bin, args, {
       cwd: options.cwd || os.tmpdir(),
       env: { ...process.env, ...options.env },
@@ -114,6 +115,18 @@ function execProcess(bin, args, options = {}) {
 
     let stdout = '';
     let stderr = '';
+    let timer = null;
+
+    if (timeoutMs > 0) {
+      timer = setTimeout(() => {
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // ignore
+        }
+        reject(new Error(`Antigravity CLI process timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
+      }, timeoutMs);
+    }
 
     child.stdout.on('data', (chunk) => {
       stdout += chunk.toString();
@@ -122,9 +135,11 @@ function execProcess(bin, args, options = {}) {
       stderr += chunk.toString();
     });
     child.on('error', (err) => {
+      if (timer) clearTimeout(timer);
       reject(err);
     });
     child.on('close', (code) => {
+      if (timer) clearTimeout(timer);
       resolve({ code, stdout, stderr });
     });
   });
@@ -323,6 +338,62 @@ Rules for "tool_calls":
 }
 
 /**
+ * Helper to safely extract JSON body from an incoming HTTP request,
+ * supporting both pre-parsed middleware bodies and raw streaming requests.
+ */
+function readRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    if (req.body && typeof req.body === 'object') {
+      return resolve(req.body);
+    }
+    if (typeof req.body === 'string' && req.body.trim()) {
+      try {
+        return resolve(JSON.parse(req.body));
+      } catch (e) {
+        return reject(e);
+      }
+    }
+    let rawBody = '';
+    req.on('data', (chunk) => {
+      rawBody += chunk.toString();
+    });
+    req.on('end', () => {
+      try {
+        resolve(JSON.parse(rawBody || '{}'));
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on('error', (err) => reject(err));
+  });
+}
+
+/**
+ * Normalizes error messages from agy CLI into a clear human-readable string and status code.
+ */
+function extractBridgeErrorDetails(err, stdout, stderr, code) {
+  const combined = `${err?.message || ''}\n${stderr || ''}\n${stdout || ''}`;
+  let statusCode = 500;
+  let message = err?.message || 'Unknown bridge error';
+
+  if (/resource_exhausted|quota reached|error_code":\s*429/i.test(combined)) {
+    statusCode = 429;
+    const match = combined.match(/Individual quota reached[^\n"]*/i);
+    message = match ? match[0] : 'Antigravity quota reached. Resets in a few hours or switch model/endpoint.';
+  } else if (/timed out/i.test(combined)) {
+    statusCode = 504;
+    message = 'Antigravity CLI timed out after 180s. Please retry or choose a lighter model.';
+  } else if (/auth|not signed in|login/i.test(combined)) {
+    statusCode = 401;
+    message = 'Antigravity authentication expired or missing. Please run `agy auth login` or switch model.';
+  } else if (code !== 0) {
+    message = err?.message || stderr.trim() || `Antigravity CLI exited with code ${code}`;
+  }
+
+  return { statusCode, message };
+}
+
+/**
  * Executes a chat completion request via `agy` and returns an OpenAI-formatted response object.
  */
 async function runAgyChatCompletion(body) {
@@ -330,14 +401,24 @@ async function runAgyChatCompletion(body) {
   const model = normalizeAgyModel(body?.model);
   const { prompt, tempImageFiles } = buildAgyPromptFromOpenAI(body?.messages || [], body?.tools || []);
 
-  const args = ['--model', model, '--output-format', 'json', '--disable-slash-commands'];
+  // Always supply --dangerously-skip-permissions and --print-timeout 180s so agy never hangs waiting for stdin confirmation
+  const args = [
+    '--model',
+    model,
+    '--output-format',
+    'json',
+    '--disable-slash-commands',
+    '--dangerously-skip-permissions',
+    '--print-timeout',
+    '180s',
+  ];
   if (tempImageFiles.length > 0) {
-    args.push('--add-dir', os.tmpdir(), '--dangerously-skip-permissions');
+    args.push('--add-dir', os.tmpdir());
   }
   args.push('-p', prompt);
 
   try {
-    const { code, stdout, stderr } = await execProcess(bin, args, { cwd: os.tmpdir() });
+    const { code, stdout, stderr } = await execProcess(bin, args, { cwd: os.tmpdir(), timeoutMs: 180000 });
 
     // Parse last JSON line from agy stdout
     let agyResult = null;
@@ -359,8 +440,10 @@ async function runAgyChatCompletion(body) {
     }
 
     if (code !== 0 && (!agyResult || agyResult.status === 'ERROR')) {
-      const errMsg = agyResult?.error || stderr || stdout || `agy exited with code ${code}`;
-      throw new Error(errMsg.trim());
+      const errDetails = extractBridgeErrorDetails(new Error(agyResult?.error || ''), stdout, stderr, code);
+      const bridgeErr = new Error(errDetails.message);
+      (bridgeErr).statusCode = errDetails.statusCode;
+      throw bridgeErr;
     }
 
     const rawResponseText = agyResult ? agyResult.response || '' : stdout;
@@ -459,30 +542,27 @@ function setupAntigravityBridgeRoutes(app) {
   app.get('/api/skills', handleSkillsRequest);
   app.get('/api/antigravity/v1/skills', handleSkillsRequest);
 
-  app.post('/api/antigravity/v1/chat/completions', (req, res) => {
-    let rawBody = '';
-    req.on('data', (chunk) => {
-      rawBody += chunk.toString();
-    });
-    req.on('end', async () => {
-      try {
-        const parsed = JSON.parse(rawBody || '{}');
-        const responsePayload = await runAgyChatCompletion(parsed);
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify(responsePayload));
-      } catch (err) {
-        res.statusCode = 500;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(
-          JSON.stringify({
-            error: {
-              message: `Antigravity Bridge Error: ${err.message || String(err)}`,
-            },
-          })
-        );
-      }
-    });
+  app.post('/api/antigravity/v1/chat/completions', async (req, res) => {
+    try {
+      const parsed = await readRequestBody(req);
+      const responsePayload = await runAgyChatCompletion(parsed);
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(responsePayload));
+    } catch (err) {
+      const status = err.statusCode || 500;
+      res.statusCode = status;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify({
+          error: {
+            message: `Antigravity Bridge Error: ${err.message || String(err)}`,
+            type: status === 429 ? 'insufficient_quota' : 'bridge_error',
+            code: status,
+          },
+        })
+      );
+    }
   });
 }
 
@@ -540,27 +620,24 @@ function startStandaloneBridgeServer(port = Number(process.env.AGY_BRIDGE_PORT) 
       req.method === 'POST' &&
       (urlPath === '/v1/chat/completions' || urlPath === '/api/antigravity/v1/chat/completions' || urlPath === '/chat/completions')
     ) {
-      let rawBody = '';
-      req.on('data', (chunk) => {
-        rawBody += chunk.toString();
-      });
-      req.on('end', async () => {
-        try {
-          const parsed = JSON.parse(rawBody || '{}');
-          const result = await runAgyChatCompletion(parsed);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(result));
-        } catch (err) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(
-            JSON.stringify({
-              error: {
-                message: `Antigravity Bridge Error: ${err.message || String(err)}`,
-              },
-            })
-          );
-        }
-      });
+      try {
+        const parsed = await readRequestBody(req);
+        const result = await runAgyChatCompletion(parsed);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err) {
+        const status = err.statusCode || 500;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            error: {
+              message: `Antigravity Bridge Error: ${err.message || String(err)}`,
+              type: status === 429 ? 'insufficient_quota' : 'bridge_error',
+              code: status,
+            },
+          })
+        );
+      }
       return;
     }
 

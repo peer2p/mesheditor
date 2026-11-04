@@ -74,6 +74,7 @@ import {
   CircleDot,
   Code,
   Combine,
+  Copy,
   createIcons,
   Crosshair,
   Download,
@@ -169,6 +170,7 @@ export const editorIcons = {
   CircleDot,
   Code,
   Combine,
+  Copy,
   Crosshair,
   Download,
   Eraser,
@@ -3931,6 +3933,19 @@ export class MeshEditorApp {
       btnSettingsToggle?.classList.add('active');
       btnSettingsToggle?.setAttribute('title', 'Back to Chat & Generation');
       if (dialogTitleText) dialogTitleText.textContent = 'AI Agent Settings';
+
+      // Auto-fetch endpoint models on first settings drawer open if not already loaded
+      const modelSelect = this.getElement<HTMLSelectElement>('aiModelSelect');
+      if (modelSelect && modelSelect.options.length <= 1) {
+        this.service.aiAgent.fetchAvailableModels().then((models) => {
+          if (models.length > 0) {
+            const current = this.service.aiAgent.getConfig().model;
+            const unique = Array.from(new Set([current, ...models].filter(Boolean)));
+            modelSelect.innerHTML = unique.map((m) => `<option value="${this.escapeHtml(m)}">${this.escapeHtml(m)}</option>`).join('');
+            modelSelect.value = current;
+          }
+        }).catch(() => {});
+      }
     } else {
       settingsPanel.style.display = 'none';
       if (agentBody) agentBody.style.display = 'flex';
@@ -3940,10 +3955,58 @@ export class MeshEditorApp {
     }
   }
 
+  public copyToClipboard(text: string, button?: HTMLElement): void {
+    if (!text) return;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {
+        this.fallbackCopyToClipboard(text);
+      });
+    } else {
+      this.fallbackCopyToClipboard(text);
+    }
+    if (button) {
+      button.classList.add('is-copied');
+      const icon = button.querySelector('i');
+      if (icon) {
+        icon.setAttribute('data-lucide', 'check');
+        if (typeof (window as any).lucide?.createIcons === 'function') {
+          (window as any).lucide.createIcons();
+        }
+      }
+      setTimeout(() => {
+        button.classList.remove('is-copied');
+        if (icon) {
+          icon.setAttribute('data-lucide', 'copy');
+          if (typeof (window as any).lucide?.createIcons === 'function') {
+            (window as any).lucide.createIcons();
+          }
+        }
+      }, 1500);
+    }
+    this.showToast('Copied to clipboard!', 'info');
+  }
+
+  private fallbackCopyToClipboard(text: string): void {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch {
+      // ignore
+    }
+  }
+
   private initAIAgentUI(): void {
     const endpointInput = this.getElement<HTMLInputElement>('aiEndpointUrlInput');
     const apiKeyInput = this.getElement<HTMLInputElement>('aiApiKeyInput');
     const modelInput = this.getElement<HTMLInputElement>('aiModelInput');
+    const modelSelect = this.getElement<HTMLSelectElement>('aiModelSelect');
+    const btnToggleCustomModel = this.getElement<HTMLButtonElement>('btnToggleCustomModel');
     const modelDatalist = this.getElement<HTMLDataListElement>('aiModelDatalist');
     const settingsPanel = this.getElement<HTMLElement>('aiSettingsPanel');
     const skillsList = this.getElement<HTMLElement>('aiSkillsList');
@@ -4009,6 +4072,61 @@ export class MeshEditorApp {
     if (endpointInput) endpointInput.value = initialConfig.baseUrl;
     if (apiKeyInput) apiKeyInput.value = initialConfig.apiKey;
     if (modelInput) modelInput.value = initialConfig.model;
+
+    const populateModelSelect = (models: string[], selectedModel?: string) => {
+      if (!modelSelect) return;
+      const targetModel = selectedModel || modelInput?.value || this.service.aiAgent.getConfig().model;
+      const existing = Array.from(modelSelect.options).map((o) => o.value);
+      const combined = Array.from(new Set([...models, ...existing, targetModel].filter(Boolean)));
+      modelSelect.innerHTML = combined
+        .map((m) => `<option value="${this.escapeHtml(m)}">${this.escapeHtml(m)}</option>`)
+        .join('');
+      if (targetModel) {
+        modelSelect.value = targetModel;
+      }
+      if (modelInput) {
+        modelInput.value = modelSelect.value || targetModel || '';
+      }
+    };
+
+    if (modelSelect) {
+      populateModelSelect([], initialConfig.model);
+      modelSelect.addEventListener('change', () => {
+        if (modelInput) modelInput.value = modelSelect.value;
+        this.service.aiAgent.saveConfig({ model: modelSelect.value });
+        updateEndpointBadge();
+      });
+    }
+
+    if (modelInput) {
+      modelInput.addEventListener('input', () => {
+        if (modelSelect && modelInput.value.trim()) {
+          populateModelSelect([modelInput.value.trim()], modelInput.value.trim());
+        }
+      });
+    }
+
+    if (btnToggleCustomModel) {
+      btnToggleCustomModel.addEventListener('click', () => {
+        if (!modelInput || !modelSelect) return;
+        const isCustomVisible = modelInput.style.display !== 'none';
+        if (isCustomVisible) {
+          modelInput.style.display = 'none';
+          modelSelect.style.display = 'inline-block';
+          btnToggleCustomModel.textContent = 'Custom ID...';
+          if (modelSelect.value) {
+            modelInput.value = modelSelect.value;
+            this.service.aiAgent.saveConfig({ model: modelSelect.value });
+            updateEndpointBadge();
+          }
+        } else {
+          modelInput.style.display = 'inline-block';
+          modelSelect.style.display = 'none';
+          btnToggleCustomModel.textContent = 'Select...';
+          modelInput.focus();
+        }
+      });
+    }
 
     if (minPolyInput) {
       minPolyInput.value = String(initialConfig.minPolygons ?? 200);
@@ -4115,6 +4233,7 @@ export class MeshEditorApp {
         if (preset) {
           if (endpointInput) endpointInput.value = preset.baseUrl;
           if (modelInput) modelInput.value = preset.defaultModel;
+          populateModelSelect([preset.defaultModel], preset.defaultModel);
           this.service.aiAgent.saveConfig({
             baseUrl: preset.baseUrl,
             model: preset.defaultModel,
@@ -4122,6 +4241,15 @@ export class MeshEditorApp {
           updateEndpointBadge();
           if (settingsStatus) settingsStatus.textContent = `Preset: ${preset.label}`;
           this.showToast(`Switched to ${preset.label} (${preset.defaultModel})`, 'info');
+
+          // Auto-fetch available models for this preset if local bridge / antigravity
+          if (preset.baseUrl.includes('antigravity') || preset.baseUrl.includes('8787')) {
+            this.service.aiAgent.fetchAvailableModels({ baseUrl: preset.baseUrl }).then((models) => {
+              if (models.length > 0) {
+                populateModelSelect(models, preset.defaultModel);
+              }
+            }).catch(() => {});
+          }
         }
       });
     });
@@ -4140,11 +4268,9 @@ export class MeshEditorApp {
           baseUrl: endpointInput?.value.trim(),
           apiKey: apiKeyInput?.value.trim(),
         });
+        populateModelSelect(models);
         if (modelDatalist) {
           modelDatalist.innerHTML = models.map((m) => `<option value="${m}"></option>`).join('');
-        }
-        if (models.length > 0 && modelInput && !modelInput.value.trim()) {
-          modelInput.value = models[0];
         }
         if (settingsStatus) settingsStatus.textContent = `${models.length} models loaded`;
         this.showToast(`Loaded ${models.length} models from endpoint.`, 'success');
@@ -4504,16 +4630,39 @@ export class MeshEditorApp {
     if (chatLog) {
       const userEl = document.createElement('div');
       userEl.className = 'ai-msg ai-msg-user';
-      const imgsHtml =
-        images.length > 0
-          ? `<div class="ai-msg-images">${images.map((u) => `<img src="${u}" alt="Ref" />`).join('')}</div>`
-          : '';
-      const userMarkdown = marked.parse(promptText || '(Image-to-Mesh Reference)', {
+      const userHeader = document.createElement('div');
+      userHeader.className = 'ai-msg-header';
+      userHeader.innerHTML = `
+        <span class="ai-msg-role"><i class="app-icon" data-lucide="user"></i> You</span>
+        <div class="ai-msg-header-right">
+          <span class="ai-msg-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          <button type="button" class="ai-msg-copy-btn" title="Copy prompt" aria-label="Copy prompt">
+            <i class="app-icon" data-lucide="copy"></i>
+          </button>
+        </div>
+      `;
+      const copyUserBtn = userHeader.querySelector<HTMLButtonElement>('.ai-msg-copy-btn');
+      copyUserBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.copyToClipboard(promptText, copyUserBtn);
+      });
+      userEl.appendChild(userHeader);
+
+      if (images.length > 0) {
+        const imgsDiv = document.createElement('div');
+        imgsDiv.className = 'ai-msg-images';
+        imgsDiv.innerHTML = images.map((u) => `<img src="${u}" alt="Ref" />`).join('');
+        userEl.appendChild(imgsDiv);
+      }
+
+      const userTextDiv = document.createElement('div');
+      userTextDiv.className = 'ai-msg-text';
+      userTextDiv.innerHTML = marked.parse(promptText || '(Image-to-Mesh Reference)', {
         async: false,
         breaks: true,
         gfm: true,
       }) as string;
-      userEl.innerHTML = `${imgsHtml}<div class="ai-msg-text">${userMarkdown}</div>`;
+      userEl.appendChild(userTextDiv);
       chatLog.appendChild(userEl);
       chatLog.scrollTop = chatLog.scrollHeight;
     }
@@ -4521,15 +4670,76 @@ export class MeshEditorApp {
     // Create assistant progress bubble
     const assistantEl = document.createElement('div');
     assistantEl.className = 'ai-msg ai-msg-assistant';
+
+    const assistantHeader = document.createElement('div');
+    assistantHeader.className = 'ai-msg-header';
+    assistantHeader.innerHTML = `
+      <span class="ai-msg-role"><i class="app-icon" data-lucide="bot"></i> AI Mesh Agent</span>
+      <div class="ai-msg-header-right">
+        <span class="ai-msg-timer" id="aiMsgTimer">Thinking (0s)...</span>
+        <button type="button" class="ai-msg-copy-btn" title="Copy response" aria-label="Copy response">
+          <i class="app-icon" data-lucide="copy"></i>
+        </button>
+      </div>
+    `;
+    const copyAssistantBtn = assistantHeader.querySelector<HTMLButtonElement>('.ai-msg-copy-btn');
+    assistantEl.appendChild(assistantHeader);
+
+    // Active Skills Bar - instant feedback of loaded capabilities
+    const activeSkills = this.service.aiAgent.getSkills().filter((s) => s.enabled);
+    if (activeSkills.length > 0) {
+      const skillsBar = document.createElement('div');
+      skillsBar.className = 'ai-active-skills-bar';
+      skillsBar.innerHTML = `
+        <span class="ai-skills-pill-label"><i class="app-icon" data-lucide="sparkles"></i> Active Skills:</span>
+        <div class="ai-skills-pills" style="display: inline-flex; flex-wrap: wrap; gap: 3px;">
+          ${activeSkills.map((s) => `<span class="ai-skill-pill">${this.escapeHtml(s.name)}</span>`).join('')}
+        </div>
+      `;
+      assistantEl.appendChild(skillsBar);
+    }
+
+    // Live Thinking & Reasoning Box
+    const thinkingBox = document.createElement('div');
+    thinkingBox.className = 'ai-thinking-box';
+    thinkingBox.innerHTML = `
+      <span class="ai-thinking-spinner"></span>
+      <span class="ai-thinking-text">Connecting to endpoint & planning 3D operations...</span>
+    `;
+    assistantEl.appendChild(thinkingBox);
+
     const stepsContainer = document.createElement('div');
     stepsContainer.className = 'ai-msg-steps';
     const textContainer = document.createElement('div');
     textContainer.className = 'ai-msg-text';
-    textContainer.textContent = 'Thinking & planning 3D operations...';
+    textContainer.style.display = 'none';
+
     assistantEl.appendChild(stepsContainer);
     assistantEl.appendChild(textContainer);
     chatLog?.appendChild(assistantEl);
     if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
+
+    // Refresh icons inside new bubbles
+    if (typeof (window as any).lucide?.createIcons === 'function') {
+      (window as any).lucide.createIcons();
+    }
+
+    copyAssistantBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rawText = assistantEl.getAttribute('data-raw-response') || textContainer.textContent || '';
+      this.copyToClipboard(rawText, copyAssistantBtn);
+    });
+
+    const startTime = Date.now();
+    const timerEl = assistantHeader.querySelector<HTMLElement>('#aiMsgTimer');
+    const thinkingTextEl = thinkingBox.querySelector<HTMLElement>('.ai-thinking-text');
+    const timerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      if (timerEl) timerEl.textContent = `Thinking (${elapsed}s)...`;
+      if (elapsed >= 12 && thinkingTextEl && thinkingTextEl.textContent?.includes('Connecting')) {
+        thinkingTextEl.textContent = `Model reasoning & building 3D mesh operations (${elapsed}s)...`;
+      }
+    }, 1000);
 
     const stepElements = new Map<string, HTMLElement>();
 
@@ -4547,6 +4757,9 @@ export class MeshEditorApp {
         includeViewportSnapshot: !!includeViewportCheck?.checked,
         signal: this.aiAbortController.signal,
         onStep: (step: AIAgentToolExecutionStep) => {
+          if (thinkingTextEl) {
+            thinkingTextEl.textContent = `Executing tool: ${step.toolName.replace(/^modeler_/, '')}...`;
+          }
           const isErr = !!step.isError;
           const statusClass = isErr ? 'error' : 'success';
           let stepEl = stepElements.get(step.id);
@@ -4571,21 +4784,32 @@ export class MeshEditorApp {
             <span class="ai-step-icon">${iconSymbol}</span>
             <span class="ai-step-name">${this.escapeHtml(step.toolName.replace(/^modeler_/, ''))}</span>
             <span class="ai-step-summary">${this.escapeHtml(String(argSummary))}</span>
+            <span class="ai-step-duration">${step.durationMs ? `${step.durationMs}ms` : ''}</span>
           `;
           if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
         },
         onStatus: (statusText: string) => {
-          textContainer.textContent = statusText;
+          if (thinkingTextEl) {
+            thinkingTextEl.textContent = statusText;
+          }
           if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
         },
       });
 
+      clearInterval(timerInterval);
+      const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      if (timerEl) timerEl.textContent = `Done in ${totalElapsed}s`;
+      thinkingBox.remove();
+
       const responseMarkdown = result.content || 'Completed 3D mesh operations.';
+      assistantEl.setAttribute('data-raw-response', responseMarkdown);
+      textContainer.style.display = 'block';
       textContainer.innerHTML = marked.parse(responseMarkdown, {
         async: false,
         breaks: true,
         gfm: true,
       }) as string;
+
       if (modelInput) {
         modelInput.value = this.service.aiAgent.getConfig().model;
       }
@@ -4594,7 +4818,13 @@ export class MeshEditorApp {
       this.updateMaterialGUI();
       this.updateCSGGUI();
     } catch (err: any) {
+      clearInterval(timerInterval);
+      const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      if (timerEl) timerEl.textContent = `Failed after ${totalElapsed}s`;
+      thinkingBox.remove();
+
       assistantEl.classList.add('ai-msg-error');
+      textContainer.style.display = 'block';
       const errMsg = err?.message || String(err);
       textContainer.textContent = `Error: ${errMsg}`;
       this.showToast(errMsg, 'error');

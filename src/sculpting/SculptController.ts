@@ -17,6 +17,7 @@ import {
   Quaternion,
   Scene,
   StandardMaterial,
+  SubMesh,
   Vector3,
   VertexBuffer,
   VertexData,
@@ -1688,28 +1689,179 @@ export class SculptController {
     }
 
     const preSnapshot = VertexData.ExtractFromMesh(mesh);
+    const preSubMeshesData = mesh.subMeshes
+      ? mesh.subMeshes.map((sm) => ({
+          materialIndex: sm.materialIndex,
+          verticesStart: sm.verticesStart,
+          verticesCount: sm.verticesCount,
+          indexStart: sm.indexStart,
+          indexCount: sm.indexCount,
+        }))
+      : null;
+    const preMaterial = mesh.material;
+    const hasSubMeshes = !!(mesh.subMeshes && mesh.subMeshes.length > 1);
 
     if (currentFaces > targetFaces) {
-      const ratio = targetFaces / currentFaces;
-      await ModelCompressor.simplifyMesh(mesh, ratio);
-    }
+      if (hasSubMeshes) {
+        // MultiMaterial Retopology: isolate each submesh so decimation never contracts
+        // edges across separate parts (eliminating tears/holes) and never scrambles materials.
+        const subMeshes = mesh.subMeshes.slice();
+        const multiMat = mesh.material;
+        const indices = mesh.getIndices();
+        const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+        const normals = mesh.getVerticesData(VertexBuffer.NormalKind);
+        const uvs = mesh.getVerticesData(VertexBuffer.UVKind);
+        const colors = mesh.getVerticesData(VertexBuffer.ColorKind);
 
-    // Ensure normal vectors are recalculated smoothly across new topology
-    const vd = VertexData.ExtractFromMesh(mesh);
-    if (vd.positions && vd.indices) {
-      vd.normals = [];
-      VertexData.ComputeNormals(vd.positions, vd.indices, vd.normals);
-      vd.applyToMesh(mesh, true);
+        if (indices && positions) {
+          const parts: Mesh[] = [];
+          const ratio = Math.max(0.05, Math.min(0.95, targetFaces / currentFaces));
+
+          for (let i = 0; i < subMeshes.length; i++) {
+            const sm = subMeshes[i];
+            const smFaceCount = Math.floor(sm.indexCount / 3);
+            const subIndices = indices.slice(sm.indexStart, sm.indexStart + sm.indexCount);
+
+            const newPositions: number[] = [];
+            const newNormals: number[] = [];
+            const newUVs: number[] = [];
+            const newColors: number[] = [];
+            const newSubIndices: number[] = [];
+            const map = new Map<number, number>();
+
+            for (let k = 0; k < subIndices.length; k++) {
+              const oldIdx = subIndices[k];
+              let newIdx = map.get(oldIdx);
+              if (newIdx === undefined) {
+                newIdx = newPositions.length / 3;
+                map.set(oldIdx, newIdx);
+                newPositions.push(
+                  positions[oldIdx * 3],
+                  positions[oldIdx * 3 + 1],
+                  positions[oldIdx * 3 + 2]
+                );
+                if (normals) {
+                  newNormals.push(
+                    normals[oldIdx * 3],
+                    normals[oldIdx * 3 + 1],
+                    normals[oldIdx * 3 + 2]
+                  );
+                }
+                if (uvs) {
+                  newUVs.push(uvs[oldIdx * 2], uvs[oldIdx * 2 + 1]);
+                }
+                if (colors) {
+                  newColors.push(
+                    colors[oldIdx * 4],
+                    colors[oldIdx * 4 + 1],
+                    colors[oldIdx * 4 + 2],
+                    colors[oldIdx * 4 + 3]
+                  );
+                }
+              }
+              newSubIndices.push(newIdx);
+            }
+
+            const part = new Mesh(`${mesh.name}_sm_${i}`, this.scene);
+            const vd = new VertexData();
+            vd.positions = newPositions;
+            vd.indices = newSubIndices;
+            if (normals) vd.normals = newNormals;
+            if (uvs) vd.uvs = newUVs;
+            if (colors) vd.colors = newColors;
+            vd.applyToMesh(part, true);
+
+            const partMat =
+              sm.getMaterial() ||
+              (multiMat as any)?.subMaterials?.[sm.materialIndex] ||
+              multiMat;
+            part.material = partMat;
+
+            // Only simplify dense submesh pieces (> 60 faces).
+            // Delicate accent meshes (eyes, badge, mustache, drawstring) stay crisp & intact.
+            if (smFaceCount > 60) {
+              await ModelCompressor.simplifyMesh(part, ratio);
+            }
+            parts.push(part);
+          }
+
+          const merged = Mesh.MergeMeshes(parts, true, true, undefined, true, true);
+          if (merged) {
+            const vd = VertexData.ExtractFromMesh(merged);
+            vd.applyToMesh(mesh, true);
+            mesh.material = merged.material;
+            if (merged.subMeshes) {
+              mesh.subMeshes = [];
+              for (const sm of merged.subMeshes) {
+                new SubMesh(
+                  sm.materialIndex,
+                  sm.verticesStart,
+                  sm.verticesCount,
+                  sm.indexStart,
+                  sm.indexCount,
+                  mesh
+                );
+              }
+            }
+            merged.dispose();
+          }
+        }
+      } else {
+        const ratio = targetFaces / currentFaces;
+        await ModelCompressor.simplifyMesh(mesh, ratio);
+      }
+
+      const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+      const indices = mesh.getIndices();
+      if (positions && indices) {
+        const normals: number[] = [];
+        VertexData.ComputeNormals(positions, indices, normals);
+        mesh.setVerticesData(VertexBuffer.NormalKind, normals, true);
+      }
+    } else {
+      // Mesh is already within or below polygon target budget:
+      // recalculate smooth normals in-place WITHOUT destroying submeshes and MultiMaterial!
+      const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+      const indices = mesh.getIndices();
+      if (positions && indices) {
+        const normals: number[] = [];
+        VertexData.ComputeNormals(positions, indices, normals);
+        mesh.setVerticesData(VertexBuffer.NormalKind, normals, true);
+      }
     }
 
     mesh.refreshBoundingInfo();
     const postSnapshot = VertexData.ExtractFromMesh(mesh);
+    const postSubMeshesData = mesh.subMeshes
+      ? mesh.subMeshes.map((sm) => ({
+          materialIndex: sm.materialIndex,
+          verticesStart: sm.verticesStart,
+          verticesCount: sm.verticesCount,
+          indexStart: sm.indexStart,
+          indexCount: sm.indexCount,
+        }))
+      : null;
+    const postMaterial = mesh.material;
 
     this.service.recordAction({
       name: `Retopologize (${Math.round(currentFaces)} to ${Math.round(mesh.getTotalIndices() / 3)} faces)`,
       undo: () => {
         if (!mesh.isDisposed()) {
           preSnapshot.applyToMesh(mesh, true);
+          mesh.material = preMaterial;
+          if (preSubMeshesData) {
+            mesh.subMeshes = [];
+            for (const sm of preSubMeshesData) {
+              new SubMesh(
+                sm.materialIndex,
+                sm.verticesStart,
+                sm.verticesCount,
+                sm.indexStart,
+                sm.indexCount,
+                mesh
+              );
+            }
+          }
           mesh.refreshBoundingInfo();
           this.service.updateStats();
           this.onMeshModified?.(mesh);
@@ -1718,6 +1870,20 @@ export class SculptController {
       redo: () => {
         if (!mesh.isDisposed()) {
           postSnapshot.applyToMesh(mesh, true);
+          mesh.material = postMaterial;
+          if (postSubMeshesData) {
+            mesh.subMeshes = [];
+            for (const sm of postSubMeshesData) {
+              new SubMesh(
+                sm.materialIndex,
+                sm.verticesStart,
+                sm.verticesCount,
+                sm.indexStart,
+                sm.indexCount,
+                mesh
+              );
+            }
+          }
           mesh.refreshBoundingInfo();
           this.service.updateStats();
           this.onMeshModified?.(mesh);

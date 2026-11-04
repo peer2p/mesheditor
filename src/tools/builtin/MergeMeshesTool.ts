@@ -45,7 +45,7 @@ export class MergeMeshesTool extends AbstractTool {
       m.computeWorldMatrix(true);
     }
 
-    const merged = Mesh.MergeMeshes(meshesToMerge, disposeSources, true, undefined, false, true);
+    const merged = Mesh.MergeMeshes(meshesToMerge, disposeSources, true, undefined, true, true);
     if (!merged) {
       throw new Error('Mesh.MergeMeshes failed.');
     }

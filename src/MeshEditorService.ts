@@ -29,6 +29,7 @@ import {
   SceneLoader,
   SceneSerializer,
   StandardMaterial,
+  SubMesh,
   Texture,
   TransformNode,
   UniversalCamera,
@@ -3906,6 +3907,23 @@ export class MeshEditorService {
     mesh.setVerticesData(VertexBuffer.PositionKind, positions);
     mesh.setIndices(newIndices);
     if (uvs.length > 0) mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+
+    // If mesh has multiple submeshes (MultiMaterial), scale their index ranges proportionally
+    if (mesh.subMeshes && mesh.subMeshes.length > 1) {
+      const oldSubMeshes = mesh.subMeshes.slice();
+      mesh.subMeshes = [];
+      const totalVerts = positions.length / 3;
+      for (const sm of oldSubMeshes) {
+        new SubMesh(
+          sm.materialIndex,
+          0,
+          totalVerts,
+          sm.indexStart * 4,
+          sm.indexCount * 4,
+          mesh
+        );
+      }
+    }
 
     const normals: number[] = [];
     VertexData.ComputeNormals(positions, newIndices, normals);

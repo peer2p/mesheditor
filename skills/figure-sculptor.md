@@ -42,18 +42,19 @@ Babylon.js uses a left-handed coordinate system: **Y is up**, **X is width (left
 All figures must be standing on ground level **$Y = 0$** and centered at **$X = 0, Z = 0$**.
 
 ### The Loomis 8-Head Canon (Standard Heroic Game Character: $H = 1.80\text{m}$)
+
 Each head unit is $\text{Unit} = \frac{1.80\text{m}}{8} = 0.225\text{m}$.
 
-| Head Segment | Height Range ($Y$) | Key Anatomical Landmarks |
-|---|---|---|
-| **Head 1** | $1.575\text{m} - 1.800\text{m}$ | Cranium crown ($1.80\text{m}$), Eye line (exact half of head, $1.687\text{m}$), Nose base ($1.63\text{m}$), Mouth ($1.60\text{m}$), Chin ($1.575\text{m}$). |
-| **Head 2** | $1.350\text{m} - 1.575\text{m}$ | Neck cylinder, Jugular notch ($1.50\text{m}$), Clavicle/Shoulder axis ($1.45\text{m}$), Nipple line ($1.35\text{m}$). |
-| **Head 3** | $1.125\text{m} - 1.350\text{m}$ | Lower ribcage arch, Navel ($1.125\text{m}$), Elbow pivot line ($1.125\text{m}$). |
-| **Head 4** | $0.900\text{m} - 1.125\text{m}$ | **Exact Body Midpoint ($0.5 \times H = 0.90\text{m}$)**: Pubic arch / Groin, Wrist line ($0.90\text{m}$), Greater trochanter (hip pivots). |
-| **Head 5** | $0.675\text{m} - 0.900\text{m}$ | Mid-thigh, Fingertips reach mid-thigh at $Y = 0.70\text{m}$. |
-| **Head 6** | $0.450\text{m} - 0.675\text{m}$ | **Lower Knee Cap / Patella ($0.25 \times H = 0.45\text{m}$)**. Knee joint flexes backwards. |
-| **Head 7** | $0.225\text{m} - 0.450\text{m}$ | Calf belly (Gastrocnemius maximum diameter at $Y = 0.35\text{m}$). |
-| **Head 8** | $0.000\text{m} - 0.225\text{m}$ | Ankle malleoli ($Y = 0.08\text{m}$), Foot sole flat on ground ($Y = 0.00\text{m}$). |
+| Head Segment | Height Range ($Y$)              | Key Anatomical Landmarks                                                                                                                                    |
+| ------------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Head 1**   | $1.575\text{m} - 1.800\text{m}$ | Cranium crown ($1.80\text{m}$), Eye line (exact half of head, $1.687\text{m}$), Nose base ($1.63\text{m}$), Mouth ($1.60\text{m}$), Chin ($1.575\text{m}$). |
+| **Head 2**   | $1.350\text{m} - 1.575\text{m}$ | Neck cylinder, Jugular notch ($1.50\text{m}$), Clavicle/Shoulder axis ($1.45\text{m}$), Nipple line ($1.35\text{m}$).                                       |
+| **Head 3**   | $1.125\text{m} - 1.350\text{m}$ | Lower ribcage arch, Navel ($1.125\text{m}$), Elbow pivot line ($1.125\text{m}$).                                                                            |
+| **Head 4**   | $0.900\text{m} - 1.125\text{m}$ | **Exact Body Midpoint ($0.5 \times H = 0.90\text{m}$)**: Pubic arch / Groin, Wrist line ($0.90\text{m}$), Greater trochanter (hip pivots).                  |
+| **Head 5**   | $0.675\text{m} - 0.900\text{m}$ | Mid-thigh, Fingertips reach mid-thigh at $Y = 0.70\text{m}$.                                                                                                |
+| **Head 6**   | $0.450\text{m} - 0.675\text{m}$ | **Lower Knee Cap / Patella ($0.25 \times H = 0.45\text{m}$)**. Knee joint flexes backwards.                                                                 |
+| **Head 7**   | $0.225\text{m} - 0.450\text{m}$ | Calf belly (Gastrocnemius maximum diameter at $Y = 0.35\text{m}$).                                                                                          |
+| **Head 8**   | $0.000\text{m} - 0.225\text{m}$ | Ankle malleoli ($Y = 0.08\text{m}$), Foot sole flat on ground ($Y = 0.00\text{m}$).                                                                         |
 
 - **Width Proportions**:
   - Shoulders width (Deltoid to Deltoid): $2.0 \times \text{head width} \approx 0.45\text{m} - 0.50\text{m}$.
@@ -93,15 +94,19 @@ A common flaw when proceduralizing characters is the **"Wooden Mannequin" (Glied
      ```javascript
      const armPath = [
        new Vector3(side * 0.18, 0.65, 0.02), // Shoulder
-       new Vector3(side * 0.32, 0.50, 0.07), // Curved elbow
+       new Vector3(side * 0.32, 0.5, 0.07), // Curved elbow
        new Vector3(side * 0.42, 0.35, 0.13), // Wrist
      ];
-     MeshBuilder.CreateTube("arm", {
-       path: armPath,
-       radiusFunction: (i) => i === 0 ? 0.07 : (i === 1 ? 0.055 : 0.045),
-       tessellation: 16,
-       cap: Mesh.CAP_ALL
-     }, scene);
+     MeshBuilder.CreateTube(
+       "arm",
+       {
+         path: armPath,
+         radiusFunction: (i) => (i === 0 ? 0.07 : i === 1 ? 0.055 : 0.045),
+         tessellation: 16,
+         cap: Mesh.CAP_ALL,
+       },
+       scene,
+     );
      ```
 
 2. **Unified Organic Volumes (Pear / Teardrop Silhouette)**:
@@ -122,18 +127,18 @@ A common flaw when proceduralizing characters is the **"Wooden Mannequin" (Glied
 
 A finished character must **NEVER be left as a single uncolored clay lump**. Every character requires distinct, vibrant PBR materials with appropriate gloss:
 
-| Character Element | PBR Albedo Color | Roughness | Metallic | Notes |
-|---|---|---|---|---|
-| **Stylized Demon Skin** | `#c9182b` (Crimson Red) | 0.38 | 0.02 | Soft satin sheen showcasing curvaceous organic contours |
-| **Horns & Halo** | `#202024` (Charcoal) | 0.45 | 0.10 | Matte horn texture / dark metallic ring |
-| **Eyes (Sclera)** | `#f0f0f5` (White) | 0.25 | 0.00 | Glossy cartoon eyeball |
-| **Pupils** | `#111114` (Jet Black) | 0.50 | 0.00 | Horizontal slit cartoon pupils |
-| **Fangs / Teeth** | `#ffffff` (Pure White) | 0.30 | 0.00 | Smooth enamel fangs |
-| **Human / Chibi Skin** | `#f5c59e` or `#f8c8a0` | 0.50 | 0.00 | Warm cartoon peach skin tone |
-| **Mario Red Cap** | `#e52521` | 0.45 | 0.00 | Iconic Nintendo vermilion red |
-| **Swimming Trunks** | `#002fbe` (Royal Blue) | 0.45 | 0.05 | Blue swim shorts with `#ffffff` waistband |
-| **Cartoon Gloves** | `#f5f5f5` | 0.40 | 0.00 | Soft white fabric with rolled wrist cuffs |
-| **Boots / Shoes** | `#5c2c16` | 0.70 | 0.00 | Deep leather brown |
+| Character Element       | PBR Albedo Color        | Roughness | Metallic | Notes                                                   |
+| ----------------------- | ----------------------- | --------- | -------- | ------------------------------------------------------- |
+| **Stylized Demon Skin** | `#c9182b` (Crimson Red) | 0.38      | 0.02     | Soft satin sheen showcasing curvaceous organic contours |
+| **Horns & Halo**        | `#202024` (Charcoal)    | 0.45      | 0.10     | Matte horn texture / dark metallic ring                 |
+| **Eyes (Sclera)**       | `#f0f0f5` (White)       | 0.25      | 0.00     | Glossy cartoon eyeball                                  |
+| **Pupils**              | `#111114` (Jet Black)   | 0.50      | 0.00     | Horizontal slit cartoon pupils                          |
+| **Fangs / Teeth**       | `#ffffff` (Pure White)  | 0.30      | 0.00     | Smooth enamel fangs                                     |
+| **Human / Chibi Skin**  | `#f5c59e` or `#f8c8a0`  | 0.50      | 0.00     | Warm cartoon peach skin tone                            |
+| **Mario Red Cap**       | `#e52521`               | 0.45      | 0.00     | Iconic Nintendo vermilion red                           |
+| **Swimming Trunks**     | `#002fbe` (Royal Blue)  | 0.45      | 0.05     | Blue swim shorts with `#ffffff` waistband               |
+| **Cartoon Gloves**      | `#f5f5f5`               | 0.40      | 0.00     | Soft white fabric with rolled wrist cuffs               |
+| **Boots / Shoes**       | `#5c2c16`               | 0.70      | 0.00     | Deep leather brown                                      |
 
 ---
 
@@ -158,35 +163,44 @@ To generate a cute, stylized organic creature or imp (soft red skin, curved horn
 
 ---
 
-## 7. Recipe: Super Mario in Swimming Trunks (Soft Organic Chibi)
+## 7. Recipe: Super Mario Like Heroes (Soft Organic Chibi)
 
 When building Super Mario in swimming trunks (T-Pose):
 
 1. **Step 1: Spawn Chibi Base Mesh in T-Pose**:
    - Call `modeler_spawn_base_mesh`:
      ```json
-     { "type": "chibi", "pose": "t_pose", "name": "mario_base", "materialStyle": "colored", "style": "organic" }
+     {
+       "type": "chibi",
+       "pose": "t_pose",
+       "name": "hero_base",
+       "materialStyle": "colored",
+       "style": "organic"
+     }
      ```
    - Setting `"style": "organic"` ensures limbs are generated as smooth continuous tubes without disjoint sphere joints!
 
-2. **Step 2: Add Iconic Mario Features via Babylon Code (`modeler_execute_babylon_code`)**:
-   - **Red Cap**:
-     - Crown: Flattened red hemisphere/ovoid placed on the upper head ($Y = 1.15\text{m}$, diameter $0.44\text{m}$, scaling $Y = 0.65$).
-     - Visor Brim: Curved red visor shelf extending forward above the brow ($Y = 1.05\text{m}, Z = 0.22\text{m}$, width $0.32\text{m}$, depth $0.14\text{m}$, tilted slightly down $10^\circ$).
-     - White Badge: Circular white disc on the front of the cap ($Y = 1.14\text{m}, Z = 0.21\text{m}$, diameter $0.09\text{m}$).
-   - **Face & Mustache**:
-     - Mustache: Arching black mustache curving beneath the nose ($Y = 0.90\text{m}, Z = 0.22\text{m}$), built with 4 to 6 overlapping rounded capsules/spheres flared outward on each side.
-     - Eyes: Two oval blue cartoon eyes ($Y = 1.02\text{m}, Z = 0.20\text{m}, X = \pm 0.07\text{m}$) with white outer sclera.
-   - **Swim Trunks Details**:
-     - Raised white waistband torus/cylinder ($Y = 0.58\text{m}$, diameter $0.45\text{m}$, height $0.04\text{m}$).
-     - White vertical side stripes down the outer hips ($X = \pm 0.22\text{m}$).
-     - Yellow drawstring knot in the front center ($Y = 0.58\text{m}, Z = 0.22\text{m}$).
-   - **Hands & Boots Alignment**:
-     - Ensure gloves sit exactly at the T-Pose wrist joints ($X = \pm 0.64\text{m}, Y = 0.74\text{m}$).
-     - Ensure brown boots are attached at feet coordinates ($X = \pm 0.13\text{m}, Y = 0.07\text{m}$).
-3. **Step 3: Retopologize to Target Budget**:
-   - Call `modeler_retopologize_mesh` with `targetFaces: 4000` (for mobile) or `15000` (for standard game).
-   - This cleans and simplifies the mesh geometry into a game-ready model while recalculating smooth normals.
+2. **Step 2: Organic Sculpting**:
+   - Call `modeler_sculpt_mesh` to accentuate organic facial planes or cheeks:
+     ```json
+     {
+       "meshName": "hero_base",
+       "brush": "inflate",
+       "strokes": [
+         { "x": 0.12, "y": 0.96, "z": 0.18, "radius": 0.22, "strength": 0.45 }
+       ],
+       "symmetryX": true
+     }
+     ```
+   - _Note on `modeler_subd_smooth`_: The organic chibi base mesh already features smooth continuous curved surfaces (~4,000 tris). `modeler_subd_smooth` is designed for low-poly angular blockout cages; do not apply it to already dense organic meshes to avoid unnecessary polygon bloat.
+
+3. **Step 3: Merge Meshes Preserving Multi-Materials**:
+   - Call `modeler_merge_meshes` with `meshNames: ["*"]`, `newName: "hero_name"`.
+   - All distinct PBR materials (e.g. skin, hair, shirt, pants, shoes) are preserved in a unified MultiMaterial!
+
+4. **Step 4: Retopologize to Target Budget**:
+   - Call `modeler_retopologize_mesh` with `targetFaces: 4000` (or the requested budget).
+   - Simplifies the geometry to the exact real-time polygon budget while keeping silhouette and smooth normals.
 
 ---
 
@@ -210,7 +224,7 @@ When creating animals, monsters, or fantasy quadrupeds (wolves, horses, dragons,
 
 ---
 
-## 4. Game-Ready Retopology & Deformation Edge Loops (Hippydrome Rules)
+## 7. Game-Ready Retopology & Deformation Edge Loops (Hippydrome Rules)
 
 High-poly sculpted meshes cannot be animated or rendered in real time. They must be retopologized into clean low/mid-poly cages with deformation loops:
 
@@ -223,8 +237,8 @@ High-poly sculpted meshes cannot be animated or rendered in real time. They must
      - Place **at least 3 parallel edge loops** across the articulation zone.
      - When the joint bends up to $120^\circ - 140^\circ$, the outer loop stretches, the middle loop holds volume, and the inner loop pinches without collapsing the mesh into a paper-thin wedge.
 3. **Facial Contour Loops**:
-   - Concentric circular loop masks around eyes (*orbicularis oculi*) for blinking.
-   - Concentric loop rings around mouth (*orbicularis oris*) for speech phonemes.
+   - Concentric circular loop masks around eyes (_orbicularis oculi_) for blinking.
+   - Concentric loop rings around mouth (_orbicularis oris_) for speech phonemes.
    - Nasolabial fold loop running from nostril wings down past the mouth corners.
 4. **Poles & Valence Management**:
    - **5-Poles (E-poles)** and **3-Poles (N-poles)** must be kept away from dynamic deformation zones (armpits, knee hollows, eyelid folds).
@@ -257,4 +271,3 @@ When building or updating figures, combine these built-in tools:
    - Call `modeler_create_material` with PBR skin/clay parameters:
      - Skin / Clay: `albedoColor: "#d9b38c"`, `roughness: 0.65`, `metallic: 0.0`.
      - Normal maps: Use `normalMapUrl` or procedural surface relief with `bumpLevel: 1.2` to retain fine wrinkles and skin pores without polygon overhead.
-

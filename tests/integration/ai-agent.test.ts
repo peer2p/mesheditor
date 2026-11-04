@@ -684,7 +684,7 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       container.remove();
     });
 
-    it('toggles exclusively between Settings panel and Operative Agent GUI and displays all skills without scrollbox limit', () => {
+    it('toggles exclusively between Settings panel and Operative Agent GUI and displays all skills without scrollbox limit', async () => {
       const container = document.createElement('div');
       document.body.appendChild(container);
       const nullEngine = new NullEngine();
@@ -760,6 +760,100 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       // Verify endpoint summary badge reflects 1Mp ceiling
       const endpointSummary = container.querySelector('#aiEndpointSummaryBar') as HTMLElement | null;
       expect(endpointSummary?.textContent).toContain('1Mp');
+
+      // 6. Test Model selector dropdown and custom input toggle
+      const modelSelect = container.querySelector('#aiModelSelect') as HTMLSelectElement | null;
+      const modelInput = container.querySelector('#aiModelInput') as HTMLInputElement | null;
+      const btnToggleCustom = container.querySelector('#btnToggleCustomModel') as HTMLButtonElement | null;
+      expect(modelSelect).toBeTruthy();
+      expect(modelInput).toBeTruthy();
+      expect(btnToggleCustom).toBeTruthy();
+
+      // Test changing model in select updates config and modelInput
+      if (modelSelect) {
+        modelSelect.value = 'gemini-4-argon-medium';
+        modelSelect.dispatchEvent(new Event('change'));
+        expect(modelInput?.value).toBe('gemini-4-argon-medium');
+        expect(app.service.aiAgent.getConfig().model).toBe('gemini-4-argon-medium');
+      }
+
+      // Test toggling custom input view
+      btnToggleCustom?.click();
+      expect(modelInput?.style.display).toBe('inline-block');
+      expect(modelSelect?.style.display).toBe('none');
+      btnToggleCustom?.click();
+      expect(modelInput?.style.display).toBe('none');
+      expect(modelSelect?.style.display).toBe('inline-block');
+
+      // 7. Test Copy Button on messages and instant skills/thinking indicators
+      const chatLog = container.querySelector('#aiChatLog') as HTMLElement;
+      expect(chatLog).toBeTruthy();
+
+      // Mock runPrompt endpoint
+      app.service.aiAgent.customFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                role: 'assistant',
+                content: 'I built a test stone pillar with fluted columns.',
+                tool_calls: [
+                  {
+                    id: 'call_1',
+                    type: 'function',
+                    function: {
+                      name: 'modeler_create_primitive',
+                      arguments: JSON.stringify({ shape: 'box', name: 'pillar_base' }),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      }) as any;
+
+      const promptInput = container.querySelector('#aiPromptInput') as HTMLTextAreaElement;
+      promptInput.value = 'Build a stone pillar';
+      await app.runAIAgentPrompt();
+
+      // Verify user message has header, role, and copy button
+      const userBubble = chatLog.querySelector('.ai-msg.ai-msg-user');
+      expect(userBubble).toBeTruthy();
+      const userCopyBtn = userBubble?.querySelector('.ai-msg-copy-btn') as HTMLButtonElement;
+      expect(userCopyBtn).toBeTruthy();
+      expect(userCopyBtn.title).toBe('Copy prompt');
+
+      // Verify assistant message has header, live timer, active skills bar, tool step, and copy button
+      const assistantBubble = chatLog.querySelector('.ai-msg.ai-msg-assistant');
+      expect(assistantBubble).toBeTruthy();
+      const assistantCopyBtn = assistantBubble?.querySelector('.ai-msg-copy-btn') as HTMLButtonElement;
+      expect(assistantCopyBtn).toBeTruthy();
+      expect(assistantCopyBtn.title).toBe('Copy response');
+
+      const skillsBar = assistantBubble?.querySelector('.ai-active-skills-bar');
+      expect(skillsBar).toBeTruthy();
+      expect(skillsBar?.textContent).toContain('Skills:');
+
+      const toolStep = assistantBubble?.querySelector('.ai-tool-step.is-success');
+      expect(toolStep).toBeTruthy();
+      expect(toolStep?.textContent).toContain('create_primitive');
+
+      // Test clipboard copy execution
+      const writeTextSpy = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: writeTextSpy,
+        },
+      });
+
+      userCopyBtn.click();
+      expect(writeTextSpy).toHaveBeenCalledWith('Build a stone pillar');
+
+      assistantCopyBtn.click();
+      expect(writeTextSpy).toHaveBeenCalledWith('I built a test stone pillar with fluted columns.');
 
       app.dispose();
       container.remove();

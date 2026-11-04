@@ -25,4 +25,5 @@ export * from './FacetArcTool';
 export * from './FacetCutThroughTool';
 export * from './SpawnBaseMeshTool';
 export * from './RetopologizeMeshTool';
+export * from './SculptMeshTool';
 
