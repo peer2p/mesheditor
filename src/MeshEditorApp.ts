@@ -1,4 +1,4 @@
-import { Color3, Engine, Mesh, PBRMaterial, StandardMaterial, Texture, Vector3 } from '@babylonjs/core';
+import { Color3, Engine, Mesh, Node, PBRMaterial, StandardMaterial, Texture, TransformNode, Vector3 } from '@babylonjs/core';
 import * as dat from 'dat.gui';
 import { marked } from 'marked';
 import { createDefaultPlatformAdapter, MeshEditorPlatformAdapter } from './adapters';
@@ -106,6 +106,7 @@ import {
   Mic,
   MicOff,
   Minus,
+  Network,
   Mouse,
   MousePointer,
   Move,
@@ -201,6 +202,7 @@ export const editorIcons = {
   Mic,
   MicOff,
   Minus,
+  Network,
   Mouse,
   MousePointer,
   Move,
@@ -282,6 +284,7 @@ export class MeshEditorApp {
   private outlinerTreeContainer: HTMLElement;
   private outlinerSearchInput: HTMLInputElement;
   private searchFilter: string = '';
+  private collapsedNodeIds: Set<string> = new Set<string>();
 
   // File Inputs
   private modelFileInput: HTMLInputElement;
@@ -2758,12 +2761,64 @@ export class MeshEditorApp {
     this.outlinerTreeContainer.innerHTML = '';
 
     const filter = this.searchFilter.toLowerCase().trim();
-    const activeGroups = this.service.groups.filter((g) => !g.isDisposed());
-    const rootMeshes = this.service.importedMeshes.filter(
-      (m) => !this.service.isEditorHelper(m) && !m.isDisposed() && (!m.parent || !this.service.isGroupNode(m.parent))
-    );
 
-    if (activeGroups.length === 0 && rootMeshes.length === 0) {
+    const isValidSceneNode = (n: any): boolean => {
+      if (!n || n.isDisposed()) return false;
+      if (this.service.isEditorHelper(n)) return false;
+      const className = n.getClassName ? n.getClassName() : '';
+      if (className.includes('Camera') || className.includes('Light')) return false;
+      return true;
+    };
+
+    const getLogicalParent = (n: Node): Node | null => {
+      if (this.service.selectionProxyActive && n.parent === this.service.selectionProxyNode) {
+        return (this.service as any).selectionProxyMap?.get(n) || null;
+      }
+      const p = n.parent;
+      if (!p || !isValidSceneNode(p)) return null;
+      return p;
+    };
+
+    const getLogicalChildren = (parent: Node): (TransformNode | Mesh)[] => {
+      const children: (TransformNode | Mesh)[] = [];
+      const rawChildren = parent.getChildren ? parent.getChildren() : [];
+      for (const c of rawChildren) {
+        if (isValidSceneNode(c) && !children.includes(c as any)) {
+          children.push(c as any);
+        }
+      }
+      if (this.service.selectionProxyActive) {
+        const map = (this.service as any).selectionProxyMap as Map<any, any>;
+        if (map) {
+          for (const [proxiedNode, origParent] of map.entries()) {
+            if (origParent === parent && isValidSceneNode(proxiedNode) && !children.includes(proxiedNode)) {
+              children.push(proxiedNode);
+            }
+          }
+        }
+      }
+      return children;
+    };
+
+    // Gather all potential scene nodes
+    const candidateNodes = new Set<Node>();
+    for (const n of this.service.scene.rootNodes) {
+      if (isValidSceneNode(n)) candidateNodes.add(n);
+    }
+    for (const m of this.service.importedMeshes) {
+      if (isValidSceneNode(m)) candidateNodes.add(m);
+    }
+    for (const g of this.service.groups) {
+      if (isValidSceneNode(g)) candidateNodes.add(g);
+    }
+    for (const tn of this.service.scene.transformNodes) {
+      if (isValidSceneNode(tn)) candidateNodes.add(tn);
+    }
+    for (const m of this.service.scene.meshes) {
+      if (isValidSceneNode(m)) candidateNodes.add(m);
+    }
+
+    if (candidateNodes.size === 0) {
       const emptyMsg = document.createElement('div');
       emptyMsg.style.padding = '18px 12px';
       emptyMsg.style.textAlign = 'center';
@@ -2775,297 +2830,195 @@ export class MeshEditorApp {
       return;
     }
 
-    // 1. Groups
-    for (const group of activeGroups) {
-      const children = group.getChildren().filter((c) => c instanceof Mesh && !this.service.isEditorHelper(c)) as Mesh[];
-      if (filter && !group.name.toLowerCase().includes(filter) && !children.some((c) => c.name.toLowerCase().includes(filter))) {
-        continue;
+    // Determine root nodes (nodes whose logical parent is not another valid candidate node)
+    const rootNodes: Node[] = [];
+    for (const n of candidateNodes) {
+      const p = getLogicalParent(n);
+      if (!p || !candidateNodes.has(p)) {
+        if (!rootNodes.includes(n)) rootNodes.push(n);
+      }
+    }
+
+    const nodeMatchesFilter = (n: Node): boolean => {
+      if (!filter) return true;
+      if ((n.name || '').toLowerCase().includes(filter)) return true;
+      const children = getLogicalChildren(n);
+      return children.some((c) => nodeMatchesFilter(c));
+    };
+
+    const renderedNodes = new Set<Node>();
+
+    const renderNode = (node: Node, depth: number, parentElement: HTMLElement) => {
+      if (renderedNodes.has(node)) return;
+      renderedNodes.add(node);
+
+      if (filter && !nodeMatchesFilter(node)) {
+        return;
       }
 
-      const isGroupSelected = this.service.selectedNodes.includes(group);
-      const groupNodeWrapper = document.createElement('div');
-      groupNodeWrapper.className = 'outliner-node';
+      const children = getLogicalChildren(node);
+      const hasChildren = children.length > 0;
+      const isGroup = this.service.isGroupNode(node);
+      const isSelected = this.service.selectedNodes.includes(node as any) || this.service.selectedMesh === node;
 
-      const groupRow = document.createElement('div');
-      groupRow.className = `outliner-item outliner-item-group ${isGroupSelected ? 'selected' : ''}`;
+      const isForcedOpen = filter.length > 0;
+      const isCollapsed = !isForcedOpen && this.collapsedNodeIds.has(node.uniqueId.toString());
+      const isExpanded = !isCollapsed;
+
+      const row = document.createElement('div');
+      row.className = `outliner-item ${isSelected ? 'selected' : ''} ${isGroup ? 'outliner-item-group' : ''}`;
+      row.style.paddingLeft = `${6 + depth * 14}px`;
 
       const left = document.createElement('div');
       left.className = 'outliner-item-left';
 
+      // Chevron or spacer
+      if (hasChildren) {
+        const chevron = document.createElement('span');
+        chevron.className = 'outliner-chevron';
+        chevron.title = isExpanded ? 'Collapse' : 'Expand';
+        chevron.innerHTML = `<i class="app-icon" data-lucide="${isExpanded ? 'chevron-down' : 'chevron-right'}"></i>`;
+        chevron.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idStr = node.uniqueId.toString();
+          if (this.collapsedNodeIds.has(idStr)) {
+            this.collapsedNodeIds.delete(idStr);
+          } else {
+            this.collapsedNodeIds.add(idStr);
+          }
+          this.updateOutliner();
+        });
+        left.appendChild(chevron);
+      } else {
+        const spacer = document.createElement('span');
+        spacer.className = 'outliner-chevron-spacer';
+        left.appendChild(spacer);
+      }
+
+      // Icon
       const icon = document.createElement('span');
       icon.className = 'outliner-item-icon';
-      icon.innerHTML = '<i class="app-icon" data-lucide="folder"></i>';
+      let iconName = 'box';
+      if (isGroup) {
+        iconName = 'folder';
+      } else if (node instanceof Mesh) {
+        iconName = node.getTotalVertices() > 0 ? 'box' : 'box-select';
+      } else {
+        iconName = 'network';
+      }
+      icon.innerHTML = `<i class="app-icon" data-lucide="${iconName}"></i>`;
       left.appendChild(icon);
 
+      // Name
       const name = document.createElement('span');
       name.className = 'outliner-item-name';
-      name.textContent = group.name;
+      name.textContent = node.name || 'Unnamed';
+      name.title = node.name || '';
       left.appendChild(name);
 
-      const badge = document.createElement('span');
-      badge.className = 'outliner-badge';
-      badge.textContent = `${children.length} Meshes`;
-      left.appendChild(badge);
+      // Badges
+      if (node instanceof Mesh && node.getTotalVertices() > 0) {
+        const polyCount = Math.floor(node.getTotalIndices() / 3);
+        const badge = document.createElement('span');
+        badge.className = 'outliner-badge';
+        badge.textContent = `${polyCount} Tris`;
+        left.appendChild(badge);
+      }
+      if (hasChildren) {
+        const childBadge = document.createElement('span');
+        childBadge.className = 'outliner-badge';
+        childBadge.textContent = `${children.length} ${children.length === 1 ? 'item' : 'items'}`;
+        left.appendChild(childBadge);
+      }
 
-      groupRow.appendChild(left);
+      row.appendChild(left);
 
       // Actions
       const actions = document.createElement('div');
       actions.className = 'outliner-item-actions';
 
+      const descMeshes = this.service.collectNodeAndDescendants(node as any).meshes;
+
+      // 1. Visibility toggle
       const btnVis = document.createElement('button');
       btnVis.className = 'outliner-btn';
-      const hasGroupVis = children.some((c) => c.isVisible);
-      btnVis.innerHTML = `<i class="app-icon" data-lucide="${hasGroupVis ? 'eye' : 'eye-off'}"></i>`;
-      btnVis.title = 'Toggle group visibility';
+      const isVis = node instanceof Mesh ? node.isVisible : descMeshes.some((m) => m.isVisible);
+      btnVis.innerHTML = `<i class="app-icon" data-lucide="${isVis ? 'eye' : 'eye-off'}"></i>`;
+      btnVis.title = 'Toggle visibility';
       btnVis.addEventListener('click', (e) => {
         e.stopPropagation();
-        const nextVis = !children.some((c) => c.isVisible);
-        for (const c of children) c.isVisible = nextVis;
+        const nextVis = !isVis;
+        if (node instanceof Mesh) {
+          node.isVisible = nextVis;
+        }
+        for (const m of descMeshes) {
+          m.isVisible = nextVis;
+        }
         btnVis.innerHTML = `<i class="app-icon" data-lucide="${nextVis ? 'eye' : 'eye-off'}"></i>`;
         this.refreshIcons();
       });
       actions.appendChild(btnVis);
 
-      const btnGroupCenter = document.createElement('button');
-      btnGroupCenter.className = 'outliner-btn';
-      btnGroupCenter.innerHTML = '<i class="app-icon" data-lucide="target"></i>';
-      btnGroupCenter.title = 'Center selection';
-      btnGroupCenter.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.service.selectNodes([group]);
-        this.service.focusOnTarget(group);
-        this.showToast(`Centered on "${group.name}"`, 'success');
-      });
-      actions.appendChild(btnGroupCenter);
-
-      const isGroupWire = children.length > 0 && children.every((c) => this.service.isMeshWireframe(c));
-      const btnGroupWire = document.createElement('button');
-      btnGroupWire.className = `outliner-btn ${isGroupWire ? 'active' : ''}`;
-      btnGroupWire.innerHTML = '<i class="app-icon" data-lucide="scan"></i>';
-      btnGroupWire.title = 'Toggle wireframe for group';
-      btnGroupWire.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const nextState = !children.every((c) => this.service.isMeshWireframe(c));
-        for (const c of children) {
-          this.service.setMeshWireframe(c, nextState);
-        }
-        this.showToast(`Wireframe ${nextState ? 'enabled' : 'disabled'} for group "${group.name}"`, 'info');
-        this.updateOutliner();
-      });
-      actions.appendChild(btnGroupWire);
-
-      const btnUngroup = document.createElement('button');
-      btnUngroup.className = 'outliner-btn';
-      btnUngroup.innerHTML = '<i class="app-icon" data-lucide="folder-minus"></i>';
-      btnUngroup.title = 'Ungroup meshes';
-      btnUngroup.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.service.selectNodes([group]);
-        this.service.ungroupSelected();
-      });
-      actions.appendChild(btnUngroup);
-
-      const btnDel = document.createElement('button');
-      btnDel.className = 'outliner-btn';
-      btnDel.innerHTML = '<i class="app-icon" data-lucide="trash-2"></i>';
-      btnDel.title = 'Delete group';
-      btnDel.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.service.selectNodes([group]);
-        this.service.deleteSelected();
-      });
-      actions.appendChild(btnDel);
-
-      groupRow.appendChild(actions);
-
-      groupRow.addEventListener('click', (e: MouseEvent) => {
-        if (e.metaKey || e.ctrlKey) {
-          this.service.toggleNodeSelection(group);
-        } else if (e.shiftKey) {
-          this.service.rangeSelectNodes(group);
-        } else {
-          this.service.selectNodes([group]);
-        }
-      });
-
-      groupRow.addEventListener('dblclick', () => {
-        this.service.focusOnTarget(group);
-      });
-
-      groupNodeWrapper.appendChild(groupRow);
-
-      // Group children
-      for (const child of children) {
-        if (filter && !child.name.toLowerCase().includes(filter) && !group.name.toLowerCase().includes(filter)) {
-          continue;
-        }
-
-        const isChildSelected = this.service.selectedNodes.includes(child);
-        const childRow = document.createElement('div');
-        childRow.className = `outliner-item outliner-item-child ${isChildSelected ? 'selected' : ''}`;
-
-        const cLeft = document.createElement('div');
-        cLeft.className = 'outliner-item-left';
-
-        const cIcon = document.createElement('span');
-        cIcon.className = 'outliner-item-icon';
-        cIcon.innerHTML = '<i class="app-icon" data-lucide="box"></i>';
-        cLeft.appendChild(cIcon);
-
-        const cName = document.createElement('span');
-        cName.className = 'outliner-item-name';
-        cName.textContent = child.name;
-        cLeft.appendChild(cName);
-
-        const polyCount = Math.floor(child.getTotalIndices() / 3);
-        const cBadge = document.createElement('span');
-        cBadge.className = 'outliner-badge';
-        cBadge.textContent = `${polyCount} Tris`;
-        cLeft.appendChild(cBadge);
-
-        childRow.appendChild(cLeft);
-
-        const cActions = document.createElement('div');
-        cActions.className = 'outliner-item-actions';
-
-        const btnCVis = document.createElement('button');
-        btnCVis.className = 'outliner-btn';
-        btnCVis.innerHTML = `<i class="app-icon" data-lucide="${child.isVisible ? 'eye' : 'eye-off'}"></i>`;
-        btnCVis.title = 'Toggle visibility';
-        btnCVis.addEventListener('click', (e) => {
-          e.stopPropagation();
-          child.isVisible = !child.isVisible;
-          btnCVis.innerHTML = `<i class="app-icon" data-lucide="${child.isVisible ? 'eye' : 'eye-off'}"></i>`;
-          this.refreshIcons();
-        });
-        cActions.appendChild(btnCVis);
-
-        const btnCCenter = document.createElement('button');
-        btnCCenter.className = 'outliner-btn';
-        btnCCenter.innerHTML = '<i class="app-icon" data-lucide="target"></i>';
-        btnCCenter.title = 'Center selection';
-        btnCCenter.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.service.selectNodes([child]);
-          this.service.focusOnTarget(child);
-          this.showToast(`Centered on "${child.name}"`, 'success');
-        });
-        cActions.appendChild(btnCCenter);
-
-        const isCWire = this.service.isMeshWireframe(child);
-        const btnCWire = document.createElement('button');
-        btnCWire.className = `outliner-btn ${isCWire ? 'active' : ''}`;
-        btnCWire.innerHTML = '<i class="app-icon" data-lucide="scan"></i>';
-        btnCWire.title = 'Toggle wireframe';
-        btnCWire.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const state = this.service.toggleMeshWireframe(child);
-          this.showToast(`Wireframe ${state ? 'enabled' : 'disabled'} for "${child.name}"`, 'info');
-          this.updateOutliner();
-        });
-        cActions.appendChild(btnCWire);
-
-        childRow.appendChild(cActions);
-
-        childRow.addEventListener('click', (e: MouseEvent) => {
-          if (e.metaKey || e.ctrlKey) {
-            this.service.toggleNodeSelection(child);
-          } else if (e.shiftKey) {
-            this.service.rangeSelectNodes(child);
-          } else {
-            this.service.selectNodes([child]);
-          }
-        });
-
-        childRow.addEventListener('dblclick', () => {
-          this.service.focusOnTarget(child);
-        });
-
-        groupNodeWrapper.appendChild(childRow);
-      }
-
-      this.outlinerTreeContainer.appendChild(groupNodeWrapper);
-    }
-
-    // 2. Root Meshes
-    for (const mesh of rootMeshes) {
-      if (filter && !mesh.name.toLowerCase().includes(filter)) {
-        continue;
-      }
-
-      const isSelected = this.service.selectedNodes.includes(mesh);
-      const row = document.createElement('div');
-      row.className = `outliner-item ${isSelected ? 'selected' : ''}`;
-
-      const left = document.createElement('div');
-      left.className = 'outliner-item-left';
-
-      const icon = document.createElement('span');
-      icon.className = 'outliner-item-icon';
-      icon.innerHTML = '<i class="app-icon" data-lucide="box"></i>';
-      left.appendChild(icon);
-
-      const name = document.createElement('span');
-      name.className = 'outliner-item-name';
-      name.textContent = mesh.name;
-      left.appendChild(name);
-
-      const polyCount = Math.floor(mesh.getTotalIndices() / 3);
-      const badge = document.createElement('span');
-      badge.className = 'outliner-badge';
-      badge.textContent = `${polyCount} Tris`;
-      left.appendChild(badge);
-
-      row.appendChild(left);
-
-      const actions = document.createElement('div');
-      actions.className = 'outliner-item-actions';
-
-      const btnVis = document.createElement('button');
-      btnVis.className = 'outliner-btn';
-      btnVis.innerHTML = `<i class="app-icon" data-lucide="${mesh.isVisible ? 'eye' : 'eye-off'}"></i>`;
-      btnVis.title = 'Toggle visibility';
-      btnVis.addEventListener('click', (e) => {
-        e.stopPropagation();
-        mesh.isVisible = !mesh.isVisible;
-        btnVis.innerHTML = `<i class="app-icon" data-lucide="${mesh.isVisible ? 'eye' : 'eye-off'}"></i>`;
-        this.refreshIcons();
-      });
-      actions.appendChild(btnVis);
-
+      // 2. Focus / Center
       const btnCenter = document.createElement('button');
       btnCenter.className = 'outliner-btn';
       btnCenter.innerHTML = '<i class="app-icon" data-lucide="target"></i>';
-      btnCenter.title = 'Center selection';
+      btnCenter.title = 'Center camera on selection';
       btnCenter.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.service.selectNodes([mesh]);
-        this.service.focusOnTarget(mesh);
-        this.showToast(`Centered on "${mesh.name}"`, 'success');
+        this.service.selectNodes([node as any]);
+        this.service.focusOnTarget(node as any);
+        this.showToast(`Centered on "${node.name}"`, 'success');
       });
       actions.appendChild(btnCenter);
 
-      const isWire = this.service.isMeshWireframe(mesh);
+      // 3. Wireframe
+      const isWire =
+        node instanceof Mesh
+          ? this.service.isMeshWireframe(node)
+          : descMeshes.length > 0 && descMeshes.every((m) => this.service.isMeshWireframe(m));
       const btnWire = document.createElement('button');
       btnWire.className = `outliner-btn ${isWire ? 'active' : ''}`;
       btnWire.innerHTML = '<i class="app-icon" data-lucide="scan"></i>';
       btnWire.title = 'Toggle wireframe';
       btnWire.addEventListener('click', (e) => {
         e.stopPropagation();
-        const state = this.service.toggleMeshWireframe(mesh);
-        this.showToast(`Wireframe ${state ? 'enabled' : 'disabled'} for "${mesh.name}"`, 'info');
+        if (node instanceof Mesh) {
+          const state = this.service.toggleMeshWireframe(node);
+          this.showToast(`Wireframe ${state ? 'enabled' : 'disabled'} for "${node.name}"`, 'info');
+        } else {
+          const nextState = !isWire;
+          for (const m of descMeshes) {
+            this.service.setMeshWireframe(m, nextState);
+          }
+          this.showToast(`Wireframe ${nextState ? 'enabled' : 'disabled'} for "${node.name}"`, 'info');
+        }
         this.updateOutliner();
       });
       actions.appendChild(btnWire);
 
+      // 4. Ungroup (if isGroup)
+      if (isGroup) {
+        const btnUngroup = document.createElement('button');
+        btnUngroup.className = 'outliner-btn';
+        btnUngroup.innerHTML = '<i class="app-icon" data-lucide="folder-minus"></i>';
+        btnUngroup.title = 'Ungroup meshes';
+        btnUngroup.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.service.selectNodes([node as any]);
+          this.service.ungroupSelected();
+        });
+        actions.appendChild(btnUngroup);
+      }
+
+      // 5. Delete (deletes node and all its children)
       const btnDel = document.createElement('button');
       btnDel.className = 'outliner-btn';
       btnDel.innerHTML = '<i class="app-icon" data-lucide="trash-2"></i>';
-      btnDel.title = 'Delete mesh';
+      btnDel.title = hasChildren ? 'Delete object and children' : 'Delete object';
       btnDel.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.service.selectMesh(mesh);
+        this.service.selectNodes([node as any]);
         this.service.deleteSelected();
       });
       actions.appendChild(btnDel);
@@ -3074,19 +3027,30 @@ export class MeshEditorApp {
 
       row.addEventListener('click', (e: MouseEvent) => {
         if (e.metaKey || e.ctrlKey) {
-          this.service.toggleNodeSelection(mesh);
+          this.service.toggleNodeSelection(node as any);
         } else if (e.shiftKey) {
-          this.service.rangeSelectNodes(mesh);
+          this.service.rangeSelectNodes(node as any);
         } else {
-          this.service.selectNodes([mesh]);
+          this.service.selectNodes([node as any]);
         }
       });
 
       row.addEventListener('dblclick', () => {
-        this.service.focusOnTarget(mesh);
+        this.service.focusOnTarget(node as any);
       });
 
-      this.outlinerTreeContainer.appendChild(row);
+      parentElement.appendChild(row);
+
+      // If expanded, render children recursively
+      if (hasChildren && isExpanded) {
+        for (const child of children) {
+          renderNode(child, depth + 1, parentElement);
+        }
+      }
+    };
+
+    for (const root of rootNodes) {
+      renderNode(root, 0, this.outlinerTreeContainer);
     }
 
     this.refreshIcons();

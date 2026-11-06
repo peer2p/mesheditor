@@ -256,7 +256,16 @@ When building or updating figures, combine these built-in tools:
      - `type: "humanoid"`: Spawns the 1.80m Loomis mannequin with built-in knee, elbow, and hip joint rings. Set `pose: "t_pose"` for outstretched arms.
      - `type: "quadruped"`: Spawns animal base with digitigrade leg mechanics and angled scapula.
      - `type: "head_bust"`: Spawns head with facial planes, eye cavities, and neck.
-     - `type: "sculpt_sphere"`: Spawns high-density clay sphere for freeform sculpting.
+     - `type: "sculpt_sphere"`: Spawns high-density clay sphere for freeform sculpting of simple single-volume props (e.g. stones, fruits, blob props).
+
+> [!CAUTION]
+> **CRITICAL: NEVER Attempt to Sculpt a Character from `sculpt_sphere`!**
+> Digital brush strokes (`modeler_sculpt_mesh`) only apply gentle surface displacement ($\approx 0.02 - 0.05\text{m}$) to existing vertices. They CANNOT pull out limbs, boots, or extrude hat visors, hair, and mustaches from a single sphere.
+> Even if a user prompt mentions "sculpt a sphere into Mario/character", you must **NEVER** leave the user with a single deformed sphere! Instead:
+> 1. Always spawn the dedicated character base mesh: `modeler_spawn_base_mesh` with `type: "chibi"`, `style: "organic"` (for Mario/toons), `type: "creature"`, or `type: "humanoid"`.
+> 2. Add accessories, hats, visors, mustaches, and clothing using modeling tools (`modeler_create_primitive`, `modeler_create_tube`, `modeler_extrude_polygon`, `modeler_facet_extrude`).
+> 3. Reserve `modeler_sculpt_mesh` strictly for subtle facial accents (inflating cheeks, smoothing seams).
+
 2. **Step 2: Box-Modeling & Proportional Edits**:
    - Use `modeler_facet_extrude` to pull out horns, armor plates, tails, or wings.
    - Use `modeler_facet_inset` to recess eye sockets or wound portals.

@@ -1089,11 +1089,11 @@ export class SculptController {
       if (!isMannequin) {
         // Organic continuous curved tube arms without joint ball seams
         const armPath = pose === 't_pose' ? [
-          new Vector3(side * 0.18, armY, 0),
+          new Vector3(side * 0.12, armY, 0),
           new Vector3(side * 0.36, armY, 0),
           new Vector3(side * 0.54, armY, 0),
         ] : [
-          new Vector3(side * 0.18, armY, 0),
+          new Vector3(side * 0.12, armY, 0),
           new Vector3(side * 0.32, armY - 0.12, 0),
           new Vector3(side * 0.42, armY - 0.28, 0),
         ];
@@ -1186,12 +1186,12 @@ export class SculptController {
     // 8. Legs (Left & Right)
     for (const side of [-1, 1]) {
       const sName = side === 1 ? 'r' : 'l';
-      const legX = side * 0.13;
+      const legX = side * 0.1;
 
       if (!isMannequin) {
         // Organic continuous curved tube legs
         const legPath = [
-          new Vector3(legX, 0.42, 0),
+          new Vector3(legX, 0.52, 0),
           new Vector3(legX, 0.28, 0.015),
           new Vector3(legX, 0.14, 0),
         ];

@@ -106,41 +106,88 @@ function normalizeAgyModel(requestedModel) {
  */
 function execProcess(bin, args, options = {}) {
   return new Promise((resolve, reject) => {
-    const timeoutMs = options.timeoutMs || 180000; // 3 minutes timeout
+    const timeoutMs = options.timeoutMs || 600000; // 10 minutes timeout
+    const isWin = process.platform === 'win32';
     const child = spawn(bin, args, {
       cwd: options.cwd || os.tmpdir(),
       env: { ...process.env, ...options.env },
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: !isWin,
     });
 
     let stdout = '';
     let stderr = '';
     let timer = null;
+    let settled = false;
+
+    const cleanup = () => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      try {
+        if (child.pid && !isWin) {
+          process.kill(-child.pid, 'SIGKILL');
+        } else {
+          child.kill('SIGKILL');
+        }
+      } catch {
+        // ignore if already exited
+      }
+    };
+
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
+    };
+
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(err);
+    };
 
     if (timeoutMs > 0) {
       timer = setTimeout(() => {
-        try {
-          child.kill('SIGKILL');
-        } catch {
-          // ignore
-        }
-        reject(new Error(`Antigravity CLI process timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
+        fail(new Error(`Antigravity CLI process timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
       }, timeoutMs);
     }
 
     child.stdout.on('data', (chunk) => {
       stdout += chunk.toString();
+      // When agy outputs its complete JSON result in print mode, resolve immediately.
+      // This prevents persistent child/grandchild processes (such as stdio MCP servers)
+      // from holding the stdout/stderr pipe open and blocking stdio stream closure.
+      if (
+        options.waitForJson !== false &&
+        stdout.includes('"conversation_id"') &&
+        (stdout.includes('"status":"SUCCESS"') || stdout.includes('"status":"ERROR"'))
+      ) {
+        setTimeout(() => {
+          finish({ code: 0, stdout, stderr });
+        }, 60);
+      }
     });
+
     child.stderr.on('data', (chunk) => {
       stderr += chunk.toString();
     });
+
     child.on('error', (err) => {
-      if (timer) clearTimeout(timer);
-      reject(err);
+      fail(err);
     });
+
+    child.on('exit', (code) => {
+      setTimeout(() => {
+        finish({ code: code ?? 0, stdout, stderr });
+      }, 50);
+    });
+
     child.on('close', (code) => {
-      if (timer) clearTimeout(timer);
-      resolve({ code, stdout, stderr });
+      finish({ code: code ?? 0, stdout, stderr });
     });
   });
 }
@@ -382,7 +429,7 @@ function extractBridgeErrorDetails(err, stdout, stderr, code) {
     message = match ? match[0] : 'Antigravity quota reached. Resets in a few hours or switch model/endpoint.';
   } else if (/timed out/i.test(combined)) {
     statusCode = 504;
-    message = 'Antigravity CLI timed out after 180s. Please retry or choose a lighter model.';
+    message = 'Antigravity CLI timed out after 10m. Please retry or choose a lighter model.';
   } else if (/auth|not signed in|login/i.test(combined)) {
     statusCode = 401;
     message = 'Antigravity authentication expired or missing. Please run `agy auth login` or switch model.';
@@ -401,7 +448,7 @@ async function runAgyChatCompletion(body) {
   const model = normalizeAgyModel(body?.model);
   const { prompt, tempImageFiles } = buildAgyPromptFromOpenAI(body?.messages || [], body?.tools || []);
 
-  // Always supply --dangerously-skip-permissions and --print-timeout 180s so agy never hangs waiting for stdin confirmation
+  // Always supply --dangerously-skip-permissions and --print-timeout 600s so agy never hangs waiting for stdin confirmation
   const args = [
     '--model',
     model,
@@ -410,7 +457,7 @@ async function runAgyChatCompletion(body) {
     '--disable-slash-commands',
     '--dangerously-skip-permissions',
     '--print-timeout',
-    '180s',
+    '600s',
   ];
   if (tempImageFiles.length > 0) {
     args.push('--add-dir', os.tmpdir());
@@ -418,7 +465,7 @@ async function runAgyChatCompletion(body) {
   args.push('-p', prompt);
 
   try {
-    const { code, stdout, stderr } = await execProcess(bin, args, { cwd: os.tmpdir(), timeoutMs: 180000 });
+    const { code, stdout, stderr } = await execProcess(bin, args, { cwd: os.tmpdir(), timeoutMs: 600000 });
 
     // Parse last JSON line from agy stdout
     let agyResult = null;

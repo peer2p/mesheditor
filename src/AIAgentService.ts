@@ -1183,10 +1183,10 @@ ${textureRule}
 
     const fetchFn = this.customFetch || globalThis.fetch.bind(globalThis);
     let res: Response;
-    const timeoutMs = 180000; // 3-minute safety limit to prevent indefinite hanging
+    const timeoutMs = 600000; // 10-minute safety limit to prevent indefinite hanging
     const timeoutController = new AbortController();
     const timer = setTimeout(() => {
-      timeoutController.abort(new Error('Endpoint request timed out after 180 seconds.'));
+      timeoutController.abort(new Error('Endpoint request timed out after 10 minutes.'));
     }, timeoutMs);
 
     // Combine caller signal with timeout controller
@@ -1230,7 +1230,7 @@ ${textureRule}
       } else {
         clearTimeout(timer);
         if (err?.name === 'AbortError' && !signal?.aborted) {
-          throw new Error('Endpoint request timed out after 180 seconds. The model or bridge did not respond in time.');
+          throw new Error('Endpoint request timed out after 10 minutes. The model or bridge did not respond in time.');
         }
         throw err;
       }

@@ -1102,6 +1102,36 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
   gap: 2px;
 }
 
+.outliner-chevron {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.outliner-chevron:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.outliner-chevron .app-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.outliner-chevron-spacer {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
 .outliner-item {
   display: flex;
   align-items: center;

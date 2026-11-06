@@ -18,6 +18,7 @@ import {
   Matrix,
   Mesh,
   MeshBuilder,
+  MultiMaterial,
   Nullable,
   Observer,
   PBRMaterial,
@@ -720,6 +721,13 @@ export class MeshEditorService {
     if (!node) return false;
     if (this.groups.includes(node)) return true;
     return !!(node.metadata && node.metadata.isEditorGroup);
+  }
+
+  public getNodeLogicalParent(node: TransformNode | AbstractMesh): TransformNode | AbstractMesh | null {
+    if (this.selectionProxyActive && node.parent === this.selectionProxyNode) {
+      return this.selectionProxyMap.get(node as any) || null;
+    }
+    return (node.parent as any) || null;
   }
 
   public isEditorHelper(mesh: AbstractMesh | TransformNode): boolean {
@@ -1457,6 +1465,26 @@ export class MeshEditorService {
     }
   }
 
+  public collectNodeAndDescendants(node: TransformNode | AbstractMesh): { meshes: Mesh[]; transformNodes: TransformNode[] } {
+    const meshes: Mesh[] = [];
+    const transformNodes: TransformNode[] = [];
+
+    const recurse = (current: any) => {
+      if (!current || this.isEditorHelper(current) || current.isDisposed()) return;
+      if (current instanceof Mesh) {
+        if (!meshes.includes(current)) meshes.push(current);
+      } else if (current instanceof TransformNode) {
+        if (!transformNodes.includes(current)) transformNodes.push(current);
+      }
+      const children = current.getChildren ? current.getChildren() : [];
+      for (const c of children) {
+        recurse(c);
+      }
+    };
+    recurse(node);
+    return { meshes, transformNodes };
+  }
+
   public deleteSelected(): void {
     const nodesToDelete =
       this.selectedNodes.length > 0
@@ -1473,16 +1501,15 @@ export class MeshEditorService {
     this.clearSelectionProxy();
 
     const affectedMeshes: Mesh[] = [];
-    const affectedGroups: TransformNode[] = [];
+    const affectedTransformNodes: TransformNode[] = [];
 
     for (const node of nodesToDelete) {
-      if (this.isGroupNode(node)) {
-        affectedGroups.push(node);
-        for (const cm of node.getChildMeshes()) {
-          if (cm instanceof Mesh && !this.isEditorHelper(cm)) affectedMeshes.push(cm);
-        }
-      } else if (node instanceof Mesh && !this.isEditorHelper(node)) {
-        affectedMeshes.push(node);
+      const { meshes, transformNodes } = this.collectNodeAndDescendants(node);
+      for (const m of meshes) {
+        if (!affectedMeshes.includes(m)) affectedMeshes.push(m);
+      }
+      for (const tn of transformNodes) {
+        if (!affectedTransformNodes.includes(tn)) affectedTransformNodes.push(tn);
       }
     }
 
@@ -1491,9 +1518,9 @@ export class MeshEditorService {
       const idx = this.importedMeshes.indexOf(m);
       if (idx !== -1) this.importedMeshes.splice(idx, 1);
     }
-    for (const g of affectedGroups) {
-      g.setEnabled(false);
-      const idx = this.groups.indexOf(g);
+    for (const tn of affectedTransformNodes) {
+      tn.setEnabled(false);
+      const idx = this.groups.indexOf(tn);
       if (idx !== -1) this.groups.splice(idx, 1);
     }
 
@@ -1506,9 +1533,9 @@ export class MeshEditorService {
           m.setEnabled(true);
           if (!this.importedMeshes.includes(m)) this.importedMeshes.push(m);
         }
-        for (const g of affectedGroups) {
-          g.setEnabled(true);
-          if (!this.groups.includes(g)) this.groups.push(g);
+        for (const tn of affectedTransformNodes) {
+          tn.setEnabled(true);
+          if (this.isGroupNode(tn) && !this.groups.includes(tn)) this.groups.push(tn);
         }
         this.selectNodes(nodesToDelete);
       },
@@ -1519,9 +1546,9 @@ export class MeshEditorService {
           const idx = this.importedMeshes.indexOf(m);
           if (idx !== -1) this.importedMeshes.splice(idx, 1);
         }
-        for (const g of affectedGroups) {
-          g.setEnabled(false);
-          const idx = this.groups.indexOf(g);
+        for (const tn of affectedTransformNodes) {
+          tn.setEnabled(false);
+          const idx = this.groups.indexOf(tn);
           if (idx !== -1) this.groups.splice(idx, 1);
         }
         this.selectNodes([]);
@@ -1705,25 +1732,20 @@ export class MeshEditorService {
   /* =========================================================================
      7. SUBMESHES & LOOSE PARTS
      ========================================================================= */
-  public separateSelectedLooseParts(): Mesh[] {
-    if (!this.selectedMesh) {
-      this.events.onToast?.('Please select a mesh to separate.', 'warning');
-      return [];
-    }
+  public separateMeshLooseParts(sourceMesh: Mesh): Mesh[] {
+    if (!sourceMesh || sourceMesh.isDisposed()) return [];
 
-    const sourceMesh = this.selectedMesh;
     const positions = sourceMesh.getVerticesData(VertexBuffer.PositionKind);
     const indices = sourceMesh.getIndices();
 
     if (!positions || !indices || indices.length < 3) {
-      this.events.onToast?.('Mesh does not contain valid geometry.', 'warning');
-      return [];
+      return [sourceMesh];
     }
-
-    this.events.onStatusChanged?.('Analyzing connected geometry components...', true);
 
     const normals = sourceMesh.getVerticesData(VertexBuffer.NormalKind);
     const uvs = sourceMesh.getVerticesData(VertexBuffer.UVKind);
+    const uv2s = sourceMesh.getVerticesData(VertexBuffer.UV2Kind);
+    const tangents = sourceMesh.getVerticesData(VertexBuffer.TangentKind);
     const colors = sourceMesh.getVerticesData(VertexBuffer.ColorKind);
 
     const vertexCount = positions.length / 3;
@@ -1751,23 +1773,48 @@ export class MeshEditorService {
       if (rootI !== rootJ) parent[rootI] = rootJ;
     };
 
-    const vertexToTriangles = new Map<number, number[]>();
+    // Quantize 3D positions to bridge split normals, UV seams, and color seams
+    const vertToPosId = new Int32Array(vertexCount);
+    const posMap = new Map<string, number>();
+
+    for (let v = 0; v < vertexCount; v++) {
+      const x = Math.round(positions[v * 3] * 10000);
+      const y = Math.round(positions[v * 3 + 1] * 10000);
+      const z = Math.round(positions[v * 3 + 2] * 10000);
+      const key = `${x}_${y}_${z}`;
+      let pid = posMap.get(key);
+      if (pid === undefined) {
+        pid = posMap.size;
+        posMap.set(key, pid);
+      }
+      vertToPosId[v] = pid;
+    }
+
+    // Connect triangles that share an edge in 3D space
+    const edgeToTriangles = new Map<string, number[]>();
     for (let t = 0; t < triangleCount; t++) {
-      for (let j = 0; j < 3; j++) {
-        const vIdx = indices[t * 3 + j];
-        let arr = vertexToTriangles.get(vIdx);
+      const p0 = vertToPosId[indices[t * 3]];
+      const p1 = vertToPosId[indices[t * 3 + 1]];
+      const p2 = vertToPosId[indices[t * 3 + 2]];
+
+      const e0 = p0 < p1 ? `${p0}_${p1}` : `${p1}_${p0}`;
+      const e1 = p1 < p2 ? `${p1}_${p2}` : `${p2}_${p1}`;
+      const e2 = p2 < p0 ? `${p2}_${p0}` : `${p0}_${p2}`;
+
+      for (const edgeKey of [e0, e1, e2]) {
+        let arr = edgeToTriangles.get(edgeKey);
         if (!arr) {
           arr = [];
-          vertexToTriangles.set(vIdx, arr);
+          edgeToTriangles.set(edgeKey, arr);
         }
         arr.push(t);
       }
     }
 
-    for (const [, triIndices] of vertexToTriangles) {
-      const first = triIndices[0];
-      for (let k = 1; k < triIndices.length; k++) {
-        union(first, triIndices[k]);
+    for (const [, triList] of edgeToTriangles) {
+      const first = triList[0];
+      for (let k = 1; k < triList.length; k++) {
+        union(first, triList[k]);
       }
     }
 
@@ -1783,8 +1830,6 @@ export class MeshEditorService {
     }
 
     if (clusters.size <= 1) {
-      this.events.onStatusChanged?.('Ready');
-      this.events.onToast?.('Mesh is already a single unified piece (no separate parts detected).', 'info');
       return [sourceMesh];
     }
 
@@ -1792,36 +1837,84 @@ export class MeshEditorService {
     const baseName = sourceMesh.name.replace(/_part\d+$/, '');
     let partNum = 1;
 
+    // Submesh & Material mapping
+    const sourceSubMeshes = sourceMesh.subMeshes || [];
+    const isMultiMat = sourceMesh.material instanceof MultiMaterial;
+    const multiMat = isMultiMat ? (sourceMesh.material as MultiMaterial) : null;
+
+    const getTriangleMaterialInfo = (t: number): { materialIndex: number; material: Material | null } => {
+      const offset = t * 3;
+      if (sourceSubMeshes.length > 0) {
+        for (const sm of sourceSubMeshes) {
+          if (offset >= sm.indexStart && offset < sm.indexStart + sm.indexCount) {
+            const matIdx = sm.materialIndex;
+            const mat = (multiMat ? multiMat.subMaterials[matIdx] : null) || sm.getMaterial() || sourceMesh.material;
+            return { materialIndex: matIdx, material: mat };
+          }
+        }
+      }
+      return { materialIndex: 0, material: sourceMesh.material };
+    };
+
     for (const [, triList] of clusters) {
+      // Analyze materials used in this cluster
+      const matGroups = new Map<number, { material: Material | null; triangles: number[] }>();
+      for (const t of triList) {
+        const { materialIndex, material } = getTriangleMaterialInfo(t);
+        let group = matGroups.get(materialIndex);
+        if (!group) {
+          group = { material, triangles: [] };
+          matGroups.set(materialIndex, group);
+        }
+        group.triangles.push(t);
+      }
+
+      const hasMultipleMaterials = matGroups.size > 1;
       const newIndices: number[] = [];
       const newPositions: number[] = [];
       const newNormals: number[] = normals ? [] : [];
       const newUVs: number[] = uvs ? [] : [];
+      const newUV2s: number[] = uv2s ? [] : [];
+      const newTangents: number[] = tangents ? [] : [];
       const newColors: number[] = colors ? [] : [];
 
       const oldToNewVertMap = new Map<number, number>();
+      const subMeshRanges: { materialIndex: number; indexStart: number; indexCount: number }[] = [];
 
-      for (const t of triList) {
-        for (let j = 0; j < 3; j++) {
-          const oldV = indices[t * 3 + j];
-          let newV = oldToNewVertMap.get(oldV);
-          if (newV === undefined) {
-            newV = newPositions.length / 3;
-            oldToNewVertMap.set(oldV, newV);
+      for (const [matIdx, group] of matGroups) {
+        const rangeStart = newIndices.length;
 
-            newPositions.push(positions[oldV * 3], positions[oldV * 3 + 1], positions[oldV * 3 + 2]);
-            if (normals) {
-              newNormals.push(normals[oldV * 3], normals[oldV * 3 + 1], normals[oldV * 3 + 2]);
+        for (const t of group.triangles) {
+          for (let j = 0; j < 3; j++) {
+            const oldV = indices[t * 3 + j];
+            let newV = oldToNewVertMap.get(oldV);
+            if (newV === undefined) {
+              newV = newPositions.length / 3;
+              oldToNewVertMap.set(oldV, newV);
+
+              newPositions.push(positions[oldV * 3], positions[oldV * 3 + 1], positions[oldV * 3 + 2]);
+              if (normals) {
+                newNormals.push(normals[oldV * 3], normals[oldV * 3 + 1], normals[oldV * 3 + 2]);
+              }
+              if (uvs) {
+                newUVs.push(uvs[oldV * 2], uvs[oldV * 2 + 1]);
+              }
+              if (uv2s) {
+                newUV2s.push(uv2s[oldV * 2], uv2s[oldV * 2 + 1]);
+              }
+              if (tangents) {
+                newTangents.push(tangents[oldV * 4], tangents[oldV * 4 + 1], tangents[oldV * 4 + 2], tangents[oldV * 4 + 3]);
+              }
+              if (colors) {
+                newColors.push(colors[oldV * 4], colors[oldV * 4 + 1], colors[oldV * 4 + 2], colors[oldV * 4 + 3]);
+              }
             }
-            if (uvs) {
-              newUVs.push(uvs[oldV * 2], uvs[oldV * 2 + 1]);
-            }
-            if (colors) {
-              newColors.push(colors[oldV * 4], colors[oldV * 4 + 1], colors[oldV * 4 + 2], colors[oldV * 4 + 3]);
-            }
+            newIndices.push(newV);
           }
-          newIndices.push(newV);
         }
+
+        const rangeCount = newIndices.length - rangeStart;
+        subMeshRanges.push({ materialIndex: matIdx, indexStart: rangeStart, indexCount: rangeCount });
       }
 
       const partMesh = new Mesh(`${baseName}_part${partNum++}`, this.scene, sourceMesh.parent);
@@ -1830,10 +1923,32 @@ export class MeshEditorService {
       vd.indices = newIndices;
       if (normals) vd.normals = newNormals;
       if (uvs) vd.uvs = newUVs;
+      if (uv2s) vd.uvs2 = newUV2s;
+      if (tangents) vd.tangents = newTangents;
       if (colors) vd.colors = newColors;
 
       vd.applyToMesh(partMesh, true);
-      partMesh.material = sourceMesh.material;
+
+      if (colors) {
+        partMesh.hasVertexAlpha = sourceMesh.hasVertexAlpha;
+        if ((sourceMesh as any).useVertexColors !== undefined) {
+          (partMesh as any).useVertexColors = (sourceMesh as any).useVertexColors;
+        }
+      }
+
+      if (!hasMultipleMaterials) {
+        const singleMat = [...matGroups.values()][0]?.material || sourceMesh.material;
+        partMesh.material = singleMat;
+        partMesh.subMeshes = [new SubMesh(0, 0, newPositions.length / 3, 0, newIndices.length, partMesh)];
+      } else {
+        partMesh.material = sourceMesh.material;
+        partMesh.subMeshes = [];
+        const totalVerts = newPositions.length / 3;
+        for (const range of subMeshRanges) {
+          new SubMesh(range.materialIndex, 0, totalVerts, range.indexStart, range.indexCount, partMesh);
+        }
+      }
+
       partMesh.position.copyFrom(sourceMesh.position);
       if (sourceMesh.rotationQuaternion) {
         partMesh.rotationQuaternion = sourceMesh.rotationQuaternion.clone();
@@ -1843,47 +1958,100 @@ export class MeshEditorService {
       partMesh.scaling.copyFrom(sourceMesh.scaling);
 
       this.centerMeshPivot(partMesh);
-      this.importedMeshes.push(partMesh);
       separatedMeshes.push(partMesh);
     }
 
-    const origIdx = this.importedMeshes.indexOf(sourceMesh);
-    if (origIdx !== -1) this.importedMeshes.splice(origIdx, 1);
-    sourceMesh.setEnabled(false);
+    return separatedMeshes;
+  }
+
+  public separateSelectedLooseParts(): Mesh[] {
+    const targetMeshes: Mesh[] = [];
+    const nodes = this.selectedNodes.length > 0 ? this.selectedNodes : this.selectedMesh ? [this.selectedMesh] : [];
+
+    for (const node of nodes) {
+      if (node instanceof Mesh && !this.isEditorHelper(node) && !node.isDisposed() && node.getTotalVertices() > 0) {
+        if (!targetMeshes.includes(node)) targetMeshes.push(node);
+      }
+      const children = node.getChildMeshes ? node.getChildMeshes() : [];
+      for (const cm of children) {
+        if (cm instanceof Mesh && !this.isEditorHelper(cm) && !cm.isDisposed() && cm.getTotalVertices() > 0) {
+          if (!targetMeshes.includes(cm)) targetMeshes.push(cm);
+        }
+      }
+    }
+
+    if (targetMeshes.length === 0) {
+      this.events.onToast?.('Please select a mesh to separate.', 'warning');
+      return [];
+    }
+
+    this.events.onStatusChanged?.('Analyzing connected geometry components...', true);
+
+    const allNewParts: Mesh[] = [];
+    const sourcesReplaced: Mesh[] = [];
+
+    for (const sourceMesh of targetMeshes) {
+      const parts = this.separateMeshLooseParts(sourceMesh);
+      if (parts.length > 1) {
+        sourcesReplaced.push(sourceMesh);
+        for (const p of parts) {
+          allNewParts.push(p);
+          this.importedMeshes.push(p);
+        }
+        const origIdx = this.importedMeshes.indexOf(sourceMesh);
+        if (origIdx !== -1) this.importedMeshes.splice(origIdx, 1);
+        sourceMesh.setEnabled(false);
+      }
+    }
+
+    if (allNewParts.length === 0) {
+      this.events.onStatusChanged?.('Ready', false);
+      this.events.onToast?.(
+        targetMeshes.length === 1
+          ? 'Mesh is already a single unified piece (no separate parts detected).'
+          : 'Selected meshes are already unified pieces (no separate parts detected).',
+        'info'
+      );
+      return targetMeshes;
+    }
 
     this.recordAction({
-      name: `Separate Loose Parts (${clusters.size} parts)`,
+      name: `Separate Loose Parts (${allNewParts.length} parts)`,
       undo: () => {
-        for (const p of separatedMeshes) {
+        for (const p of allNewParts) {
           const idx = this.importedMeshes.indexOf(p);
           if (idx !== -1) this.importedMeshes.splice(idx, 1);
           p.setEnabled(false);
         }
-        if (!this.importedMeshes.includes(sourceMesh)) this.importedMeshes.push(sourceMesh);
-        sourceMesh.setEnabled(true);
-        this.selectMesh(sourceMesh);
+        for (const sm of sourcesReplaced) {
+          if (!this.importedMeshes.includes(sm)) this.importedMeshes.push(sm);
+          sm.setEnabled(true);
+        }
+        this.selectNodes(sourcesReplaced);
       },
       redo: () => {
-        const idx = this.importedMeshes.indexOf(sourceMesh);
-        if (idx !== -1) this.importedMeshes.splice(idx, 1);
-        sourceMesh.setEnabled(false);
-        for (const p of separatedMeshes) {
+        for (const sm of sourcesReplaced) {
+          const idx = this.importedMeshes.indexOf(sm);
+          if (idx !== -1) this.importedMeshes.splice(idx, 1);
+          sm.setEnabled(false);
+        }
+        for (const p of allNewParts) {
           if (!this.importedMeshes.includes(p)) this.importedMeshes.push(p);
           p.setEnabled(true);
         }
-        this.selectNodes(separatedMeshes);
+        this.selectNodes(allNewParts);
       },
     });
 
-    this.selectNodes(separatedMeshes);
+    this.selectNodes(allNewParts);
     this.updateStats();
-    this.events.onStatusChanged?.('Ready');
+    this.events.onStatusChanged?.('Ready', false);
     this.events.onSceneModified?.();
     this.events.onToast?.(
-      `Separated into ${separatedMeshes.length} individual parts!`,
+      `Separated into ${allNewParts.length} individual parts!`,
       'success'
     );
-    return separatedMeshes;
+    return allNewParts;
   }
 
   public mergeSelectedMeshes(): Mesh | null {
@@ -1895,23 +2063,29 @@ export class MeshEditorService {
         : [];
 
     const meshesToMerge: Mesh[] = [];
-    const affectedGroups: TransformNode[] = [];
+    const affectedParentNodes: TransformNode[] = [];
 
     for (const node of selected) {
-      if (this.isGroupNode(node)) {
-        if (!affectedGroups.includes(node)) affectedGroups.push(node);
-        for (const cm of node.getChildMeshes()) {
-          if (cm instanceof Mesh && !this.isEditorHelper(cm) && !cm.isDisposed() && cm.getTotalVertices() > 0) {
-            if (!meshesToMerge.includes(cm)) meshesToMerge.push(cm);
-          }
-        }
-      } else if (node instanceof Mesh && !this.isEditorHelper(node) && !node.isDisposed() && node.getTotalVertices() > 0) {
+      if (node instanceof Mesh && !this.isEditorHelper(node) && !node.isDisposed() && node.getTotalVertices() > 0) {
         if (!meshesToMerge.includes(node)) meshesToMerge.push(node);
+      } else if (node instanceof TransformNode && !this.isEditorHelper(node) && !node.isDisposed()) {
+        if (!affectedParentNodes.includes(node)) affectedParentNodes.push(node);
+      }
+      const children = node.getChildMeshes ? node.getChildMeshes() : [];
+      for (const cm of children) {
+        if (cm instanceof Mesh && !this.isEditorHelper(cm) && !cm.isDisposed() && cm.getTotalVertices() > 0) {
+          if (!meshesToMerge.includes(cm)) meshesToMerge.push(cm);
+        }
       }
     }
 
     if (meshesToMerge.length < 2) {
-      this.events.onToast?.('Please select at least 2 meshes to merge.', 'warning');
+      this.events.onToast?.(
+        meshesToMerge.length === 1
+          ? 'Only 1 mesh found in selection. Need at least 2 meshes to merge.'
+          : 'Please select at least 2 meshes (or a parent node containing multiple meshes) to merge.',
+        'warning'
+      );
       return null;
     }
 
@@ -1921,6 +2095,9 @@ export class MeshEditorService {
     for (const m of meshesToMerge) {
       m.computeWorldMatrix(true);
     }
+
+    const firstMesh = meshesToMerge[0];
+    const targetParent = firstMesh.parent;
 
     // Merge meshes into a single mesh; multiMultiMaterials preserves individual materials as subMeshes
     const merged = Mesh.MergeMeshes(
@@ -1940,6 +2117,7 @@ export class MeshEditorService {
 
     const baseName = meshesToMerge[0].name.replace(/_merged(_\d+)?$/, '');
     merged.name = `${baseName}_merged`;
+    merged.parent = targetParent;
     this.centerMeshPivot(merged);
     this.importedMeshes.push(merged);
 
@@ -1952,7 +2130,7 @@ export class MeshEditorService {
       if (idx !== -1) this.importedMeshes.splice(idx, 1);
     }
 
-    for (const g of affectedGroups) {
+    for (const g of affectedParentNodes) {
       g.setEnabled(false);
       const idx = this.groups.indexOf(g);
       if (idx !== -1) this.groups.splice(idx, 1);
@@ -1970,9 +2148,9 @@ export class MeshEditorService {
           if (!this.importedMeshes.includes(m)) this.importedMeshes.push(m);
           m.setEnabled(true);
         }
-        for (const g of affectedGroups) {
+        for (const g of affectedParentNodes) {
           g.setEnabled(true);
-          if (!this.groups.includes(g)) this.groups.push(g);
+          if (this.isGroupNode(g) && !this.groups.includes(g)) this.groups.push(g);
         }
         this.selectNodes(meshesToMerge);
       },
@@ -1983,7 +2161,7 @@ export class MeshEditorService {
           if (idx !== -1) this.importedMeshes.splice(idx, 1);
           m.setEnabled(false);
         }
-        for (const g of affectedGroups) {
+        for (const g of affectedParentNodes) {
           g.setEnabled(false);
           const idx = this.groups.indexOf(g);
           if (idx !== -1) this.groups.splice(idx, 1);
