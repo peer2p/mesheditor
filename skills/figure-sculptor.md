@@ -250,33 +250,39 @@ High-poly sculpted meshes cannot be animated or rendered in real time. They must
 
 When building or updating figures, combine these built-in tools:
 
-1. **Step 1: Spawn Base Mesh Blockout**:
-   - Call `modeler_spawn_base_mesh`:
-     - `type: "chibi"` (or `canon: "chibi"`): Spawns the 3.5-head cartoon blockout in T-Pose with pre-assigned PBR materials for skin, clothing, gloves, and boots (ideal for Mario, dwarves, toons).
-     - `type: "humanoid"`: Spawns the 1.80m Loomis mannequin with built-in knee, elbow, and hip joint rings. Set `pose: "t_pose"` for outstretched arms.
-     - `type: "quadruped"`: Spawns animal base with digitigrade leg mechanics and angled scapula.
-     - `type: "head_bust"`: Spawns head with facial planes, eye cavities, and neck.
-     - `type: "sculpt_sphere"`: Spawns high-density clay sphere for freeform sculpting of simple single-volume props (e.g. stones, fruits, blob props).
+1. **Step 1: Choose the Right Organic Base (SDF Clay, Base Mesh, or Clay Sphere)**:
+   - **Option A — Smooth Organic SDF Clay (`modeler_create_sdf_mesh`)**:
+     - Best for seamless, watertight organic torsos, heads, creatures, muscles, and stylized characters without hard primitive seams.
+     - Combine `ellipsoid`, `sphere`, `round_cone` (tapered capsules from `start` to `end` with `radius` and `endRadius`), and `box` (with `rounding`) using `blend: 0.04` to `0.12` and `symmetryX: true`. Use `op: "subtract"` to carve eye sockets or mouth cavities.
+   - **Option B — Anatomical Base Mesh (`modeler_spawn_base_mesh`)**:
+     - `type: "chibi"` (`style: "organic"`): 3.5-head cartoon blockout in T-Pose with pre-assigned PBR materials.
+     - `type: "creature"`: Stylized organic creature / demon base mesh.
+     - `type: "humanoid"`: 1.80m Loomis mannequin with joint rings (`pose: "t_pose"`).
+     - `type: "quadruped"`: Animal base with digitigrade/unguligrade leg mechanics.
+     - `type: "head_bust"`: Head with facial planes, eye cavities, and neck.
+   - **Option C — Clay Sphere Sculpting (`type: "sculpt_sphere"` + `modeler_sculpt_mesh`)**:
+     - **User Intent Priority**: Whenever the user explicitly asks to sculpt or model from a clay sphere (`sculpt_sphere`), **ALWAYS honor that request!**
+     - First spawn `modeler_spawn_base_mesh` with `type: "sculpt_sphere"` (or `modeler_create_sdf_mesh`), then call `modeler_sculpt_mesh` using continuous stroke paths (`from: {x,y,z}`, `to: {x,y,z}`, `steps`, `radius`, `strength`, `symmetryX: true`):
+       - `"grab"`: Drag primary silhouettes outward (jawline, chin, nose bridge, brow ridge, ears, horns, neck).
+       - `"clay"` / `"inflate"`: Build up cheek mass, lips, brow muscles, and anatomical volumes along surface normals (`invert: true` to carve eye sockets and cavities).
+       - `"pinch"`: Sharpen eyelid folds, lip vermilion borders, and nasolabial creases.
+       - `"flatten"`: Plane off temple, forehead, and jaw flats.
+       - `"smooth"`: Relax transitions and polish the surface.
 
-> [!CAUTION]
-> **CRITICAL: NEVER Attempt to Sculpt a Character from `sculpt_sphere`!**
-> Digital brush strokes (`modeler_sculpt_mesh`) only apply gentle surface displacement ($\approx 0.02 - 0.05\text{m}$) to existing vertices. They CANNOT pull out limbs, boots, or extrude hat visors, hair, and mustaches from a single sphere.
-> Even if a user prompt mentions "sculpt a sphere into Mario/character", you must **NEVER** leave the user with a single deformed sphere! Instead:
-> 1. Always spawn the dedicated character base mesh: `modeler_spawn_base_mesh` with `type: "chibi"`, `style: "organic"` (for Mario/toons), `type: "creature"`, or `type: "humanoid"`.
-> 2. Add accessories, hats, visors, mustaches, and clothing using modeling tools (`modeler_create_primitive`, `modeler_create_tube`, `modeler_extrude_polygon`, `modeler_facet_extrude`).
-> 3. Reserve `modeler_sculpt_mesh` strictly for subtle facial accents (inflating cheeks, smoothing seams).
+2. **Step 2: Proportional Polygon Budget Rule (Eye vs. Torso)**:
+   - **Primary Volumes (50–65% of budget)**: Torso, cranium, pelvis, main body.
+   - **Secondary Volumes (25–35% of budget)**: Arms, legs, hands, boots, hair, hats.
+   - **Tertiary Details (< 10% of budget)**: Eyeballs, pupils, buttons, buckles, teeth, fingernails.
+   - **CRITICAL**: Never give a small tertiary detail (like an eyeball) more triangles than the torso! When adding eyes or buttons via `modeler_create_primitive`, always pass `detailTier: "tertiary"` or `options: { segments: 6 }` (~190 triangles instead of 2,700). Call `modeler_plan_model` first on multi-part characters to verify proportional polygon allocation.
 
-2. **Step 2: Box-Modeling & Proportional Edits**:
+3. **Step 3: Box-Modeling & Proportional Edits**:
    - Use `modeler_facet_extrude` to pull out horns, armor plates, tails, or wings.
    - Use `modeler_facet_inset` to recess eye sockets or wound portals.
    - Call `modeler_subd_smooth` with `iterations: 1` or `2` to relax blockout polygons into smooth organic curvature.
-3. **Step 3: Game-Ready Retopology & Optimization**:
-   - Call `modeler_retopologize_mesh` with `targetFaces`:
-     - `targetFaces: 4000` for mobile/WebGL models.
-     - `targetFaces: 15000` for standard third-person game characters.
-     - `targetFaces: 32000` for high-fidelity hero assets.
+4. **Step 4: Game-Ready Retopology & Optimization**:
+   - Call `modeler_retopologize_mesh` with `targetFaces` matching the user's polygon budget (e.g. `4000` for WebGL/mobile, `15000` for standard game characters).
    - This applies Quadric Error Metric simplification, preserves silhouettes, and recalculates smooth vertex normals.
-4. **Step 4: PBR Material & Normal Maps**:
+5. **Step 5: PBR Material & Normal Maps**:
    - Call `modeler_create_material` with PBR skin/clay parameters:
      - Skin / Clay: `albedoColor: "#d9b38c"`, `roughness: 0.65`, `metallic: 0.0`.
      - Normal maps: Use `normalMapUrl` or procedural surface relief with `bumpLevel: 1.2` to retain fine wrinkles and skin pores without polygon overhead.

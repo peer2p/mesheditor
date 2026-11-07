@@ -29,6 +29,15 @@ import {
   SpawnBaseMeshTool,
   RetopologizeMeshTool,
   SculptMeshTool,
+  CreateSdfMeshTool,
+  CreateRoundedBoxTool,
+  CreateWallTool,
+  CreateArchTool,
+  CreateColumnTool,
+  CreateMoldingTool,
+  CreateStairsTool,
+  CreateRoofTool,
+  PlanModelTool,
 } from './builtin';
 
 /**
@@ -109,17 +118,26 @@ export class ToolRegistry {
 }
 
 /**
- * Factory helper creating a new ToolRegistry populated with all 17 built-in Babylon.js modeling tools.
+ * Factory helper creating a new ToolRegistry populated with all 37 built-in Babylon.js modeling tools.
  */
 export function createDefaultToolRegistry(): ToolRegistry {
   return new ToolRegistry([
     new GetSceneInfoTool(),
+    new PlanModelTool(),
     new CreatePrimitiveTool(),
+    new CreateRoundedBoxTool(),
+    new CreateSdfMeshTool(),
     new ExtrudePolygonTool(),
     new ExtrudeShapeTool(),
     new CreateLatheTool(),
     new CreateTubeTool(),
     new BooleanOperationTool(),
+    new CreateWallTool(),
+    new CreateArchTool(),
+    new CreateColumnTool(),
+    new CreateMoldingTool(),
+    new CreateStairsTool(),
+    new CreateRoofTool(),
     new CreateMaterialTool(),
     new ApplyMaterialTool(),
     new AutoUVMappingTool(),
@@ -143,4 +161,3 @@ export function createDefaultToolRegistry(): ToolRegistry {
     new SculptMeshTool(),
   ]);
 }
-

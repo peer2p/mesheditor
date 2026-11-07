@@ -858,6 +858,263 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       app.dispose();
       container.remove();
     });
+
+    it('enforces size-adaptive tessellation (eye has fewer polygons than torso) and supports clay sphere sculpting', async () => {
+      // 1. Verify figure-sculptor skill allows clay sphere sculpting when requested
+      const sysPrompt = service.aiAgent.buildSystemPrompt();
+      expect(sysPrompt).not.toContain('NEVER Attempt to Sculpt a Character from `sculpt_sphere`');
+      expect(sysPrompt).toContain('Explicit Clay Sphere Requests');
+
+      // 2. Create a small eyeball sphere (diameter 0.04m) and a larger torso sphere (diameter 0.65m)
+      const eyeRes = JSON.parse(
+        await service.aiAgent.executeToolCall('modeler_create_primitive', {
+          type: 'sphere',
+          name: 'Char_Eye_Left',
+          diameter: 0.04,
+          position: { x: 0.06, y: 1.65, z: 0.12 },
+        })
+      );
+      const torsoRes = JSON.parse(
+        await service.aiAgent.executeToolCall('modeler_create_primitive', {
+          type: 'sphere',
+          name: 'Char_Torso',
+          diameter: 0.65,
+          position: { x: 0, y: 1.15, z: 0 },
+        })
+      );
+
+      expect(eyeRes.triangles).toBeLessThan(250);
+      expect(torsoRes.triangles).toBeGreaterThan(eyeRes.triangles * 3);
+
+      // 3. Spawn a clay sphere and sculpt it using directional grab and clay stroke paths
+      const spawnRes = JSON.parse(
+        await service.aiAgent.executeToolCall('modeler_spawn_base_mesh', {
+          type: 'sculpt_sphere',
+          name: 'Clay_Bust_Sphere',
+        })
+      );
+      expect(spawnRes.status).toBe('ok');
+
+      const sculptRes = JSON.parse(
+        await service.aiAgent.executeToolCall('modeler_sculpt_mesh', {
+          meshName: 'Clay_Bust_Sphere',
+          brush: 'grab',
+          symmetryX: true,
+          strokes: [
+            {
+              from: { x: 0, y: 0.6, z: 0.45 },
+              to: { x: 0, y: 0.35, z: 0.62 },
+              radius: 0.35,
+              strength: 0.8,
+            },
+            {
+              from: { x: 0.25, y: 1.0, z: 0.3 },
+              to: { x: 0.45, y: 1.25, z: 0.2 },
+              radius: 0.28,
+              strength: 0.7,
+            },
+          ],
+        })
+      );
+      expect(sculptRes.status).toBe('ok');
+      expect(sculptRes.strokesApplied).toBe(2);
+      expect(sculptRes.samplesApplied).toBeGreaterThan(4);
+    });
+
+    it('arranges AI checkboxes in a dedicated row and runs the Multi-View Visual Critique pass with the same model', async () => {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const nullEngine = new NullEngine();
+      const app = new MeshEditorApp({ container, engine: nullEngine });
+
+      // 1. Verify dedicated checkbox row in AI Mesh Agent UI
+      const checkboxRow = container.querySelector('#aiCheckboxRow.ai-checkbox-row') as HTMLElement | null;
+      const modeBar = container.querySelector('.ai-mode-bar') as HTMLElement | null;
+      const visualCheckQuick = container.querySelector('#aiVisualCritiqueCheckQuick') as HTMLInputElement | null;
+      const visualCheckSettings = container.querySelector('#aiVisualCritiqueCheck') as HTMLInputElement | null;
+
+      expect(checkboxRow).not.toBeNull();
+      expect(modeBar).not.toBeNull();
+      expect(visualCheckQuick).not.toBeNull();
+      expect(visualCheckSettings).not.toBeNull();
+      // Checkboxes are inside #aiCheckboxRow, separate from .ai-mode-bar
+      expect(checkboxRow?.querySelectorAll('input[type="checkbox"]').length).toBe(4);
+      expect(modeBar?.querySelectorAll('input[type="checkbox"]').length).toBe(0);
+
+      // Toggle quick Visual Check checkbox and verify sync with config & settings checkbox
+      expect(visualCheckQuick?.checked).toBe(false);
+      visualCheckQuick?.click();
+      expect(visualCheckQuick?.checked).toBe(true);
+      expect(visualCheckSettings?.checked).toBe(true);
+      expect(app.service.aiAgent.getConfig().visualCritique).toBe(true);
+
+      // Verify AI Quick Prompts cover all modeling techniques and populate #aiPromptInput on click
+      const quickPromptChips = Array.from(
+        container.querySelectorAll<HTMLButtonElement>('#aiQuickPrompts .ai-prompt-chip[data-prompt]')
+      );
+      expect(quickPromptChips.length).toBe(10);
+      const techniques = quickPromptChips.map((c) => c.getAttribute('data-technique'));
+      expect(techniques).toEqual([
+        'sdf',
+        'clay_sphere',
+        'architecture',
+        'gothic',
+        'bevel',
+        'lathe',
+        'figure',
+        'csg',
+        'voxel',
+        'update',
+      ]);
+      const sdfChip = quickPromptChips[0];
+      sdfChip.click();
+      const promptInputCheck = container.querySelector('#aiPromptInput') as HTMLTextAreaElement;
+      expect(promptInputCheck.value).toContain('modeler_create_sdf_mesh');
+
+      // 2. Run a prompt with visualCritique enabled and verify:
+      //    Turn 1: builds initial mesh
+      //    Turn 2: returns no tool calls -> triggers Multi-View Visual Critique user message with 4-view image
+      //    Turn 3 (critique pass): same model inspects 4-view sheet and emits a corrective tool call
+      //    Turn 4: final summary
+      const modelsUsed: string[] = [];
+      const requestBodies: any[] = [];
+      let callIdx = 0;
+
+      const modelInput = container.querySelector('#aiModelInput') as HTMLInputElement | null;
+      if (modelInput) {
+        modelInput.value = 'gemini-3.8-flash-high';
+      }
+      app.service.aiAgent.saveConfig({ model: 'gemini-3.8-flash-high', visualCritique: true });
+      app.service.aiAgent.customFetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+        callIdx++;
+        const body = JSON.parse(String(init?.body || '{}'));
+        modelsUsed.push(body.model);
+        requestBodies.push(body);
+
+        if (callIdx === 1) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              choices: [
+                {
+                  message: {
+                    role: 'assistant',
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: 'call_init_1',
+                        type: 'function',
+                        function: {
+                          name: 'modeler_create_arch',
+                          arguments: JSON.stringify({
+                            name: 'Temple_Arch',
+                            style: 'round',
+                            span: 2.2,
+                          }),
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            }),
+          };
+        }
+
+        if (callIdx === 2) {
+          // Model finishes initial build -> AIAgentService will inject Multi-View Visual Critique turn next
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              choices: [
+                {
+                  message: {
+                    role: 'assistant',
+                    content: 'Initial arch constructed.',
+                  },
+                },
+              ],
+            }),
+          };
+        }
+
+        if (callIdx === 3) {
+          // Critique turn: model sees 4-view image and adds a roof during self-correction
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              choices: [
+                {
+                  message: {
+                    role: 'assistant',
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: 'call_fix_1',
+                        type: 'function',
+                        function: {
+                          name: 'modeler_create_roof',
+                          arguments: JSON.stringify({
+                            name: 'Temple_Gable_Roof',
+                            style: 'gable',
+                            width: 3.0,
+                            depth: 1.0,
+                            position: { x: 0, y: 3.2, z: 0 },
+                          }),
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            }),
+          };
+        }
+
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            choices: [
+              {
+                message: {
+                  role: 'assistant',
+                  content: 'Verified 4-view sheet and added the missing gable roof on top of the arch.',
+                },
+              },
+            ],
+          }),
+        };
+      });
+
+      const promptInput = container.querySelector('#aiPromptInput') as HTMLTextAreaElement;
+      promptInput.value = 'Build a temple arch with a gable roof';
+      await app.runAIAgentPrompt();
+
+      expect(callIdx).toBe(4);
+      // Verify the exact same model was used for both building and visual critique
+      expect(new Set(modelsUsed).size).toBe(1);
+      expect(modelsUsed[0]).toBe('gemini-3.8-flash-high');
+
+      // Verify Turn 3 received the [VISUAL CRITIQUE & SELF-CORRECTION PHASE] message and 4-view image_url
+      const critiqueTurnMessages = requestBodies[2].messages;
+      const lastMsg = critiqueTurnMessages[critiqueTurnMessages.length - 1];
+      expect(lastMsg.role).toBe('user');
+      expect(Array.isArray(lastMsg.content)).toBe(true);
+      expect(lastMsg.content[0].text).toContain('[VISUAL CRITIQUE & SELF-CORRECTION PHASE]');
+      expect(lastMsg.content[1].type).toBe('image_url');
+      expect(lastMsg.content[1].image_url.url).toContain('data:image/png');
+
+      // Both initial and self-corrected meshes exist in scene
+      expect(app.service.importedMeshes.some((m) => m.name === 'Temple_Arch')).toBe(true);
+      expect(app.service.importedMeshes.some((m) => m.name === 'Temple_Gable_Roof')).toBe(true);
+
+      app.dispose();
+      container.remove();
+    });
   });
 });
 

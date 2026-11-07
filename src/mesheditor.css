@@ -2943,6 +2943,18 @@ progress.loading-spinner:indeterminate {
   flex: 1;
 }
 
+.ai-checkbox-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .ai-checkbox-label {
   display: inline-flex;
   align-items: center;
@@ -3005,6 +3017,9 @@ progress.loading-spinner:indeterminate {
 }
 
 .ai-prompt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 2px 7px;
   font-size: 10px;
   border-radius: 999px;
@@ -3019,6 +3034,23 @@ progress.loading-spinner:indeterminate {
   background: rgba(88, 166, 255, 0.15);
   color: #fff;
   border-color: var(--accent-color);
+}
+
+.ai-chip-tag {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: rgba(88, 166, 255, 0.16);
+  color: #58a6ff;
+  line-height: 1.2;
+}
+
+.ai-prompt-chip:hover .ai-chip-tag {
+  background: rgba(88, 166, 255, 0.3);
+  color: #ffffff;
 }
 
 .ai-chat-log {

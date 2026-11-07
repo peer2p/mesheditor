@@ -201,3 +201,27 @@ Normal mapping simulates fine geometric crevices, pores, grooves, bevels, and bu
    - Ideal for vases, chalices, pillar bases, bottles, chess pieces, domes, or lamp shades. Define profile in the XY plane (`x >= 0` radius, `y` height).
 5. **Metallic & filigree structures**:
    - Use thin cylinders or `modeler_create_tube` for railings, frames, pipes, and cables. For realistic metal use `metallic: 0.8`, `roughness: 0.25`.
+
+## Parametric Architecture, Beveled Hard-Surface & Organic SDF Tools
+
+To avoid crude, wooden, or blocky results, prefer these high-level parametric tools over stacking un-beveled boxes:
+
+1. **Pre-Build Structural & Budget Planning (`modeler_plan_model`)**:
+   - Before building multi-part characters, creatures, or buildings, call `modeler_plan_model` to validate part hierarchy (`primary` 50–65% of triangles, `secondary` 25–35%, `tertiary` < 10–15%) and vertical grounding (`yRange`).
+   - Never assign more triangles to a tiny tertiary detail (like an eye, rivet, or doorknob) than to the torso or main wall. Pass `detailTier: "tertiary"` on small primitives.
+2. **Beveled Hard-Surface Boxes (`modeler_create_rounded_box` or `bevelRadius` on `modeler_create_primitive`)**:
+   - Real-world stone blocks, tabletops, steps, pedestals, and mechanical casings have beveled edges that catch specular light. Use `modeler_create_rounded_box` with `radius: 0.02` to `0.08` and `segments: 2` or `3`.
+3. **Architectural Walls with Cut Openings & Frames (`modeler_create_wall`)**:
+   - Creates a bottom-aligned wall (`Y = 0`) with rectangular, arched (`type: "arch"`), or circular (`type: "round"`) windows and doors cleanly cut through, complete with 3D beveled frames, base `plinthHeight`, and top `corniceHeight`.
+4. **Freestanding Arches & Portals (`modeler_create_arch`)**:
+   - Supports `"round"` (Roman), `"pointed"` (Gothic lancet), `"segmental"`, `"horseshoe"`, and `"flat"` arches with piers, plinth bases, impost capitals, voussoir ring, and protruding `keystone`.
+5. **Classical Fluted Columns with Entasis (`modeler_create_column`)**:
+   - Supports `"doric"`, `"tuscan"`, `"ionic"` (with volute scrolls), `"corinthian"`, and `"modern"` orders with square plinth, torus base, tapered entasis shaft with carved vertical concave `flutes`, echinus capital, and abacus.
+6. **Mitered Cornices, Baseboards & Moldings (`modeler_create_molding`)**:
+   - Sweeps a classical profile (`"cornice"`, `"ogee"`, `"cove"`, `"torus"`, `"baseboard"`, `"stepped"`) along a 3D `path` with exact 45-degree mitered corners (`closed: true` for building/room perimeters).
+7. **Straight & Spiral Staircases (`modeler_create_stairs`)**:
+   - Builds `"straight"` or `"spiral"` stairs with beveled treads, nosing overhang, risers/center column, and `"left"`, `"right"`, or `"both"` handrails.
+8. **Pitched, Hip, Mansard & Dome Roofs (`modeler_create_roof`)**:
+   - Builds `"gable"`, `"hip"`, `"pyramid"`, `"shed"`, or `"dome"` roofs with real fascia slab thickness, eaves `overhang`, ridge cap beam, and triangular gable infill walls. Place at `position: { x: 0, y: wallHeight, z: 0 }`.
+9. **Seamless Organic Clay / Metaball Meshes (`modeler_create_sdf_mesh`)**:
+   - Evaluates analytical Signed Distance Fields (`sphere`, `ellipsoid`, `round_cone`, `capsule`, `box`, `torus`, `cylinder`) with polynomial smooth union (`blend: 0.04` to `0.12`), smooth subtraction (`op: "subtract"`), `symmetryX: true`, and smooth vertex color blending.

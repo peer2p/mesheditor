@@ -160,6 +160,14 @@
               <div class="ai-slider-subtext">AI generates normal/bump maps for surface depth and relief when checked.</div>
             </div>
 
+            <div class="ai-form-group">
+              <label class="ai-checkbox-label" for="aiVisualCritiqueCheck" style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="aiVisualCritiqueCheck" />
+                <span><strong>Multi-View Visual Critique</strong></span>
+              </label>
+              <div class="ai-slider-subtext">Renders a 4-view + wireframe inspection sheet after modeling so the AI verifies and self-corrects proportions and polygon density.</div>
+            </div>
+
             <div class="ai-settings-actions" style="display: flex; gap: 8px;">
               <button type="button" class="tool-btn" id="btnCancelAISettings" style="flex: 1;">
                 <span class="btn-icon"><i class="app-icon" data-lucide="arrow-left"></i></span>
@@ -179,6 +187,10 @@
                 <option value="create_or_update">Create / Update in Scene</option>
                 <option value="replace_scene">Replace Scene (Clear First)</option>
               </select>
+            </div>
+
+            <!-- Dedicated Checkbox Options Row -->
+            <div class="ai-checkbox-row" id="aiCheckboxRow">
               <label class="ai-checkbox-label" title="Generate procedural and seamless textures on created meshes">
                 <input type="checkbox" id="aiCreateTexturesCheckQuick" checked />
                 <span>Textures</span>
@@ -186,6 +198,10 @@
               <label class="ai-checkbox-label" title="Generate normal/bump maps for surface micro-relief and depth">
                 <input type="checkbox" id="aiCreateNormalMapsCheckQuick" checked />
                 <span>Normal Maps</span>
+              </label>
+              <label class="ai-checkbox-label" title="Multi-View Visual Critique: AI inspects a 4-angle + wireframe render of its generation and self-corrects">
+                <input type="checkbox" id="aiVisualCritiqueCheckQuick" />
+                <span>Visual Check</span>
               </label>
               <label class="ai-checkbox-label" title="Send a screenshot of the current 3D viewport to the vision model">
                 <input type="checkbox" id="aiIncludeViewportCheck" />
@@ -199,14 +215,78 @@
               <button type="button" class="ai-link-btn" id="btnOpenAISettingsInline">Configure</button>
             </div>
 
-            <!-- Quick Example Prompts -->
+            <!-- Quick Example Prompts (Covering All Modeling Techniques & Motifs) -->
             <div class="ai-quick-prompts" id="aiQuickPrompts">
-              <button type="button" class="ai-prompt-chip" data-prompt="Build an ancient fluted stone pillar with a stepped base and capital.">Stone Pillar</button>
-              <button type="button" class="ai-prompt-chip" data-prompt="Create a metallic gear wheel with 12 teeth and a center bore.">Gear Wheel</button>
-              <button type="button" class="ai-prompt-chip" data-prompt="Build a medieval wooden treasure chest with golden trim.">Treasure Chest</button>
-              <button type="button" class="ai-prompt-chip" data-prompt="Build a detailed voxel knight helmet with visor.">Voxel Helmet</button>
-              <button type="button" class="ai-prompt-chip" data-prompt="Update the currently selected mesh: hollow it out with CSG and apply a polished marble material.">Mesh Update</button>
-              <button type="button" class="ai-prompt-chip" data-prompt="Build a stylized Super Mario 3D character with soft organic contours. Spawn the chibi base mesh with style 'organic' in T-Pose with colored materials. Model his iconic red cap with a front curved visor, add his curved mustache over the nose, and retopologize the final model to 15,000 triangles.">Mario in trunks</button>
+              <button
+                type="button"
+                class="ai-prompt-chip"
+                data-technique="sdf"
+                title="Technique: SDF Smooth Clay / Metaball Blending (modeler_create_sdf_mesh + Surface Nets)"
+                data-prompt="Plan with modeler_plan_model, then use modeler_create_sdf_mesh (resolution: 56, taubinIterations: 6) to sculpt a smooth, seamless baby dragon sitting on its hind legs. Blend ellipsoid and tapered capsule primitives with smooth union (op: 'union', k: 0.14) and mirrorX: true for the torso, belly, curved neck, snout, lower jaw, haunches, forelegs, bat-like wing arms, curved horns, and a curling tail. Carve shallow eye sockets with op: 'subtract', then add two small glossy eye spheres with modeler_create_primitive (detailTier: 'tertiary', diameter: 0.07) so the eyes use far fewer polygons than the body."
+              ><span class="ai-chip-tag">SDF</span>Dragon Whelp</button>
+              <button
+                type="button"
+                class="ai-prompt-chip"
+                data-technique="clay_sphere"
+                title="Technique: Digital Clay Sphere Sculpting with Directional Brush Strokes (sculpt_sphere + modeler_sculpt_mesh)"
+                data-prompt="Spawn a digital clay sphere using modeler_spawn_base_mesh (type: 'sculpt_sphere', name: 'Clay_Gargoyle_Bust'). Then sculpt an expressive stylized gargoyle head bust directly from the clay sphere using modeler_sculpt_mesh with symmetryX: true and subdivideIfCoarse: true: use directional 'grab' strokes (from -> to) to pull out the jaw, chin, cheekbones, pointed ears, and swept-back horns; use 'clay' and 'inflate' strokes to build the heavy brow ridge, nose bridge, and muzzle; use 'crease' strokes to carve the eye sockets and grinning mouth; and finish with 'smooth' and a weathered stone PBR material."
+              ><span class="ai-chip-tag">Clay</span>Sphere Bust</button>
+              <button
+                type="button"
+                class="ai-prompt-chip"
+                data-technique="architecture"
+                title="Technique: Parametric Classical Architecture (Columns, Cut-Window Wall, Stairs, Molding & Gable Roof)"
+                data-prompt="Plan with modeler_plan_model, then build a classical Greco-Roman temple portico using parametric architecture tools: 1) a stepped stone podium and front staircase with modeler_create_stairs (type: 'straight', width: 3.2, height: 0.6, depth: 1.2, steps: 6), 2) four fluted Ionic columns along the front porch using modeler_create_column (style: 'ionic', height: 3.0, radius: 0.22, flutes: 20, entasis: 0.04), 3) a sanctuary wall behind the columns using modeler_create_wall with an arched central doorway and two arched side windows with frames, plinth, and cornice, 4) a perimeter frieze with modeler_create_molding, and 5) a pitched terracotta roof with overhang using modeler_create_roof (style: 'gable')."
+              ><span class="ai-chip-tag">Arch</span>Temple Portico</button>
+              <button
+                type="button"
+                class="ai-prompt-chip"
+                data-technique="gothic"
+                title="Technique: Gothic Pointed Arches, Lancet Window Wall & Spiral Staircase"
+                data-prompt="Build a medieval Gothic courtyard ruin corner using parametric architecture tools: create two pointed stone archways with modeler_create_arch (style: 'pointed', span: 2.2, height: 3.4, keystone: true, impost: true), connect them to a stone wall using modeler_create_wall featuring two pointed Gothic lancet window openings (shape: 'pointed', hasFrame: true, hasSill: true) and a ground-level arched doorway, crown the wall with a stepped cornice via modeler_create_molding, and place a stone spiral staircase alongside it using modeler_create_stairs (type: 'spiral', height: 3.4, outerRadius: 1.3, turns: 1.25, centralColumn: true, railing: 'both')."
+              ><span class="ai-chip-tag">Gothic</span>Arch &amp; Spiral Stairs</button>
+              <button
+                type="button"
+                class="ai-prompt-chip"
+                data-technique="bevel"
+                title="Technique: Beveled Hard-Surface Modeling (modeler_create_rounded_box) + Proportional Detail Tiers"
+                data-prompt="Plan with modeler_plan_model, then build an ornate medieval oak and forged-iron treasure chest with smooth beveled edges: use modeler_create_rounded_box (bevelRadius: 0.04, bevelSegments: 3) for the wooden chest body, beveled iron corner brackets, and reinforcement straps. Add a vaulted barrel lid, a front brass lock plate with keyhole, and two curved side carry handles using modeler_create_tube. Keep small rivets and hinges in detailTier: 'tertiary' so they stay lightweight, and apply weathered oak and brushed gold PBR materials."
+              ><span class="ai-chip-tag">Bevel</span>Treasure Chest</button>
+              <button
+                type="button"
+                class="ai-prompt-chip"
+                data-technique="lathe"
+                title="Technique: Rotational Lathe Profile (modeler_create_lathe) + Swept Tube Filigree (modeler_create_tube)"
+                data-prompt="Build an ornate alchemist potion vessel using rotational and sweep modeling: 1) use modeler_create_lathe with a 12-point silhouette profile to turn a flared pedestal foot, a ribbed bulbous glass body, a slender collared neck, and a flared pouring lip, 2) create a glowing emissive mana core inside the bulb, 3) add a tapered cork stopper on top, and 4) sweep two S-curved golden filigree handles along the sides using modeler_create_tube."
+              ><span class="ai-chip-tag">Lathe</span>Alchemist Flask</button>
+              <button
+                type="button"
+                class="ai-prompt-chip"
+                data-technique="figure"
+                title="Technique: Anatomical Base Mesh + Sculpting + Beveled Armor + Quad Retopology"
+                data-prompt="Spawn an organic stylized character base mesh using modeler_spawn_base_mesh (type: 'chibi', pose: 'a_pose', style: 'organic', coloredMaterials: true). Refine the torso and facial planes using modeler_sculpt_mesh with symmetryX: true, then equip the character with beveled shoulder pauldrons and a belt buckle using modeler_create_rounded_box, a knight helmet visor, and a cape. Keep small rivets and buckles in detailTier: 'tertiary', and finish with modeler_retopologize_mesh (targetFaces: 12000, symmetryX: true)."
+              ><span class="ai-chip-tag">Figure</span>Stylized Knight</button>
+              <button
+                type="button"
+                class="ai-prompt-chip"
+                data-technique="csg"
+                title="Technique: CSG Boolean Subtraction + Radial Array (modeler_csg_boolean + modeler_clone_array)"
+                data-prompt="Build a precision steampunk planetary gear wheel assembly: create the main bronze gear rim, use modeler_csg_boolean (operation: 'subtract') to carve out a central shaft bore and 6 circular weight-reduction holes around the web, distribute 16 beveled gear teeth evenly around the outer perimeter using modeler_clone_array (mode: 'radial', count: 16), and add a central steel hub with small hex bolts (detailTier: 'tertiary')."
+              ><span class="ai-chip-tag">CSG</span>Planetary Gear</button>
+              <button
+                type="button"
+                class="ai-prompt-chip"
+                data-technique="voxel"
+                title="Technique: Multi-Material Voxel Grid with Interior Face Culling (modeler_build_voxel_mesh)"
+                data-prompt="Use modeler_build_voxel_mesh (voxelSize: 0.2) to construct a multi-material voxel floating island: build tapered dark-stone cliff layers underneath, grassy terraced terrain on top, a traditional red torii gate and stone lantern with a warm emissive light core, a cascading blue voxel waterfall on the front edge, and a cherry blossom tree with pink canopy clusters."
+              ><span class="ai-chip-tag">Voxel</span>Floating Island</button>
+              <button
+                type="button"
+                class="ai-prompt-chip"
+                data-technique="update"
+                title="Technique: Non-Destructive Scene Inspection, Bevel Detailing & CSG Refinement"
+                data-prompt="Inspect the currently selected mesh (or active scene): add beveled trim or architectural molding around its primary silhouette using modeler_create_rounded_box or modeler_create_molding, carve recessed surface details with modeler_csg_boolean, and upgrade its PBR materials with procedural surface textures and normal maps."
+              ><span class="ai-chip-tag">Edit</span>Mesh Update</button>
             </div>
 
             <!-- Chat & Tool Execution Log -->

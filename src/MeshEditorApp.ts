@@ -3989,6 +3989,8 @@ export class MeshEditorApp {
     const createTexturesCheckQuick = this.getElement<HTMLInputElement>('aiCreateTexturesCheckQuick');
     const createNormalMapsCheck = this.getElement<HTMLInputElement>('aiCreateNormalMapsCheck');
     const createNormalMapsCheckQuick = this.getElement<HTMLInputElement>('aiCreateNormalMapsCheckQuick');
+    const visualCritiqueCheck = this.getElement<HTMLInputElement>('aiVisualCritiqueCheck');
+    const visualCritiqueCheckQuick = this.getElement<HTMLInputElement>('aiVisualCritiqueCheckQuick');
 
     if (chatLog) {
       if (!chatLog.innerHTML.trim()) {
@@ -4165,6 +4167,24 @@ export class MeshEditorApp {
       syncNormalMaps(!!createNormalMapsCheckQuick.checked);
     });
 
+    const initialVisualCritique = !!initialConfig.visualCritique;
+    if (visualCritiqueCheck) visualCritiqueCheck.checked = initialVisualCritique;
+    if (visualCritiqueCheckQuick) visualCritiqueCheckQuick.checked = initialVisualCritique;
+
+    const syncVisualCritique = (enabled: boolean) => {
+      if (visualCritiqueCheck) visualCritiqueCheck.checked = enabled;
+      if (visualCritiqueCheckQuick) visualCritiqueCheckQuick.checked = enabled;
+      this.service.aiAgent.saveConfig({ visualCritique: enabled });
+      updateEndpointBadge();
+    };
+
+    visualCritiqueCheck?.addEventListener('change', () => {
+      syncVisualCritique(!!visualCritiqueCheck.checked);
+    });
+    visualCritiqueCheckQuick?.addEventListener('change', () => {
+      syncVisualCritique(!!visualCritiqueCheckQuick.checked);
+    });
+
     updateEndpointBadge();
     this.renderAISkills();
 
@@ -4250,12 +4270,16 @@ export class MeshEditorApp {
       const maxVal = maxPolyInput ? Math.max(minVal, Number(maxPolyInput.value) || 5000) : 5000;
       const createTex = createTexturesCheck ? !!createTexturesCheck.checked : true;
       const createNorm = createNormalMapsCheck ? !!createNormalMapsCheck.checked : true;
+      const visCritique = visualCritiqueCheck ? !!visualCritiqueCheck.checked : false;
 
       if (createTexturesCheckQuick && createTexturesCheck) {
         createTexturesCheckQuick.checked = createTexturesCheck.checked;
       }
       if (createNormalMapsCheckQuick && createNormalMapsCheck) {
         createNormalMapsCheckQuick.checked = createNormalMapsCheck.checked;
+      }
+      if (visualCritiqueCheckQuick && visualCritiqueCheck) {
+        visualCritiqueCheckQuick.checked = visualCritiqueCheck.checked;
       }
 
       this.service.aiAgent.saveConfig({
@@ -4266,6 +4290,7 @@ export class MeshEditorApp {
         maxPolygons: maxVal,
         createTextures: createTex,
         createNormalMaps: createNorm,
+        visualCritique: visCritique,
       });
       updateEndpointBadge();
       if (settingsStatus) settingsStatus.textContent = 'Saved ✓';
@@ -4539,6 +4564,7 @@ export class MeshEditorApp {
       this.getElement<HTMLElement>('aiEndpointSummaryText') || this.getElement<HTMLElement>('aiEndpointBadge');
     const actionModeSelect = this.getElement<HTMLSelectElement>('aiActionModeSelect');
     const includeViewportCheck = this.getElement<HTMLInputElement>('aiIncludeViewportCheck');
+    const visualCritiqueCheckQuick = this.getElement<HTMLInputElement>('aiVisualCritiqueCheckQuick');
 
     const promptText = (promptOverride !== undefined ? promptOverride : promptInput?.value || '').trim();
     const images = [...this.aiPendingImages];
@@ -4719,6 +4745,9 @@ export class MeshEditorApp {
         images,
         mode: modeVal,
         includeViewportSnapshot: !!includeViewportCheck?.checked,
+        visualCritique: visualCritiqueCheckQuick
+          ? !!visualCritiqueCheckQuick.checked
+          : this.service.aiAgent.getConfig().visualCritique,
         signal: this.aiAbortController.signal,
         onStep: (step: AIAgentToolExecutionStep) => {
           if (thinkingTextEl) {

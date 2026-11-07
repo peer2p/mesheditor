@@ -358,7 +358,7 @@ function buildAgyPromptFromOpenAI(messages, tools) {
 
   const imageInstruction =
     tempImageFiles.length > 0
-      ? `You may ONLY call your internal read_file tool on [${tempImageFiles.join(', ')}] to inspect the user's reference image. Do NOT call any other internal CLI/workspace tools (no run_command, no edit_file, etc.).`
+      ? `You may ONLY call your internal read_file tool on [${tempImageFiles.join(', ')}] to inspect the attached reference or 4-view visual critique image(s). Do NOT call any other internal CLI/workspace tools (no run_command, no edit_file, etc.).`
       : `CRITICAL: Do NOT call any internal CLI/workspace tools (do NOT call run_command, read_file, write_file, edit_file, etc.).`;
 
   sections.push(`=== OUTPUT FORMAT REQUIREMENT ===
@@ -374,9 +374,9 @@ Instead, respond ONLY with a single valid JSON object (no markdown prose outside
   ]
 }
 Rules for "tool_calls":
-1. To create or modify 3D meshes in the scene, populate "tool_calls" with one or more calls to the AVAILABLE 3D MODELER TOOLS listed above (e.g. "modeler_create_primitive", "modeler_extrude_polygon", "modeler_create_lathe", "modeler_boolean_operation", "modeler_create_material", "modeler_build_voxel_mesh", "modeler_execute_babylon_code", etc.).
+1. To create or modify 3D meshes in the scene, populate "tool_calls" with one or more calls to the AVAILABLE 3D MODELER TOOLS listed above (e.g. "modeler_plan_model", "modeler_create_sdf_mesh", "modeler_create_rounded_box", "modeler_create_wall", "modeler_create_arch", "modeler_create_column", "modeler_create_molding", "modeler_create_stairs", "modeler_create_roof", "modeler_sculpt_mesh", "modeler_create_primitive", "modeler_extrude_polygon", "modeler_create_lathe", "modeler_boolean_operation", "modeler_create_material", "modeler_build_voxel_mesh", "modeler_execute_babylon_code", etc.).
 2. You can emit multiple tool_calls in a single turn to build all parts of the requested 3D model at once, or inspect results across turns.
-3. If all required TOOL EXECUTION RESULTS are already present above and the 3D model is complete, set "tool_calls": [] and provide a concise final summary in "content".`);
+3. If all required TOOL EXECUTION RESULTS are already present above and the 3D model is complete (including any VISUAL CRITIQUE self-corrections), set "tool_calls": [] and provide a concise final summary in "content".`);
 
   return {
     prompt: sections.join('\n\n'),

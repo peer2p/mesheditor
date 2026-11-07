@@ -1,11 +1,66 @@
 import { Mesh, MeshBuilder } from '@babylonjs/core';
+import { createRoundedBoxMesh } from '../../geometry/roundedBox';
 import { AbstractTool } from '../AbstractTool';
 import { ToolExecutionContext } from '../ToolExecutionContext';
+
+/**
+ * Computes size-adaptive and budget-aware segment/tessellation counts when not explicitly provided.
+ * Prevents tiny tertiary details (such as eyeballs, buttons, or bolts) from consuming more polygons
+ * than primary structural volumes (such as a torso or hull).
+ */
+export function computeAdaptiveTessellation(
+  shapeType: string,
+  maxWorldDimension: number,
+  maxPolygonBudget = 5000,
+  detailTier?: string
+): number {
+  const tier = (detailTier || '').toLowerCase();
+  const budgetScale = maxPolygonBudget >= 20000 ? 1.35 : maxPolygonBudget <= 1500 ? 0.75 : 1.0;
+
+  if (shapeType === 'sphere') {
+    let baseSegs: number;
+    if (tier === 'tertiary' || maxWorldDimension <= 0.08) {
+      baseSegs = 4; // 144 triangles for tiny eyeballs, rivets, beads
+    } else if (maxWorldDimension <= 0.18) {
+      baseSegs = 6; // 256 triangles for small spheres/joints
+    } else if (tier === 'secondary' || maxWorldDimension <= 0.45) {
+      baseSegs = 12; // 784 triangles for medium volumes (heads, shoulders)
+    } else {
+      baseSegs = 16; // 1,296 triangles for large primary volumes
+    }
+    return Math.max(4, Math.min(32, Math.round(baseSegs * budgetScale)));
+  }
+
+  if (shapeType === 'torus' || shapeType === 'disc') {
+    let baseTess: number;
+    if (tier === 'tertiary' || maxWorldDimension <= 0.12) {
+      baseTess = 12;
+    } else if (tier === 'secondary' || maxWorldDimension <= 0.45) {
+      baseTess = 18;
+    } else {
+      baseTess = 24;
+    }
+    return Math.max(8, Math.min(48, Math.round(baseTess * budgetScale)));
+  }
+
+  // cylinder, cone, capsule
+  let baseTess: number;
+  if (tier === 'tertiary' || maxWorldDimension <= 0.1) {
+    baseTess = 8;
+  } else if (maxWorldDimension <= 0.25) {
+    baseTess = 12;
+  } else if (tier === 'secondary' || maxWorldDimension <= 0.6) {
+    baseTess = 16;
+  } else {
+    baseTess = 20;
+  }
+  return Math.max(6, Math.min(36, Math.round(baseTess * budgetScale)));
+}
 
 export class CreatePrimitiveTool extends AbstractTool {
   public readonly name = 'modeler_create_primitive';
   public readonly description =
-    'Creates a 3D primitive mesh (box, sphere, cylinder, cone, capsule, torus, torusKnot, plane, disc, ground, polyhedron) in the live Babylon.js scene.';
+    'Creates a 3D primitive mesh (box, sphere, cylinder, cone, capsule, torus, torusKnot, plane, disc, ground, polyhedron) in the live Babylon.js scene. Automatically adapts segment density to part size and polygon budget so tiny details (like eyes or bolts) stay lightweight while primary volumes stay smooth. Supports optional bevelRadius on boxes.';
 
   public readonly parameters = {
     type: 'object',
@@ -28,10 +83,21 @@ export class CreatePrimitiveTool extends AbstractTool {
         ],
         description: 'Primitive geometry type.',
       },
+      detailTier: {
+        type: 'string',
+        enum: ['primary', 'secondary', 'tertiary'],
+        description:
+          'Optional hierarchy tier: "primary" (torso, main body, building shell), "secondary" (limbs, medium parts), or "tertiary" (eyes, buttons, rivets, small trim). Controls automatic segment allocation.',
+      },
+      bevelRadius: {
+        type: 'number',
+        description:
+          'Optional edge bevel/rounding radius in meters for type="box" (e.g. 0.03) so edges catch specular highlights instead of looking razor-sharp.',
+      },
       options: {
         type: 'object',
         description:
-          'Babylon.js MeshBuilder options: width, height, depth, size, diameter, diameterTop, diameterBottom, thickness, tessellation, segments, subdivisions, polyType (0-4), arc, slice.',
+          'Babylon.js MeshBuilder options: width, height, depth, size, diameter, diameterTop, diameterBottom, thickness, tessellation, segments, subdivisions, polyType (0-4), arc, slice, bevelRadius.',
         properties: {
           width: { type: 'number' },
           height: { type: 'number' },
@@ -47,6 +113,7 @@ export class CreatePrimitiveTool extends AbstractTool {
           polyType: { type: 'number' },
           arc: { type: 'number' },
           slice: { type: 'number' },
+          bevelRadius: { type: 'number' },
         },
       },
       position: {
@@ -86,78 +153,110 @@ export class CreatePrimitiveTool extends AbstractTool {
       ? `${baseName}_${Date.now().toString().slice(-4)}`
       : baseName;
 
+    // Determine effective world scale to drive size-adaptive tessellation
+    const sc = args.scaling
+      ? Array.isArray(args.scaling)
+        ? [Number(args.scaling[0] ?? 1) || 1, Number(args.scaling[1] ?? 1) || 1, Number(args.scaling[2] ?? 1) || 1]
+        : [Number(args.scaling.x ?? 1) || 1, Number(args.scaling.y ?? 1) || 1, Number(args.scaling.z ?? 1) || 1]
+      : [1, 1, 1];
+    const maxScale = Math.max(Math.abs(sc[0]), Math.abs(sc[1]), Math.abs(sc[2]));
+    const budget = context.aiAgent?.config?.maxPolygons ?? 5000;
+    const detailTier = opts.detailTier;
+
     let mesh: Mesh;
     switch (type) {
-      case 'sphere':
+      case 'sphere': {
+        const diam = opts.diameter ?? opts.size ?? 1;
+        const dx = opts.width ?? diam;
+        const dy = opts.height ?? diam;
+        const dz = opts.depth ?? diam;
+        const maxWorldDim = Math.max(dx * Math.abs(sc[0]), dy * Math.abs(sc[1]), dz * Math.abs(sc[2]));
+        const adaptiveSegs = computeAdaptiveTessellation('sphere', maxWorldDim, budget, detailTier);
         mesh = MeshBuilder.CreateSphere(
           uniqueName,
           {
-            diameter: opts.diameter ?? opts.size ?? 1,
+            diameter: diam,
             diameterX: opts.width,
             diameterY: opts.height,
             diameterZ: opts.depth,
-            segments: opts.segments ?? opts.tessellation ?? 24,
+            segments: opts.segments ?? opts.tessellation ?? adaptiveSegs,
             arc: opts.arc,
             slice: opts.slice,
           },
           context.scene
         );
         break;
-      case 'cylinder':
+      }
+      case 'cylinder': {
+        const diam = opts.diameter ?? opts.size ?? 1;
+        const dTop = opts.diameterTop ?? diam;
+        const dBot = opts.diameterBottom ?? diam;
+        const maxRadiusDim = Math.max(dTop, dBot) * maxScale;
+        const adaptiveTess = computeAdaptiveTessellation('cylinder', maxRadiusDim, budget, detailTier);
         mesh = MeshBuilder.CreateCylinder(
           uniqueName,
           {
             height: opts.height ?? 2,
-            diameter: opts.diameter ?? opts.size ?? 1,
+            diameter: diam,
             diameterTop: opts.diameterTop,
             diameterBottom: opts.diameterBottom,
-            tessellation: opts.tessellation ?? opts.segments ?? 24,
+            tessellation: opts.tessellation ?? opts.segments ?? adaptiveTess,
             arc: opts.arc,
           },
           context.scene
         );
         break;
-      case 'cone':
+      }
+      case 'cone': {
+        const dBot = opts.diameterBottom ?? opts.diameter ?? opts.size ?? 1;
+        const adaptiveTess = computeAdaptiveTessellation('cone', dBot * maxScale, budget, detailTier);
         mesh = MeshBuilder.CreateCylinder(
           uniqueName,
           {
             height: opts.height ?? 2,
             diameterTop: opts.diameterTop ?? 0,
-            diameterBottom: opts.diameterBottom ?? opts.diameter ?? opts.size ?? 1,
-            tessellation: opts.tessellation ?? 24,
+            diameterBottom: dBot,
+            tessellation: opts.tessellation ?? opts.segments ?? adaptiveTess,
           },
           context.scene
         );
         break;
-      case 'capsule':
+      }
+      case 'capsule': {
+        const diam = opts.diameter ?? opts.size ?? 1;
+        const adaptiveTess = computeAdaptiveTessellation('capsule', diam * maxScale, budget, detailTier);
         mesh = MeshBuilder.CreateCapsule(
           uniqueName,
           {
             height: opts.height ?? 2,
-            radius: (opts.diameter ?? opts.size ?? 1) * 0.5,
-            tessellation: opts.tessellation ?? 24,
+            radius: diam * 0.5,
+            tessellation: opts.tessellation ?? opts.segments ?? adaptiveTess,
           },
           context.scene
         );
         break;
-      case 'torus':
+      }
+      case 'torus': {
+        const diam = opts.diameter ?? opts.size ?? 1;
+        const adaptiveTess = computeAdaptiveTessellation('torus', diam * maxScale, budget, detailTier);
         mesh = MeshBuilder.CreateTorus(
           uniqueName,
           {
-            diameter: opts.diameter ?? opts.size ?? 1,
-            thickness: opts.thickness ?? (opts.diameter ?? 1) * 0.25,
-            tessellation: opts.tessellation ?? 32,
+            diameter: diam,
+            thickness: opts.thickness ?? diam * 0.25,
+            tessellation: opts.tessellation ?? opts.segments ?? adaptiveTess,
           },
           context.scene
         );
         break;
+      }
       case 'torusknot':
         mesh = MeshBuilder.CreateTorusKnot(
           uniqueName,
           {
             radius: (opts.diameter ?? opts.size ?? 1) * 0.4,
             tube: opts.thickness ?? 0.12,
-            radialSegments: opts.tessellation ?? 64,
+            radialSegments: opts.tessellation ?? 48,
           },
           context.scene
         );
@@ -172,16 +271,19 @@ export class CreatePrimitiveTool extends AbstractTool {
           context.scene
         );
         break;
-      case 'disc':
+      case 'disc': {
+        const diam = opts.diameter ?? opts.size ?? 1;
+        const adaptiveTess = computeAdaptiveTessellation('disc', diam * maxScale, budget, detailTier);
         mesh = MeshBuilder.CreateDisc(
           uniqueName,
           {
-            radius: (opts.diameter ?? opts.size ?? 1) * 0.5,
-            tessellation: opts.tessellation ?? 32,
+            radius: diam * 0.5,
+            tessellation: opts.tessellation ?? opts.segments ?? adaptiveTess,
           },
           context.scene
         );
         break;
+      }
       case 'ground':
         mesh = MeshBuilder.CreateGround(
           uniqueName,
@@ -204,17 +306,33 @@ export class CreatePrimitiveTool extends AbstractTool {
         );
         break;
       case 'box':
-      default:
-        mesh = MeshBuilder.CreateBox(
-          uniqueName,
-          {
-            width: opts.width ?? opts.size ?? 1,
-            height: opts.height ?? opts.size ?? 1,
-            depth: opts.depth ?? opts.size ?? 1,
-          },
-          context.scene
-        );
+      default: {
+        const bevelRadius = Number(opts.bevelRadius ?? opts.rounding ?? 0);
+        if (bevelRadius > 0) {
+          mesh = createRoundedBoxMesh(
+            uniqueName,
+            {
+              width: opts.width ?? opts.size ?? 1,
+              height: opts.height ?? opts.size ?? 1,
+              depth: opts.depth ?? opts.size ?? 1,
+              radius: bevelRadius,
+              segments: opts.segments ?? 2,
+            },
+            context.scene
+          );
+        } else {
+          mesh = MeshBuilder.CreateBox(
+            uniqueName,
+            {
+              width: opts.width ?? opts.size ?? 1,
+              height: opts.height ?? opts.size ?? 1,
+              depth: opts.depth ?? opts.size ?? 1,
+            },
+            context.scene
+          );
+        }
         break;
+      }
     }
 
     mesh.material = context.getOrCreateMaterial(
@@ -231,6 +349,8 @@ export class CreatePrimitiveTool extends AbstractTool {
     return JSON.stringify({
       status: 'ok',
       meshName: mesh.name,
+      vertices: mesh.getTotalVertices(),
+      triangles: Math.floor(mesh.getTotalIndices() / 3),
       bounds: {
         min: {
           x: Number(bb.minimumWorld.x.toFixed(3)),
@@ -246,4 +366,3 @@ export class CreatePrimitiveTool extends AbstractTool {
     });
   }
 }
-

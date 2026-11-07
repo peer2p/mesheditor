@@ -61,6 +61,7 @@ export const DEFAULT_AI_AGENT_CONFIG: AIAgentEndpointConfig = {
   maxPolygons: 5000,
   createTextures: true,
   createNormalMaps: true,
+  visualCritique: false,
 };
 
 export interface EndpointPreset {
@@ -245,6 +246,8 @@ export class AIAgentService {
           typeof parsed.createTextures === 'boolean' ? parsed.createTextures : DEFAULT_AI_AGENT_CONFIG.createTextures,
         createNormalMaps:
           typeof parsed.createNormalMaps === 'boolean' ? parsed.createNormalMaps : DEFAULT_AI_AGENT_CONFIG.createNormalMaps,
+        visualCritique:
+          typeof parsed.visualCritique === 'boolean' ? parsed.visualCritique : DEFAULT_AI_AGENT_CONFIG.visualCritique,
       };
     } catch {
       return {};
@@ -452,6 +455,150 @@ export class AIAgentService {
     return null;
   }
 
+  /**
+   * Renders a 4-panel multi-view inspection sheet (1. Front, 2. Right Side, 3. 3/4 Perspective, 4. 3/4 Wireframe/Topology)
+   * into a composite PNG data URL so the AI model can visually critique proportions, alignment, and polygon density.
+   */
+  public captureMultiViewDataUrl(): string | null {
+    const cam = this.service.camera;
+    const validMeshes = this.service.importedMeshes.filter(
+      (m) => !this.service.isEditorHelper(m) && !m.isDisposed() && m.isVisible
+    );
+
+    // Compute scene bounding box
+    let min = new Vector3(Infinity, Infinity, Infinity);
+    let max = new Vector3(-Infinity, -Infinity, -Infinity);
+    for (const m of validMeshes) {
+      m.computeWorldMatrix(true);
+      const bb = m.getBoundingInfo()?.boundingBox;
+      if (bb && Number.isFinite(bb.minimumWorld.x) && Number.isFinite(bb.maximumWorld.x)) {
+        min = Vector3.Minimize(min, bb.minimumWorld);
+        max = Vector3.Maximize(max, bb.maximumWorld);
+      }
+    }
+    if (!Number.isFinite(min.x)) {
+      min = new Vector3(-1, 0, -1);
+      max = new Vector3(1, 2, 1);
+    }
+
+    const center = min.add(max).scale(0.5);
+    const size = max.subtract(min);
+    const radius = Math.max(Vector3.Distance(min, max) * 0.5, 0.5);
+    const vFov = cam?.fov || 0.8;
+    const dist = Math.max(( radius / Math.sin(vFov * 0.5) ) * 1.1, Math.max(size.x, size.y, size.z) * 1.45, 1.5);
+
+    const savedPos = cam ? cam.position.clone() : Vector3.Zero();
+    const savedRot = cam ? cam.rotation.clone() : Vector3.Zero();
+    const savedWireframe = new Map<Material, boolean>();
+    for (const m of validMeshes) {
+      if (m.material && !savedWireframe.has(m.material)) {
+        savedWireframe.set(m.material, !!m.material.wireframe);
+      }
+    }
+
+    const views: Array<{ label: string; pos: Vector3; wireframe: boolean }> = [
+      {
+        label: '1. FRONT (+Z)',
+        pos: new Vector3(center.x, center.y + dist * 0.12, center.z - dist),
+        wireframe: false,
+      },
+      {
+        label: '2. RIGHT SIDE (+X)',
+        pos: new Vector3(center.x + dist, center.y + dist * 0.12, center.z),
+        wireframe: false,
+      },
+      {
+        label: '3. 3/4 PERSPECTIVE',
+        pos: new Vector3(center.x + dist * 0.68, center.y + dist * 0.52, center.z - dist * 0.68),
+        wireframe: false,
+      },
+      {
+        label: '4. 3/4 WIREFRAME (DENSITY)',
+        pos: new Vector3(center.x - dist * 0.68, center.y + dist * 0.52, center.z - dist * 0.68),
+        wireframe: true,
+      },
+    ];
+
+    try {
+      if (typeof document !== 'undefined' && this.service.canvas) {
+        const sheet = document.createElement('canvas');
+        const quadW = 400;
+        const quadH = 300;
+        sheet.width = quadW * 2;
+        sheet.height = quadH * 2;
+        let ctx: CanvasRenderingContext2D | null = null;
+        try {
+          ctx = sheet.getContext('2d');
+        } catch {
+          ctx = null;
+        }
+
+        if (ctx) {
+          ctx.fillStyle = '#0d1117';
+          ctx.fillRect(0, 0, sheet.width, sheet.height);
+
+          for (let i = 0; i < views.length; i++) {
+            const v = views[i];
+            if (cam) {
+              cam.rotationQuaternion = null;
+              cam.position.copyFrom(v.pos);
+              cam.setTarget(center);
+            }
+            for (const [mat, origWf] of savedWireframe.entries()) {
+              mat.wireframe = v.wireframe ? true : origWf;
+            }
+            this.service.scene.render();
+
+            const qx = (i % 2) * quadW;
+            const qy = Math.floor(i / 2) * quadH;
+            try {
+              ctx.drawImage(this.service.canvas, qx, qy, quadW, quadH);
+            } catch {
+              // ignore drawImage error on headless mock canvas
+            }
+
+            // Draw quadrant border & label badge
+            ctx.strokeStyle = 'rgba(88, 166, 255, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(qx + 1, qy + 1, quadW - 2, quadH - 2);
+            ctx.fillStyle = 'rgba(13, 17, 23, 0.82)';
+            ctx.fillRect(qx + 8, qy + 8, 190, 22);
+            ctx.fillStyle = '#58a6ff';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText(v.label, qx + 14, qy + 23);
+          }
+
+          const compositeUrl = sheet.toDataURL('image/png');
+          if (compositeUrl && compositeUrl.startsWith('data:image/')) {
+            return compositeUrl;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[AIAgentService] Multi-view composite capture fallback:', err);
+    } finally {
+      for (const [mat, origWf] of savedWireframe.entries()) {
+        mat.wireframe = origWf;
+      }
+      if (cam) {
+        cam.rotationQuaternion = null;
+        cam.position.copyFrom(savedPos);
+        cam.rotation.copyFrom(savedRot);
+      }
+      try {
+        this.service.scene.render();
+      } catch {
+        // ignore
+      }
+    }
+
+    // Fallback to single viewport capture or minimal 1x1 PNG in headless test mode
+    return (
+      this.captureViewportDataUrl() ||
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+    );
+  }
+
   /* =========================================================================
      SYSTEM PROMPT & SCENE CONTEXT BUILDER
      ========================================================================= */
@@ -460,7 +607,7 @@ export class AIAgentService {
       (m) => !this.service.isEditorHelper(m) && !m.isDisposed()
     );
 
-    const meshes = validMeshes.map((m) => {
+    const rawMeshes = validMeshes.map((m) => {
       m.computeWorldMatrix(true);
       const bb = m.getBoundingInfo()?.boundingBox;
       const min = bb?.minimumWorld || Vector3.Zero();
@@ -495,13 +642,16 @@ export class AIAgentService {
         };
       }
 
+      const triangles = Math.floor(m.getTotalIndices() / 3);
+      const volumeApprox = Math.max(1e-6, Math.abs(size.x * size.y * size.z));
+
       return {
         name: m.name,
         visible: m.isVisible,
         isSelected: this.service.selectedNodes.includes(m) || this.service.selectedMesh === m,
         parentGroup: m.parent && this.service.isGroupNode(m.parent) ? m.parent.name : null,
         vertices: m.getTotalVertices(),
-        triangles: Math.floor(m.getTotalIndices() / 3),
+        triangles,
         subMeshesCount: m.subMeshes?.length || 1,
         position: {
           x: Number(m.position.x.toFixed(3)),
@@ -524,9 +674,46 @@ export class AIAgentService {
           size: { x: Number(size.x.toFixed(3)), y: Number(size.y.toFixed(3)), z: Number(size.z.toFixed(3)) },
           center: { x: Number(center.x.toFixed(3)), y: Number(center.y.toFixed(3)), z: Number(center.z.toFixed(3)) },
         },
+        volumeApprox: Number(volumeApprox.toFixed(4)),
         material: matSummary,
       };
     });
+
+    const totalSceneTriangles = rawMeshes.reduce((acc, m) => acc + m.triangles, 0);
+    const meshes = rawMeshes.map((m) => ({
+      ...m,
+      triangleSharePercent:
+        totalSceneTriangles > 0 ? Number(((m.triangles / totalSceneTriangles) * 100).toFixed(1)) : 0,
+    }));
+
+    // Compute automatic topology & proportion diagnostics
+    const proportionWarnings: string[] = [];
+    if (meshes.length >= 2) {
+      const sortedByVol = [...meshes].sort((a, b) => b.volumeApprox - a.volumeApprox);
+      const primary = sortedByVol[0];
+      for (const m of meshes) {
+        if (
+          m.name !== primary.name &&
+          m.volumeApprox < primary.volumeApprox * 0.08 &&
+          m.triangles > primary.triangles
+        ) {
+          proportionWarnings.push(
+            `Disproportionate polygon density: small detail "${m.name}" (${m.triangles} tris) has more polygons than primary volume "${primary.name}" (${primary.triangles} tris).`
+          );
+        }
+      }
+    }
+
+    const minPoly = typeof this.config.minPolygons === 'number' ? this.config.minPolygons : 200;
+    const maxPoly = typeof this.config.maxPolygons === 'number' ? this.config.maxPolygons : 5000;
+    const budgetStatus =
+      totalSceneTriangles === 0
+        ? 'empty'
+        : totalSceneTriangles < minPoly
+          ? 'below_minimum'
+          : totalSceneTriangles > maxPoly
+            ? 'exceeds_maximum'
+            : 'within_budget';
 
     const groups = this.service.groups
       .filter((g) => !g.isDisposed())
@@ -540,8 +727,13 @@ export class AIAgentService {
 
     return {
       totalMeshes: meshes.length,
+      totalSceneTriangles,
       selectedMeshNames: this.service.selectedNodes.map((n) => n.name),
       activeMeshName: this.service.selectedMesh?.name || null,
+      diagnostics: {
+        budgetStatus,
+        proportionWarnings,
+      },
       groups,
       meshes,
     };
@@ -584,12 +776,17 @@ ${sceneStateJson}
 1. **Actively call the provided tools** to create or modify geometry in the scene! Never reply with text alone when the user requests a 3D model or modification.
 2. **Descriptive Naming**: Give every created mesh and material a meaningful name (e.g., \`"stone_pillar_base"\`, \`"gear_wheel"\`, \`"oak_wood_mat"\`).
 ${textureRule}
-4. **Complex Geometries**: For complex, parametric, or multi-loop models (e.g. gears, multi-column temples, stairs, detailed furniture/castles/vehicles), you can either combine multiple tool calls or use \`modeler_execute_babylon_code\`.
+4. **Right Tool for the Job (Avoid Wooden / Blocky Results)**:
+   - **Organic, Characters, Creatures & Smooth Clay**: Use \`modeler_create_sdf_mesh\` (smooth polynomial union/subtraction of spheres, ellipsoids, tapered round_cones, and capsules with \`symmetryX: true\`) for seamless, watertight organic bodies, busts, and limbs, OR \`modeler_spawn_base_mesh\` + \`modeler_sculpt_mesh\`.
+   - **Explicit Clay Sphere Requests**: If the user explicitly asks to sculpt or model from a clay sphere, ALWAYS honor the request! Call \`modeler_spawn_base_mesh\` with \`type: "sculpt_sphere"\` and shape it using \`modeler_sculpt_mesh\` (using \`"grab"\`, \`"clay"\`, \`"inflate"\`, \`"pinch"\`, \`"flatten"\`, \`"smooth"\` with \`from\`/\`to\` paths) and/or \`modeler_create_sdf_mesh\`.
+   - **Architecture & Hard-Surface**: Prefer high-level architectural tools (\`modeler_create_wall\` with window/door \`openings\`, \`modeler_create_arch\`, \`modeler_create_column\`, \`modeler_create_molding\`, \`modeler_create_stairs\`, \`modeler_create_roof\`, and \`modeler_create_rounded_box\` for beveled masonry/furniture) instead of raw un-beveled boxes.
+   - **Complex Multi-Part Planning**: For multi-part characters, creatures, or buildings, call \`modeler_plan_model\` first to verify proportional hierarchy, vertical grounding, and per-part polygon budgets.
 5. **Concise Summary at the End**: When all tool calls are completed, explain concisely to the user what you built or updated.
-6. **Polygon Budget & Detail Target (Game Asset)**:
+6. **Polygon Budget & Proportional Density (Game Asset)**:
    - Target Polygon Budget: **${minPoly.toLocaleString()} to ${maxPoly.toLocaleString()} triangles**.
-   - **Minimum Polygons (${minPoly.toLocaleString()})**: Ensure the asset has sufficient geometric definition, bevels, segments, or facets to meet or exceed this baseline without being an oversimplified flat shape.
-   - **Maximum Polygons (${maxPoly.toLocaleString()})**: Do NOT exceed this limit! Use clean game-ready topology and keep the total triangle count strictly within this budget.`;
+   - **Proportional Density Rule**: Primary volumes (torso, head, main walls, roof) must receive **50–65%** of the polygon budget; Secondary parts (limbs, columns, arches) **25–35%**; Tertiary details (eyes, pupils, buttons, bolts, rivets, fingers) **< 10–15%**. NEVER give a small detail (such as an eye) more triangles than the torso or main body! Use \`detailTier: "tertiary"\` or low \`segments\` (6–8) on small spheres/cylinders.
+   - **Minimum Polygons (${minPoly.toLocaleString()})**: Ensure the asset has sufficient geometric definition, bevels, segments, or facets to meet or exceed this baseline.
+   - **Maximum Polygons (${maxPoly.toLocaleString()})**: Do NOT exceed this limit! Use \`modeler_retopologize_mesh\` if a high-poly sculpt or SDF mesh exceeds the budget.`;
   }
 
   /* =========================================================================
@@ -886,6 +1083,9 @@ ${textureRule}
 
     const executedSteps: AIAgentToolExecutionStep[] = [];
     const maxIterations = Math.max(1, Math.min(25, this.config.maxIterations || 12));
+    const enableVisualCritique =
+      options.visualCritique !== undefined ? options.visualCritique : !!this.config.visualCritique;
+    let critiqueCompleted = false;
     let finalAssistantText = '';
     let toolsSupported = true;
 
@@ -1027,6 +1227,73 @@ ${textureRule}
           }
           this.service.updateStats();
           this.service.events.onSceneModified?.();
+        }
+
+        // Optional Multi-View Visual Critique & Self-Correction Phase (uses the same active 3D model)
+        if (
+          enableVisualCritique &&
+          !critiqueCompleted &&
+          executedSteps.length > 0 &&
+          iteration + 1 < maxIterations
+        ) {
+          critiqueCompleted = true;
+          options.onStatus?.('Visual critique: rendering 4-view + wireframe sheet for inspection...');
+
+          const multiViewUrl = this.captureMultiViewDataUrl();
+          const summary = this.buildSceneSummary();
+          const minPoly = typeof this.config.minPolygons === 'number' ? this.config.minPolygons : 200;
+          const maxPoly = typeof this.config.maxPolygons === 'number' ? this.config.maxPolygons : 5000;
+
+          if (assistantContent) {
+            apiMessages.push({
+              role: 'assistant',
+              content: assistantContent,
+            });
+          }
+
+          const critiqueText = `[VISUAL CRITIQUE & SELF-CORRECTION PHASE]
+Inspect the attached 4-view render sheet (1. Front, 2. Right Side, 3. 3/4 Perspective, 4. 3/4 Wireframe/Topology) and the 3D Scene Diagnostics below against the user's request: "${prompt || 'Reference image reconstruction'}".
+
+Scene Diagnostics:
+${JSON.stringify(
+  {
+    totalSceneTriangles: summary.totalSceneTriangles,
+    targetBudget: { minPolygons: minPoly, maxPolygons: maxPoly },
+    diagnostics: summary.diagnostics,
+    meshes: (summary.meshes || []).map((m: any) => ({
+      name: m.name,
+      triangles: m.triangles,
+      triangleSharePercent: m.triangleSharePercent,
+      worldBounds: m.worldBounds,
+    })),
+  },
+  null,
+  2
+)}
+
+Evaluate all 4 criteria:
+1. Silhouette & Organic/Architectural Quality: Does the model look natural and detailed rather than blocky or wooden?
+2. Alignment & Grounding: Are any parts floating, detached, or mispositioned in the Front/Side views?
+3. Proportional Polygon Density (Wireframe View): Does any small detail (such as an eye, button, or trim) have more triangles than the torso/main body, or is total triangle count outside the budget?
+4. Completeness: Are all requested features and materials present?
+
+If you detect ANY issues or warnings above, call the appropriate \`modeler_*\` tools NOW to fix them (e.g. transform mispositioned parts, replace disproportionate primitives, smooth/sculpt wooden forms, or retopologize). If the model is already well-proportioned and complete, reply with a concise final summary and no tool calls.`;
+
+          if (multiViewUrl) {
+            apiMessages.push({
+              role: 'user',
+              content: [
+                { type: 'text', text: critiqueText },
+                { type: 'image_url', image_url: { url: multiViewUrl } },
+              ],
+            });
+          } else {
+            apiMessages.push({
+              role: 'user',
+              content: critiqueText,
+            });
+          }
+          continue;
         }
 
         // No more tool calls -> finished!

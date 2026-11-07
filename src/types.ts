@@ -86,6 +86,7 @@ export interface AIAgentEndpointConfig {
   maxPolygons?: number;
   createTextures?: boolean;
   createNormalMaps?: boolean;
+  visualCritique?: boolean;
 }
 
 export interface AIAgentSkillDefinition {
@@ -119,6 +120,7 @@ export interface AIAgentRequestOptions {
   images?: string[];
   mode?: 'create_or_update' | 'replace_scene';
   includeViewportSnapshot?: boolean;
+  visualCritique?: boolean;
   signal?: AbortSignal;
   onStep?: (step: AIAgentToolExecutionStep) => void;
   onStatus?: (statusText: string) => void;

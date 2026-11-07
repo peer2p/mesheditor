@@ -103,18 +103,27 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
   });
 
   describe('2. ToolRegistry Management', () => {
-    it('initializes default registry with all 28 built-in modeling tools', () => {
+    it('initializes default registry with all 37 built-in modeling tools', () => {
       const registry = createDefaultToolRegistry();
       const allTools = registry.getAll();
 
-      expect(allTools.length).toBe(28);
+      expect(allTools.length).toBe(37);
       expect(registry.has('modeler_get_scene_info')).toBe(true);
+      expect(registry.has('modeler_plan_model')).toBe(true);
       expect(registry.has('modeler_create_primitive')).toBe(true);
+      expect(registry.has('modeler_create_rounded_box')).toBe(true);
+      expect(registry.has('modeler_create_sdf_mesh')).toBe(true);
       expect(registry.has('modeler_extrude_polygon')).toBe(true);
       expect(registry.has('modeler_extrude_shape')).toBe(true);
       expect(registry.has('modeler_create_lathe')).toBe(true);
       expect(registry.has('modeler_create_tube')).toBe(true);
       expect(registry.has('modeler_boolean_operation')).toBe(true);
+      expect(registry.has('modeler_create_wall')).toBe(true);
+      expect(registry.has('modeler_create_arch')).toBe(true);
+      expect(registry.has('modeler_create_column')).toBe(true);
+      expect(registry.has('modeler_create_molding')).toBe(true);
+      expect(registry.has('modeler_create_stairs')).toBe(true);
+      expect(registry.has('modeler_create_roof')).toBe(true);
       expect(registry.has('modeler_create_material')).toBe(true);
       expect(registry.has('modeler_apply_material')).toBe(true);
       expect(registry.has('modeler_auto_uv_mapping')).toBe(true);
@@ -138,7 +147,7 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       expect(registry.has('modeler_sculpt_mesh')).toBe(true);
 
       const openAiDefs = registry.getOpenAITools();
-      expect(openAiDefs.length).toBe(28);
+      expect(openAiDefs.length).toBe(37);
       expect(openAiDefs.every((d) => d.type === 'function' && typeof d.function.name === 'string')).toBe(true);
     });
 
