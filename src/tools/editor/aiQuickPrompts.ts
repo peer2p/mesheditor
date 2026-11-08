@@ -162,7 +162,56 @@ export const AI_QUICK_PROMPTS: AIQuickPrompt[] = [
     description: 'Stylized character with custom sculpted bathrobe and belt sash',
     prompt:
       "Spawn a chibi character base mesh using modeler_spawn_base_mesh (type: 'chibi', pose: 'a_pose', style: 'organic'). Sculpt a plush wrap-around bathrobe over the character body using modeler_sculpt_mesh: build a thick draped shawl collar around the neck, add a tied waist belt sash with dangling knot ends, sculpt soft fabric folds around the sleeves, and apply a cozy warm fleece PBR material.",
-
+  },
+  {
+    id: 'scifi_crate_bevel',
+    title: 'Beveled Sci-Fi Crate',
+    technique: 'bevel_modifier',
+    tag: 'Bevel',
+    category: 'Hard-Surface & CSG',
+    description: 'Non-destructive CSG boolean carving with chamfer & fillet live bevel modifier',
+    prompt:
+      "Plan with modeler_plan_model, then build a modular sci-fi armor transport crate using non-destructive CSG booleans and live edge beveling: 1) create the base container using modeler_create_rounded_box, 2) carve recessed panel insets on the top and sides using modeler_boolean_operation (operation: 'subtract', nonDestructive: true, bevelWidth: 0.04, bevelSegments: 2, bevelProfile: 'chamfer') so the carved edges catch specular glints cleanly, 3) add reinforced corner brackets and magnetic latch handles using modeler_create_tube, and 4) finish with a dark gunmetal and safety hazard orange PBR material with metallic: 0.85 and roughness: 0.28.",
+  },
+  {
+    id: 'shrinkwrap_quad_retopo',
+    title: 'Shrinkwrap & Quad Retopo',
+    technique: 'retopology',
+    tag: 'Retopo',
+    category: 'Game Retopology',
+    description: 'High-poly sculpt surface projection with Shrinkwrap modifier & quad-flow cage',
+    prompt:
+      "Spawn an organic creature sculpt using modeler_spawn_base_mesh (type: 'creature', name: 'Alien_HighPoly'). Then demonstrate clean game retopology: 1) generate a low-poly structured quad-cage around the sculpt using modeler_retopologize_mesh (mode: 'quad_cage', meshName: 'Alien_HighPoly', rings: 20, segments: 20, surfaceOffset: 0.003, relaxIterations: 3), 2) project and wrap the low-poly mesh tightly onto the high-poly sculpt surface via shrinkwrap, and 3) ensure the retopologized mesh maintains clean quad topology suitable for mobile and indie game engines.",
+  },
+  {
+    id: 'smart_uv_texel_density',
+    title: 'Smart UV & Texel Density',
+    technique: 'uv_unwrap',
+    tag: 'UV',
+    category: 'UV & Texturing',
+    description: 'Sharp seam detection, uniform 256 px/m Texel Density & 2D island bin-packing',
+    prompt:
+      "Build an architectural watchtower with stone battlements and a timber entrance door. Once geometry is merged, perform game-ready UV unwrapping: call modeler_uv_unwrap with seamMode: 'sharp_edges' (angleThreshold: 45) to detect logical cut seams, unfold charts with harmonic relaxation, normalize Texel Density to targetTexelDensity: 256 px/m (at textureSize: 1024) across all walls and timber beams, and pack UV islands tightly into [0, 1] space using packIslands: true with paddingPixels: 4 so no texture stretching or inconsistent resolution occurs.",
+  },
+  {
+    id: 'baking_normal_ao_cage',
+    title: 'Normal & AO Texture Baking',
+    technique: 'texture_baking',
+    tag: 'Bake',
+    category: 'Baking & Materials',
+    description: 'Raycast projection cage to bake Tangent Normal & AO maps from high-poly',
+    prompt:
+      "Create a detailed high-poly carved stone monolith ('Monolith_HighPoly') with deep surface cracks, runes, and ornate bevels using modeler_sculpt_mesh and modeler_boolean_operation. Then build a simple 12-face low-poly bounding monolith ('Monolith_LowPoly'). Bake all high-resolution micro-details onto the low-poly game model using modeler_bake_textures: generate a smooth-normal projection cage with cageOffset: 0.06, raycast Tangent-Space Normal Maps and Ambient Occlusion (AO) with dilationPixels: 4, and assign the resulting 1024x1024 textures directly to the low-poly PBR material.",
+  },
+  {
+    id: 'auto_rig_weight_paint',
+    title: 'Humanoid Auto-Rig & Skinning',
+    technique: 'rigging',
+    tag: 'Rig',
+    category: 'Rigging & Animation',
+    description: '20-bone Humanoid skeleton auto-rig, 4-bone skin binding & joint pose testing',
+    prompt:
+      "Spawn a humanoid character blockout in T-Pose using modeler_spawn_base_mesh (type: 'humanoid', pose: 't_pose', name: 'Hero_Humanoid'). Prepare it for game engine animation: 1) auto-generate a 20-bone humanoid skeleton hierarchy matched to mesh bounding bounds using modeler_rig_and_weight (action: 'auto_rig', template: 'humanoid', autoBindSkin: true), 2) bind normalized 4-bone capsule skin weights summing strictly to 1.0, and 3) test joint articulation by rotating the right forearm and left knee using action: 'pose_bone' (pitchDeg: 45) to verify natural limb flexion without pinch distortion.",
   },
 ];
 
