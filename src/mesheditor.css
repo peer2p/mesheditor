@@ -160,6 +160,8 @@ mesh-editor {
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
   gap: 6px;
   padding: 0 8px;
   z-index: 100;
@@ -1963,6 +1965,8 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
   position: relative;
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .dropdown-toggle {
@@ -2004,6 +2008,9 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
   top: calc(100% + 5px);
   left: 0;
   min-width: 220px;
+  max-height: calc(100vh - 70px);
+  overflow-y: auto;
+  overflow-x: hidden;
   background: rgba(18, 22, 31, 0.98);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -2018,6 +2025,15 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
   gap: 2px;
   z-index: 1001;
   animation: dropdownFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dropdown-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
 }
 
 .dropdown-wrapper.open .dropdown-menu,
