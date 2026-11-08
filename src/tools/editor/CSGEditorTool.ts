@@ -11,7 +11,7 @@ export class CSGEditorTool extends AbstractEditorTool {
   public readonly menuId = 'menuTools';
   public readonly menuLabel = 'Constructive Solid Geometry';
   public readonly icon = 'shapes';
-  public readonly order = 3;
+  public readonly order = 8;
   public readonly defaultOpen = true;
   public readonly description =
     'Constructive Solid Geometry operations (Subtract, Union, Intersect) using selected meshes.';

@@ -11,7 +11,7 @@ export class AnimationPlayerEditorTool extends AbstractEditorTool {
   public readonly menuId = 'menuTools';
   public readonly menuLabel = 'Animation Player';
   public readonly icon = 'film';
-  public readonly order = 12;
+  public readonly order = 14;
   public readonly defaultOpen = true;
   public readonly description =
     'Play, pause, scrub, and inspect skeletal animations and animation groups imported with 3D models.';

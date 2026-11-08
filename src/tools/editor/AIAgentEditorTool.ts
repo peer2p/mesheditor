@@ -11,7 +11,7 @@ export class AIAgentEditorTool extends AbstractEditorTool {
   public readonly menuId = 'menuTools';
   public readonly menuLabel = 'AI Mesh Agent';
   public readonly icon = 'bot';
-  public readonly order = 8;
+  public readonly order = 2;
   public readonly defaultOpen = false;
   public readonly description =
     'Text-to-Mesh and Image-to-Mesh generator and conversational scene assistant.';

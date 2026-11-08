@@ -11,7 +11,7 @@ export class SceneEnvironmentEditorTool extends AbstractEditorTool {
   public readonly menuId = 'menuTools';
   public readonly menuLabel = 'Scene & Environment';
   public readonly icon = 'sun-medium';
-  public readonly order = 11;
+  public readonly order = 13;
   public readonly defaultOpen = true;
   public readonly description =
     'Adjust scene background color, ground grid, ambient lighting, sunlight intensity, camera speed, and transform grid snapping.';

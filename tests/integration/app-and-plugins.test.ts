@@ -279,14 +279,18 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
   });
 
   it('manages stackpanel sidebar mode, accordion minimizing, and active-focus state cleanly', () => {
+    localStorage.removeItem('mesheditor_layout_mode');
     app = new MeshEditorApp({
       container,
       engine,
     });
 
-    app.setLayoutMode('stackpanel', false);
+    // Default layout on fresh startup is stackpanel
     expect(app.layoutMode).toBe('stackpanel');
     expect(document.body.classList.contains('layout-stackpanel')).toBe(true);
+
+    const btnHelp = container.querySelector('#top-toolbar .panel-group #btnHelp');
+    expect(btnHelp).not.toBeNull();
 
     const dialogMesh = container.querySelector('#dialog-mesh') as HTMLElement;
     const dialogScene = container.querySelector('#dialog-scene') as HTMLElement;
@@ -312,6 +316,31 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
     expect(dialogScene.classList.contains('minimized')).toBe(false);
     expect(dialogMesh.classList.contains('minimized')).toBe(true);
     expect(dialogMesh.classList.contains('active-focus')).toBe(false);
+
+    // Minimizing Scene Objects (dialog-outliner) manages height and bottom properties
+    const dialogOutliner = container.querySelector('#dialog-outliner') as HTMLElement;
+    expect(dialogOutliner).not.toBeNull();
+    app.toggleDialogMinimize(dialogOutliner, true);
+    expect(dialogOutliner.classList.contains('minimized')).toBe(true);
+    expect(dialogOutliner.style.bottom).toBe('auto');
+    expect(dialogOutliner.style.height).toBe('auto');
+
+    // Restoring Scene Objects restores normal height and bottom
+    app.toggleDialogMinimize(dialogOutliner, false);
+    expect(dialogOutliner.classList.contains('minimized')).toBe(false);
+    expect(dialogOutliner.style.bottom).toBe('');
+    expect(dialogOutliner.style.height).toBe('');
+
+    // Unified order verification: Tools menu order matches stackpanel sidebar order
+    const menuTools = container.querySelector('#menuTools');
+    const menuButtons = Array.from(menuTools?.querySelectorAll('.dropdown-item[data-tool-name]') || []) as HTMLElement[];
+    const sidebarDialogs = Array.from(container.querySelectorAll('.stackpanel-sidebar .floating-dialog')) as HTMLElement[];
+
+    const menuToolNames = menuButtons.map((b) => b.getAttribute('data-tool-name'));
+    const sidebarToolNames = sidebarDialogs.map((d) => app.getToolByDialogId(d.id)?.name).filter(Boolean);
+
+    expect(menuToolNames[0]).toBe('scene_outliner');
+    expect(menuToolNames.slice(1)).toEqual(sidebarToolNames);
   });
 
   it('renders btnMergeMeshes in Actions menu and triggers service.mergeSelectedMeshes()', () => {

@@ -257,5 +257,38 @@ describe('Scene Hierarchy Tree, Selection-Aware Operations & Loose Parts Separat
       expect(outliner?.textContent).toContain('Character'); // Parent included to display hierarchy branch
       expect(outliner?.textContent).not.toContain('IronShield');
     });
+
+    it('toggles mesh visibility immediately on consecutive clicks of the eye icon without requiring clicking another icon', () => {
+      const box = MeshBuilder.CreateBox('ToggleEyeBox', { size: 1 }, service.scene);
+      service.importedMeshes.push(box);
+      app.updateOutliner();
+
+      expect(box.isVisible).toBe(true);
+
+      const outliner = container.querySelector('#outlinerTreeContainer') as HTMLElement;
+      const getEyeBtn = () => {
+        const rows = Array.from(outliner.querySelectorAll('.outliner-item'));
+        const row = rows.find((r) => r.textContent?.includes('ToggleEyeBox'));
+        return row?.querySelector('.outliner-item-actions .outliner-btn') as HTMLButtonElement | null;
+      };
+
+      // 1st click: hides the mesh
+      let eyeBtn = getEyeBtn();
+      expect(eyeBtn).not.toBeNull();
+      eyeBtn!.click();
+      expect(box.isVisible).toBe(false);
+
+      // 2nd consecutive click on the same eye icon: immediately makes mesh visible again
+      eyeBtn = getEyeBtn();
+      expect(eyeBtn).not.toBeNull();
+      eyeBtn!.click();
+      expect(box.isVisible).toBe(true);
+
+      // 3rd consecutive click: hides it again
+      eyeBtn = getEyeBtn();
+      expect(eyeBtn).not.toBeNull();
+      eyeBtn!.click();
+      expect(box.isVisible).toBe(false);
+    });
   });
 });

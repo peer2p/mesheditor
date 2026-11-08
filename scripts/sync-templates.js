@@ -10,19 +10,19 @@ const templateTsPath = path.resolve(rootDir, 'src/template.ts');
 
 const TOOLS = [
   { className: 'OutlinerEditorTool', file: 'OutlinerEditorTool.ejs', id: 'dialog-outliner' },
-  { className: 'AIAgentEditorTool', file: 'AIAgentEditorTool.ejs', id: 'dialog-ai-agent' },
   { className: 'CreatePrimitiveEditorTool', file: 'CreatePrimitiveEditorTool.ejs', id: 'dialog-create-primitive' },
   { className: 'CSGEditorTool', file: 'CSGEditorTool.ejs', id: 'dialog-csg' },
   { className: 'FacetEditorTool', file: 'FacetEditorTool.ejs', id: 'dialog-facet' },
   { className: 'SculptEditorTool', file: 'SculptEditorTool.ejs', id: 'dialog-sculpt' },
-  { className: 'SceneEnvironmentEditorTool', file: 'SceneEnvironmentEditorTool.ejs', id: 'dialog-scene' },
-  { className: 'MeshPropertiesEditorTool', file: 'MeshPropertiesEditorTool.ejs', id: 'dialog-mesh' },
-  { className: 'MaterialEditorTool', file: 'MaterialEditorTool.ejs', id: 'dialog-material' },
-  { className: 'AnimationPlayerEditorTool', file: 'AnimationPlayerEditorTool.ejs', id: 'dialog-anim' },
-  { className: 'TextureOptimizerEditorTool', file: 'TextureOptimizerEditorTool.ejs', id: 'dialog-textures' },
-  { className: 'CompressModelEditorTool', file: 'CompressModelEditorTool.ejs', id: 'dialog-compress-model' },
   { className: 'VoxelPainterEditorTool', file: 'VoxelPainterEditorTool.ejs', id: 'dialog-voxel-painter' },
   { className: 'PathExtrusionEditorTool', file: 'PathExtrusionEditorTool.ejs', id: 'dialog-path-extrusion' },
+  { className: 'AIAgentEditorTool', file: 'AIAgentEditorTool.ejs', id: 'dialog-ai-agent' },
+  { className: 'MeshPropertiesEditorTool', file: 'MeshPropertiesEditorTool.ejs', id: 'dialog-mesh' },
+  { className: 'MaterialEditorTool', file: 'MaterialEditorTool.ejs', id: 'dialog-material' },
+  { className: 'TextureOptimizerEditorTool', file: 'TextureOptimizerEditorTool.ejs', id: 'dialog-textures' },
+  { className: 'CompressModelEditorTool', file: 'CompressModelEditorTool.ejs', id: 'dialog-compress-model' },
+  { className: 'SceneEnvironmentEditorTool', file: 'SceneEnvironmentEditorTool.ejs', id: 'dialog-scene' },
+  { className: 'AnimationPlayerEditorTool', file: 'AnimationPlayerEditorTool.ejs', id: 'dialog-anim' },
 ];
 
 function syncTemplates() {
@@ -71,7 +71,7 @@ export function getToolViewTemplate(identifier: string): string {
   );
 
   // Extract the inner content of <div id="app-container">...</div>
-  const appContainerMatch = renderedHtml.match(/<div id="app-container">([\s\S]*?)<\/div>\s*<\/body>/);
+  const appContainerMatch = renderedHtml.match(/<div id="app-container"[^>]*>([\s\S]*?)<\/div>\s*<\/body>/);
   if (!appContainerMatch) {
     console.error('[sync-templates] Error: Could not locate #app-container in rendered mesheditor.ejs');
     return;

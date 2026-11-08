@@ -326,7 +326,7 @@ export class MeshEditorApp {
   private uvControllers: { [key: string]: dat.GUIController } = {};
 
   // Layout Mode
-  public layoutMode: 'floating' | 'stackpanel' = 'floating';
+  public layoutMode: 'floating' | 'stackpanel' = 'stackpanel';
 
   // Compress Model Tool State
   public compressLoadedFile: File | null = null;
@@ -696,7 +696,7 @@ export class MeshEditorApp {
     const savedLayoutMode =
       options.layoutMode ||
       (localStorage.getItem('mesheditor_layout_mode') as 'floating' | 'stackpanel') ||
-      'floating';
+      'stackpanel';
     this.setLayoutMode(savedLayoutMode, false);
     this.refreshIcons();
 
@@ -1205,6 +1205,16 @@ export class MeshEditorApp {
       if (save) {
         this.showToast('Switched to Stackpanel sidebar layout', 'info');
       }
+      const outliner = this.getElement('dialog-outliner');
+      if (outliner) {
+        if (outliner.classList.contains('minimized')) {
+          outliner.style.bottom = 'auto';
+          outliner.style.height = 'auto';
+        } else {
+          outliner.style.bottom = '';
+          outliner.style.height = '';
+        }
+      }
     } else {
       document.body.classList.remove('layout-stackpanel');
       this.rootContainer?.classList.remove('layout-stackpanel');
@@ -1217,6 +1227,11 @@ export class MeshEditorApp {
   }
 
   private setupFloatingDialog(dialog: HTMLElement): void {
+    const tool = this.getToolByDialogId(dialog.id);
+    if (tool && tool.order !== undefined) {
+      dialog.style.order = String(tool.order);
+    }
+
     const header = dialog.querySelector('.dialog-header') as HTMLElement;
     const btnClose = dialog.querySelector('.btn-close');
     const btnMin = dialog.querySelector('.btn-min');
@@ -1425,9 +1440,17 @@ export class MeshEditorApp {
     if (willBeMin) {
       dialog.classList.add('minimized');
       dialog.classList.remove('active-focus');
+      if (dialog.id === 'dialog-outliner') {
+        dialog.style.bottom = 'auto';
+        dialog.style.height = 'auto';
+      }
       tool?.onMinimize?.(this);
     } else {
       dialog.classList.remove('minimized');
+      if (dialog.id === 'dialog-outliner') {
+        dialog.style.bottom = '';
+        dialog.style.height = '';
+      }
       if (this.layoutMode === 'stackpanel') {
         this.accordionMinimizeOthers(dialog);
       }
@@ -1900,6 +1923,15 @@ export class MeshEditorApp {
         // Restore minimized state
         const isMin = !!state.minimized;
         dialog.classList.toggle('minimized', isMin);
+        if (id === 'dialog-outliner') {
+          if (isMin) {
+            dialog.style.bottom = 'auto';
+            dialog.style.height = 'auto';
+          } else {
+            dialog.style.bottom = '';
+            dialog.style.height = '';
+          }
+        }
         const btnMin = dialog.querySelector('.btn-min') as HTMLElement | null;
         if (btnMin) {
           btnMin.innerHTML = `<i class="app-icon" data-lucide="${isMin ? 'plus' : 'minus'}"></i>`;
@@ -2773,6 +2805,7 @@ export class MeshEditorApp {
      ========================================================================= */
   public updateOutliner(): void {
     if (!this.outlinerTreeContainer) return;
+    const prevScrollTop = this.outlinerTreeContainer.scrollTop;
     this.outlinerTreeContainer.innerHTML = '';
 
     const filter = this.searchFilter.toLowerCase().trim();
@@ -2957,20 +2990,21 @@ export class MeshEditorApp {
       // 1. Visibility toggle
       const btnVis = document.createElement('button');
       btnVis.className = 'outliner-btn';
-      const isVis = node instanceof Mesh ? node.isVisible : descMeshes.some((m) => m.isVisible);
+      const isCurrentlyVisible = (): boolean =>
+        node instanceof Mesh ? node.isVisible : descMeshes.some((m) => m.isVisible);
+      const isVis = isCurrentlyVisible();
       btnVis.innerHTML = `<i class="app-icon" data-lucide="${isVis ? 'eye' : 'eye-off'}"></i>`;
       btnVis.title = 'Toggle visibility';
       btnVis.addEventListener('click', (e) => {
         e.stopPropagation();
-        const nextVis = !isVis;
+        const nextVis = !isCurrentlyVisible();
         if (node instanceof Mesh) {
           node.isVisible = nextVis;
         }
         for (const m of descMeshes) {
           m.isVisible = nextVis;
         }
-        btnVis.innerHTML = `<i class="app-icon" data-lucide="${nextVis ? 'eye' : 'eye-off'}"></i>`;
-        this.refreshIcons();
+        this.updateOutliner();
       });
       actions.appendChild(btnVis);
 
@@ -2988,10 +3022,11 @@ export class MeshEditorApp {
       actions.appendChild(btnCenter);
 
       // 3. Wireframe
-      const isWire =
+      const checkIsWire = (): boolean =>
         node instanceof Mesh
           ? this.service.isMeshWireframe(node)
           : descMeshes.length > 0 && descMeshes.every((m) => this.service.isMeshWireframe(m));
+      const isWire = checkIsWire();
       const btnWire = document.createElement('button');
       btnWire.className = `outliner-btn ${isWire ? 'active' : ''}`;
       btnWire.innerHTML = '<i class="app-icon" data-lucide="scan"></i>';
@@ -3002,7 +3037,7 @@ export class MeshEditorApp {
           const state = this.service.toggleMeshWireframe(node);
           this.showToast(`Wireframe ${state ? 'enabled' : 'disabled'} for "${node.name}"`, 'info');
         } else {
-          const nextState = !isWire;
+          const nextState = !checkIsWire();
           for (const m of descMeshes) {
             this.service.setMeshWireframe(m, nextState);
           }
@@ -3069,6 +3104,7 @@ export class MeshEditorApp {
     }
 
     this.refreshIcons();
+    this.outlinerTreeContainer.scrollTop = prevScrollTop;
   }
 
   /* =========================================================================

@@ -7,8 +7,8 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/%3E%3Cpolyline points='3.27 6.96 12 12.01 20.73 6.96'/%3E%3Cline x1='12' y1='22.08' x2='12' y2='12'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="./mesheditor.css" />
   </head>
-  <body>
-    <div id="app-container">
+  <body class="layout-stackpanel">
+    <div id="app-container" class="layout-stackpanel">
       <!-- Hidden file inputs -->
       <input type="file" id="modelFileInput" class="hidden-input" accept=".glb,.gltf,.obj,.stl,.ply,.fbx,.babylon,.bin,.png,.jpg,.jpeg,.webp" multiple />
       <input type="file" id="importFileInput" class="hidden-input" accept=".glb,.gltf,.obj,.stl,.ply,.fbx,.babylon,.bin,.png,.jpg,.jpeg,.webp" multiple />
@@ -135,11 +135,11 @@
           </button>
           <div class="dropdown-menu" id="menuView">
             <div class="dropdown-header-label">Layout Mode</div>
-            <button class="dropdown-item active" id="btnLayoutFloating" title="Floating layout: freely movable windows">
+            <button class="dropdown-item" id="btnLayoutFloating" title="Floating layout: freely movable windows">
               <span class="btn-icon"><i class="app-icon" data-lucide="app-window"></i></span>
               <span class="btn-label">Float</span>
             </button>
-            <button class="dropdown-item" id="btnLayoutStack" title="Stackpanel layout: neatly docked vertical sidebar">
+            <button class="dropdown-item active" id="btnLayoutStack" title="Stackpanel layout: neatly docked vertical sidebar">
               <span class="btn-icon"><i class="app-icon" data-lucide="panel-right"></i></span>
               <span class="btn-label">Stack</span>
             </button>
@@ -178,9 +178,7 @@
           </button>
         </div>
 
-        <div class="toolbar-divider"></div>
-
-        <div style="float: right;" class="btn-group panel-group">
+        <div class="btn-group panel-group">
           <button class="tool-btn panel-btn" id="btnHelp" title="Help & Keyboard Shortcuts">
             <span class="btn-icon"><i class="app-icon" data-lucide="help-circle"></i></span>
           </button>
@@ -321,19 +319,19 @@
 
       <!-- Floating HTML Dialog Containers for dat.GUI (wrapped for Stackpanel mode) -->
       <div id="stackpanelRightSidebar" class="stackpanel-sidebar">
-        <%- include('./tools/editor/AIAgentEditorTool.ejs') %>
         <%- include('./tools/editor/CreatePrimitiveEditorTool.ejs') %>
         <%- include('./tools/editor/CSGEditorTool.ejs') %>
         <%- include('./tools/editor/FacetEditorTool.ejs') %>
         <%- include('./tools/editor/SculptEditorTool.ejs') %>
-        <%- include('./tools/editor/SceneEnvironmentEditorTool.ejs') %>
-        <%- include('./tools/editor/MeshPropertiesEditorTool.ejs') %>
-        <%- include('./tools/editor/MaterialEditorTool.ejs') %>
-        <%- include('./tools/editor/AnimationPlayerEditorTool.ejs') %>
-        <%- include('./tools/editor/TextureOptimizerEditorTool.ejs') %>
-        <%- include('./tools/editor/CompressModelEditorTool.ejs') %>
         <%- include('./tools/editor/VoxelPainterEditorTool.ejs') %>
         <%- include('./tools/editor/PathExtrusionEditorTool.ejs') %>
+        <%- include('./tools/editor/AIAgentEditorTool.ejs') %>
+        <%- include('./tools/editor/MeshPropertiesEditorTool.ejs') %>
+        <%- include('./tools/editor/MaterialEditorTool.ejs') %>
+        <%- include('./tools/editor/TextureOptimizerEditorTool.ejs') %>
+        <%- include('./tools/editor/CompressModelEditorTool.ejs') %>
+        <%- include('./tools/editor/SceneEnvironmentEditorTool.ejs') %>
+        <%- include('./tools/editor/AnimationPlayerEditorTool.ejs') %>
       </div>
 
       <!-- Bottom Status Bar -->

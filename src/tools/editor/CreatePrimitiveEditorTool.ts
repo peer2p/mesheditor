@@ -11,7 +11,7 @@ export class CreatePrimitiveEditorTool extends AbstractEditorTool {
   public readonly menuId = 'menuTools';
   public readonly menuLabel = 'Create Mesh';
   public readonly icon = 'plus-circle';
-  public readonly order = 2;
+  public readonly order = 3;
   public readonly defaultOpen = true;
   public readonly description =
     'Interactive 3D primitive mesh generation with raycast pick-and-place.';

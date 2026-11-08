@@ -368,6 +368,7 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       const app = new MeshEditorApp({
         container,
         engine,
+        layoutMode: 'floating',
       });
 
       // 1. Open Voxel Painter: sets active = true

@@ -253,6 +253,10 @@ body.is-electron-mac #top-toolbar .toolbar-brand {
   min-width: 4px;
 }
 
+#top-toolbar .panel-group {
+  margin-left: auto;
+}
+
 /* Segmented Button Groups */
 .btn-group {
   display: inline-flex;
@@ -717,6 +721,16 @@ body.layout-stackpanel #dialog-outliner,
   transform: none !important;
   box-shadow: none !important;
   outline: none !important;
+}
+
+#dialog-outliner.minimized,
+body.layout-stackpanel #dialog-outliner.minimized,
+#app-container.layout-stackpanel #dialog-outliner.minimized {
+  bottom: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: 38px !important;
+  overflow: hidden !important;
 }
 
 body.layout-stackpanel #dialog-outliner .dialog-body,

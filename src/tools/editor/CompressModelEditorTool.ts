@@ -12,7 +12,7 @@ export class CompressModelEditorTool extends AbstractEditorTool {
   public readonly menuId = 'menuTools';
   public readonly menuLabel = 'Compress Model';
   public readonly icon = 'file-archive';
-  public readonly order = 6;
+  public readonly order = 12;
   public readonly defaultOpen = false;
   public readonly description =
     'Reduce 3D model file size in browser: weld duplicate vertices, cull unused geometry, and apply Draco compression.';

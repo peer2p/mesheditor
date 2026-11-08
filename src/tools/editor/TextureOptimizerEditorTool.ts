@@ -11,7 +11,7 @@ export class TextureOptimizerEditorTool extends AbstractEditorTool {
   public readonly menuId = 'menuTools';
   public readonly menuLabel = 'Texture Optimizer';
   public readonly icon = 'zap';
-  public readonly order = 5;
+  public readonly order = 11;
   public readonly defaultOpen = true;
   public readonly description =
     'Optimize, resize, convert textures to WebP, inspect texture memory, and embed texture assets.';
