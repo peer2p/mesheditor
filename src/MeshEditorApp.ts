@@ -19,6 +19,13 @@ import {
 import { PathExtrusionStudio } from './pathExtrusion';
 import { getBuiltinEditorTools, ToolInterface } from './tools';
 import {
+  AI_QUICK_PROMPTS,
+  AIQuickPrompt,
+  getAllQuickPrompts,
+  getQuickPromptById,
+  normalizePromptImageUrl,
+} from './tools/editor/aiQuickPrompts';
+import {
   ModelCompressor,
   ModelCompressorOptions,
   ModelCompressorStats,
@@ -4401,16 +4408,8 @@ export class MeshEditorApp {
       this.showToast(`AI settings saved (${minVal.toLocaleString()}–${maxVal.toLocaleString()} polys, textures ${createTex ? 'on' : 'off'}, normal maps ${createNorm ? 'on' : 'off'}).`, 'success');
     });
 
-    // Quick prompt chips
-    this.getElement('aiQuickPrompts')?.querySelectorAll('[data-prompt]').forEach((chip) => {
-      chip.addEventListener('click', () => {
-        const text = (chip as HTMLElement).getAttribute('data-prompt') || '';
-        if (promptInput) {
-          promptInput.value = text;
-          promptInput.focus();
-        }
-      });
-    });
+    // Initialize AI Quick Prompts select-like dropdown from JS array
+    this.initAIQuickPrompts();
 
     // Image attachments (Upload File, Capture 3D Viewport, Paste)
     this.getElement('btnAIAttachImage')?.addEventListener('click', () => {
@@ -4527,6 +4526,198 @@ export class MeshEditorApp {
         this.renderAIAttachments();
       });
       bar.appendChild(thumb);
+    });
+  }
+
+  /**
+   * Returns all available AI quick prompt presets.
+   */
+  public getQuickPrompts(): AIQuickPrompt[] {
+    return getAllQuickPrompts();
+  }
+
+  /**
+   * Initializes the AI Quick Prompts select-like dropdown menu from the JS array.
+   * Renders a compact single-row GUI with rich thumbnails, tags, and reference image support.
+   */
+  private initAIQuickPrompts(): void {
+    const container = this.getElement('aiQuickPrompts');
+    if (!container) return;
+
+    const wrapper = this.getElement('aiQuickSelectWrapper');
+    const selectBtn = this.getElement<HTMLButtonElement>('btnAIQuickSelect');
+    const menu = this.getElement('aiQuickPromptMenu');
+    const nativeSelect = this.getElement<HTMLSelectElement>('aiQuickPromptSelect');
+    const textEl = this.getElement('aiQuickSelectText');
+    const thumbWrap = this.getElement('aiQuickSelectThumb');
+    const thumbImg = this.getElement<HTMLImageElement>('aiQuickSelectThumbImg');
+    const iconEl = this.getElement('aiQuickSelectIcon');
+    const promptInput = this.getElement<HTMLTextAreaElement>('aiPromptInput');
+
+    if (!menu) return;
+
+    // Render quick prompt items from the central JS array
+    const prompts = getAllQuickPrompts();
+    menu.innerHTML = '';
+    if (nativeSelect) {
+      nativeSelect.innerHTML = '<option value="">Quick Prompts (Examples)...</option>';
+    }
+
+    // Top clear/reset option in menu
+    const resetItem = document.createElement('button');
+    resetItem.type = 'button';
+    resetItem.className = 'ai-quick-menu-item';
+    resetItem.style.borderBottom = '1px solid rgba(255, 255, 255, 0.08)';
+    resetItem.style.marginBottom = '2px';
+    resetItem.innerHTML = `
+      <div class="ai-quick-item-thumb" style="width: 28px; height: 28px;">
+        <span class="ai-quick-item-thumb-placeholder" style="color: var(--text-secondary); font-size: 14px;">&times;</span>
+      </div>
+      <div class="ai-quick-item-info">
+        <div class="ai-quick-item-title" style="color: var(--text-secondary);">Clear / Reset Selection</div>
+      </div>
+    `;
+    resetItem.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (promptInput) promptInput.value = '';
+      this.aiPendingImages = [];
+      this.renderAIAttachments();
+      if (textEl) textEl.textContent = 'Quick Prompts (Examples)...';
+      if (thumbWrap) thumbWrap.style.display = 'none';
+      if (iconEl) iconEl.style.display = '';
+      if (nativeSelect) nativeSelect.value = '';
+      menu.querySelectorAll('.ai-quick-menu-item').forEach((i) => i.classList.remove('active'));
+      wrapper?.classList.remove('open');
+      menu.style.display = 'none';
+      selectBtn?.setAttribute('aria-expanded', 'false');
+    });
+    menu.appendChild(resetItem);
+
+    const applyPrompt = (prompt: AIQuickPrompt, itemEl?: HTMLElement) => {
+      if (promptInput) {
+        promptInput.value = prompt.prompt;
+        promptInput.focus();
+      }
+
+      // Handle image attachment with normalized URL
+      const primaryImage = normalizePromptImageUrl(prompt.image);
+      const rawImages = prompt.images && prompt.images.length > 0 ? prompt.images : (primaryImage ? [primaryImage] : []);
+      if (rawImages.length > 0) {
+        const toAttach = rawImages.map((u) => normalizePromptImageUrl(u) || u);
+        this.aiPendingImages = [...toAttach];
+        this.renderAIAttachments();
+        this.showToast(`Selected: ${prompt.title} (+ image attached)`, 'info');
+      } else {
+        this.showToast(`Selected: ${prompt.title}`, 'info');
+      }
+
+      // Update select trigger button UI
+      if (textEl) {
+        textEl.textContent = `[${prompt.tag}] ${prompt.title}`;
+      }
+      if (primaryImage && thumbWrap && thumbImg) {
+        thumbImg.src = primaryImage;
+        thumbWrap.style.display = 'flex';
+        if (iconEl) iconEl.style.display = 'none';
+      } else {
+        if (thumbWrap) thumbWrap.style.display = 'none';
+        if (iconEl) iconEl.style.display = '';
+      }
+
+      if (nativeSelect) {
+        nativeSelect.value = prompt.id;
+      }
+
+      // Update active highlight in menu
+      menu.querySelectorAll('.ai-quick-menu-item').forEach((i) => i.classList.remove('active'));
+      if (itemEl) {
+        itemEl.classList.add('active');
+      }
+
+      // Close dropdown
+      wrapper?.classList.remove('open');
+      menu.style.display = 'none';
+      selectBtn?.setAttribute('aria-expanded', 'false');
+    };
+
+    prompts.forEach((prompt) => {
+      // 1. Add to native select for accessibility & syncing
+      if (nativeSelect) {
+        const opt = document.createElement('option');
+        opt.value = prompt.id;
+        opt.textContent = `[${prompt.tag}] ${prompt.title}`;
+        nativeSelect.appendChild(opt);
+      }
+
+      // 2. Add to custom dropdown menu
+      const resolvedImg = normalizePromptImageUrl(prompt.image);
+      const itemBtn = document.createElement('button');
+      itemBtn.type = 'button';
+      itemBtn.className = 'ai-quick-menu-item ai-prompt-chip';
+      itemBtn.setAttribute('data-id', prompt.id);
+      itemBtn.setAttribute('data-technique', prompt.technique);
+      itemBtn.setAttribute('data-prompt', prompt.prompt);
+      if (resolvedImg) itemBtn.setAttribute('data-image', resolvedImg);
+      itemBtn.title = `${prompt.title}: ${prompt.description}`;
+      itemBtn.setAttribute('role', 'option');
+
+      const thumbHtml = resolvedImg
+        ? `<img src="${resolvedImg}" alt="${prompt.title}" onerror="this.style.display='none'; if (this.nextElementSibling) this.nextElementSibling.style.display='flex';" /><span class="ai-quick-item-thumb-placeholder" style="display: none;">${prompt.tag}</span>`
+        : `<span class="ai-quick-item-thumb-placeholder">${prompt.tag}</span>`;
+
+      itemBtn.innerHTML = `
+        <div class="ai-quick-item-thumb">
+          ${thumbHtml}
+        </div>
+        <div class="ai-quick-item-info">
+          <div class="ai-quick-item-header">
+            <span class="ai-quick-item-badge">${prompt.tag}</span>
+            <span class="ai-quick-item-title">${prompt.title}</span>
+            ${resolvedImg ? '<span class="ai-quick-item-img-tag" title="Includes reference image">IMG</span>' : ''}
+          </div>
+          <div class="ai-quick-item-desc">${prompt.description}</div>
+        </div>
+      `;
+
+      itemBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        applyPrompt(prompt, itemBtn);
+      });
+
+      menu.appendChild(itemBtn);
+    });
+
+    // Toggle dropdown open/close on trigger button click
+    selectBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = wrapper?.classList.contains('open') || menu.style.display === 'flex';
+      if (isOpen) {
+        wrapper?.classList.remove('open');
+        menu.style.display = 'none';
+        selectBtn.setAttribute('aria-expanded', 'false');
+      } else {
+        wrapper?.classList.add('open');
+        menu.style.display = 'flex';
+        selectBtn.setAttribute('aria-expanded', 'true');
+      }
+    });
+
+    // Close on click outside
+    document.addEventListener('click', (e) => {
+      if (wrapper && !wrapper.contains(e.target as unknown as HTMLElement)) {
+        wrapper.classList.remove('open');
+        menu.style.display = 'none';
+        selectBtn?.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    // Native select change sync
+    nativeSelect?.addEventListener('change', () => {
+      const selected = getQuickPromptById(nativeSelect.value);
+      if (selected) {
+        const itemEl = menu.querySelector<HTMLElement>(`[data-id="${selected.id}"]`) || undefined;
+        applyPrompt(selected, itemEl);
+      }
     });
   }
 

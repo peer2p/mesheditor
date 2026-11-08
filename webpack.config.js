@@ -26,9 +26,23 @@ module.exports = (env, argv) => {
       allowedHosts: 'all',
       hot: true,
       open: true,
-      static: {
-        directory: path.resolve(__dirname, 'dist'),
-      },
+      static: [
+        {
+          directory: path.resolve(__dirname, 'dist'),
+        },
+        {
+          directory: path.resolve(__dirname, 'src/promptImages'),
+          publicPath: '/promptImages',
+        },
+        {
+          directory: path.resolve(__dirname, 'src/promptImages'),
+          publicPath: '/src/promptImages',
+        },
+        {
+          directory: path.resolve(__dirname, 'docs/screenshots'),
+          publicPath: '/screenshots',
+        },
+      ],
       client: {
         overlay: {
           errors: true,
@@ -59,6 +73,10 @@ module.exports = (env, argv) => {
         {
           test: /\.md$/,
           type: 'asset/source',
+        },
+        {
+          test: /\.(png|jpe?g|gif|svg|webp)$/i,
+          type: 'asset/resource',
         },
       ],
     },
@@ -92,6 +110,9 @@ module.exports = (env, argv) => {
         patterns: [
           { from: 'src/mesheditor.css', to: 'mesheditor.css' },
           { from: 'skills', to: 'skills' },
+          { from: 'src/promptImages', to: 'promptImages', noErrorOnMissing: true },
+          { from: 'src/promptImages', to: 'src/promptImages', noErrorOnMissing: true },
+          { from: 'docs/screenshots', to: 'screenshots', noErrorOnMissing: true },
         ],
       }),
     ],

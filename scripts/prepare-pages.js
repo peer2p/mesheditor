@@ -24,5 +24,12 @@ if (fs.existsSync(docsDir)) {
   console.log('[prepare-pages] Copied docs/* -> dist/ (Marketing Landing Page at root)');
 }
 
+// 3. Ensure src/promptImages are present in dist/promptImages
+const promptImagesSrc = path.join(rootDir, 'src', 'promptImages');
+if (fs.existsSync(promptImagesSrc)) {
+  fs.cpSync(promptImagesSrc, path.join(distDir, 'promptImages'), { recursive: true, force: true });
+  console.log('[prepare-pages] Copied src/promptImages -> dist/promptImages');
+}
+
 console.log('[prepare-pages] Successfully prepared GitHub Pages artifact in dist/');
 

@@ -951,12 +951,13 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
       expect(app.service.aiAgent.getConfig().visualCritique).toBe(true);
 
       // Verify AI Quick Prompts cover all modeling techniques and populate #aiPromptInput on click
+      expect(app.getQuickPrompts().length).toBeGreaterThanOrEqual(13);
       const quickPromptChips = Array.from(
         container.querySelectorAll<HTMLButtonElement>('#aiQuickPrompts .ai-prompt-chip[data-prompt]')
       );
-      expect(quickPromptChips.length).toBe(10);
+      expect(quickPromptChips.length).toBeGreaterThanOrEqual(10);
       const techniques = quickPromptChips.map((c) => c.getAttribute('data-technique'));
-      expect(techniques).toEqual([
+      expect(techniques.slice(0, 10)).toEqual([
         'sdf',
         'clay_sphere',
         'architecture',
@@ -968,10 +969,23 @@ Build low-poly trees using cylinder trunks and icosphere foliage.`;
         'voxel',
         'update',
       ]);
+      expect(techniques).toContain('pillar');
+      expect(techniques).toContain('seating');
+      expect(techniques).toContain('chibi_costume');
+
+      // Click an item without image (SDF) and verify prompt populates
       const sdfChip = quickPromptChips[0];
       sdfChip.click();
       const promptInputCheck = container.querySelector('#aiPromptInput') as HTMLTextAreaElement;
       expect(promptInputCheck.value).toContain('modeler_create_sdf_mesh');
+
+      // Click an item with reference image (e.g. cinema_chair or prompt with data-image) and verify both prompt and image attachment populate
+      const imageChip = quickPromptChips.find((c) => c.hasAttribute('data-image'));
+      expect(imageChip).toBeDefined();
+      imageChip?.click();
+      const attachmentsBar = container.querySelector('#aiImageAttachmentsBar') as HTMLElement;
+      expect(attachmentsBar.style.display).not.toBe('none');
+      expect(attachmentsBar.querySelectorAll('img').length).toBeGreaterThanOrEqual(1);
 
       // 2. Run a prompt with visualCritique enabled and verify:
       //    Turn 1: builds initial mesh
