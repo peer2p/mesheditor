@@ -14,6 +14,12 @@ export interface ToolExecutionContext {
   scene: Scene;
   /** The AI agent service instance if running within an agent session */
   aiAgent?: AIAgentService;
+  /** Reference images (data URLs or HTTP URLs) attached to the current agent request */
+  attachedImages?: string[];
+  /** Optional abort signal for long-running async tools */
+  signal?: AbortSignal;
+  /** Optional status callback for long-running async tools */
+  onStatus?: (statusText: string) => void;
   /** Cached materials by name */
   materialRegistry: Map<string, PBRMaterial>;
 

@@ -11,6 +11,7 @@ export * from './voxel';
 export * from './pathExtrusion';
 export * from './compression/ModelCompressor';
 export * from './tools';
+export * from './Neural3DGeneratorService';
 export * from './AIAgentService';
 export * from './MeshEditorService';
 export * from './MeshEditorApp';

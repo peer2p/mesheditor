@@ -35,3 +35,4 @@ export * from './CreateMoldingTool';
 export * from './CreateStairsTool';
 export * from './CreateRoofTool';
 export * from './PlanModelTool';
+export * from './GenerateNeuralMeshTool';

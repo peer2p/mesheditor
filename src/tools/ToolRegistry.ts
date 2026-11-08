@@ -38,6 +38,7 @@ import {
   CreateStairsTool,
   CreateRoofTool,
   PlanModelTool,
+  GenerateNeuralMeshTool,
 } from './builtin';
 
 /**
@@ -159,5 +160,6 @@ export function createDefaultToolRegistry(): ToolRegistry {
     new SpawnBaseMeshTool(),
     new RetopologizeMeshTool(),
     new SculptMeshTool(),
+    new GenerateNeuralMeshTool(),
   ]);
 }

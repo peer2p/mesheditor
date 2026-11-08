@@ -2,12 +2,20 @@ import { Color3, Engine, Mesh, Node, PBRMaterial, StandardMaterial, Texture, Tra
 import * as dat from 'dat.gui';
 import { marked } from 'marked';
 import { createDefaultPlatformAdapter, MeshEditorPlatformAdapter } from './adapters';
-import { AI_ENDPOINT_PRESETS } from './AIAgentService';
+import { AI_ENDPOINT_PRESETS, NEURAL_3D_PROTOCOL_DEFAULTS } from './AIAgentService';
 import { MeshEditorService } from './MeshEditorService';
 import { MenuItemDefinition, MeshEditorPlugin, PluginManager, ToolbarButtonDefinition } from './plugin';
 import { ensureMeshEditorStyles } from './styles';
 import { AI_CHAT_EMPTY_HTML, getMeshEditorTemplate } from './template';
-import { AIAgentToolExecutionStep, ExportOptions, MeshEditorServiceEvents, PrimitiveShape } from './types';
+import {
+  AIAgentToolExecutionStep,
+  ExportOptions,
+  MeshEditorServiceEvents,
+  Neural3DBackendId,
+  Neural3DProtocol,
+  Neural3DProvidersMap,
+  PrimitiveShape,
+} from './types';
 import { PathExtrusionStudio } from './pathExtrusion';
 import { getBuiltinEditorTools, ToolInterface } from './tools';
 import {
@@ -4025,8 +4033,13 @@ export class MeshEditorApp {
         return String(n);
       };
       const polySummary = `${formatPoly(minP)}–${formatPoly(maxP)}p`;
+      const enabledNeural = this.service.aiAgent.getEnabledNeural3DProviders();
+      const neuralSuffix =
+        enabledNeural.length > 0
+          ? ` • 3D: ${enabledNeural.map((p) => (p.id === 'trellis' ? 'TRELLIS' : p.id === 'hunyuan3d' ? 'Hunyuan3D' : 'Hi3D')).join('+')}`
+          : '';
       if (endpointBadge) {
-        endpointBadge.textContent = `${cfg.model} • ${polySummary} • ${host} (${keyStatus})`;
+        endpointBadge.textContent = `${cfg.model} • ${polySummary} • ${host} (${keyStatus})${neuralSuffix}`;
       }
       if (endpointDot) {
         endpointDot.classList.toggle('is-ready', hasKey);
@@ -4185,6 +4198,95 @@ export class MeshEditorApp {
       syncVisualCritique(!!visualCritiqueCheckQuick.checked);
     });
 
+    // Neural 3D Generators (TRELLIS 2, Hunyuan3D, Hi3D)
+    const neuralProviderIds: Neural3DBackendId[] = ['trellis', 'hunyuan3d', 'hi3d'];
+    const readNeuralProvidersFromDOM = (): Neural3DProvidersMap => {
+      const currentMap = this.service.aiAgent.getNeural3DProviders();
+      for (const id of neuralProviderIds) {
+        const enableEl = this.getElement<HTMLInputElement>(`aiNeuralEnabled_${id}`);
+        const protoEl = this.getElement<HTMLSelectElement>(`aiNeuralProtocol_${id}`);
+        const modelEl = this.getElement<HTMLInputElement>(`aiNeuralModel_${id}`);
+        const urlEl = this.getElement<HTMLInputElement>(`aiNeuralUrl_${id}`);
+        const keyEl = this.getElement<HTMLInputElement>(`aiNeuralKey_${id}`);
+
+        const protocol = (protoEl?.value || currentMap[id].protocol) as Neural3DProtocol;
+        const preset = NEURAL_3D_PROTOCOL_DEFAULTS[id][protocol] || NEURAL_3D_PROTOCOL_DEFAULTS[id].omlx;
+        currentMap[id] = {
+          ...currentMap[id],
+          enabled: enableEl ? !!enableEl.checked : currentMap[id].enabled,
+          protocol,
+          modelId: modelEl?.value.trim() || preset.modelId,
+          endpointUrl: urlEl?.value.trim() || preset.endpointUrl,
+          apiKey: keyEl ? keyEl.value.trim() : currentMap[id].apiKey,
+        };
+      }
+      return currentMap;
+    };
+
+    const syncNeuralProvidersUI = () => {
+      const providers = this.service.aiAgent.getNeural3DProviders();
+      for (const id of neuralProviderIds) {
+        const p = providers[id];
+        const enableEl = this.getElement<HTMLInputElement>(`aiNeuralEnabled_${id}`);
+        const bodyEl = this.getElement<HTMLElement>(`aiNeuralConfigBody_${id}`);
+        const protoEl = this.getElement<HTMLSelectElement>(`aiNeuralProtocol_${id}`);
+        const modelEl = this.getElement<HTMLInputElement>(`aiNeuralModel_${id}`);
+        const urlEl = this.getElement<HTMLInputElement>(`aiNeuralUrl_${id}`);
+        const keyEl = this.getElement<HTMLInputElement>(`aiNeuralKey_${id}`);
+
+        if (enableEl) enableEl.checked = !!p.enabled;
+        if (bodyEl) bodyEl.style.display = p.enabled ? 'flex' : 'none';
+        if (protoEl) protoEl.value = p.protocol;
+        if (modelEl) modelEl.value = p.modelId || '';
+        if (urlEl) urlEl.value = p.endpointUrl || '';
+        if (keyEl) keyEl.value = p.apiKey || '';
+      }
+    };
+
+    for (const id of neuralProviderIds) {
+      const enableEl = this.getElement<HTMLInputElement>(`aiNeuralEnabled_${id}`);
+      const bodyEl = this.getElement<HTMLElement>(`aiNeuralConfigBody_${id}`);
+      const protoEl = this.getElement<HTMLSelectElement>(`aiNeuralProtocol_${id}`);
+      const modelEl = this.getElement<HTMLInputElement>(`aiNeuralModel_${id}`);
+      const urlEl = this.getElement<HTMLInputElement>(`aiNeuralUrl_${id}`);
+      const keyEl = this.getElement<HTMLInputElement>(`aiNeuralKey_${id}`);
+      const testBtn = this.getElement<HTMLButtonElement>(`btnTestNeural_${id}`);
+
+      enableEl?.addEventListener('change', () => {
+        const enabled = !!enableEl.checked;
+        if (bodyEl) bodyEl.style.display = enabled ? 'flex' : 'none';
+        this.service.aiAgent.saveConfig({ neural3DProviders: readNeuralProvidersFromDOM() });
+        updateEndpointBadge();
+      });
+
+      protoEl?.addEventListener('change', () => {
+        const newProto = (protoEl.value || 'omlx') as Neural3DProtocol;
+        const preset = NEURAL_3D_PROTOCOL_DEFAULTS[id][newProto];
+        if (preset) {
+          if (urlEl) urlEl.value = preset.endpointUrl;
+          if (modelEl) modelEl.value = preset.modelId;
+        }
+        this.service.aiAgent.saveConfig({ neural3DProviders: readNeuralProvidersFromDOM() });
+        updateEndpointBadge();
+      });
+
+      const onFieldChange = () => {
+        this.service.aiAgent.saveConfig({ neural3DProviders: readNeuralProvidersFromDOM() });
+        updateEndpointBadge();
+      };
+      modelEl?.addEventListener('change', onFieldChange);
+      urlEl?.addEventListener('change', onFieldChange);
+      keyEl?.addEventListener('change', onFieldChange);
+
+      testBtn?.addEventListener('click', async () => {
+        this.service.aiAgent.saveConfig({ neural3DProviders: readNeuralProvidersFromDOM() });
+        const res = await this.service.aiAgent.testNeural3DProvider(id);
+        this.showToast(res.message, res.ok ? 'success' : 'warning');
+      });
+    }
+
+    syncNeuralProvidersUI();
+
     updateEndpointBadge();
     this.renderAISkills();
 
@@ -4291,6 +4393,7 @@ export class MeshEditorApp {
         createTextures: createTex,
         createNormalMaps: createNorm,
         visualCritique: visCritique,
+        neural3DProviders: readNeuralProvidersFromDOM(),
       });
       updateEndpointBadge();
       if (settingsStatus) settingsStatus.textContent = 'Saved ✓';

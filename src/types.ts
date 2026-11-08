@@ -76,6 +76,27 @@ export interface MeshEditorServiceEvents {
   onExportModel?: (blob: Blob, filename: string, format: ExportOptions['format']) => Promise<boolean> | boolean;
 }
 
+export type Neural3DBackendId = 'trellis' | 'hunyuan3d' | 'hi3d';
+
+export type Neural3DProtocol =
+  | 'omlx'
+  | 'local_rest'
+  | 'gradio'
+  | 'fal'
+  | 'replicate';
+
+export interface Neural3DProviderConfig {
+  id: Neural3DBackendId;
+  name: string;
+  enabled: boolean;
+  protocol: Neural3DProtocol;
+  endpointUrl: string;
+  apiKey?: string;
+  modelId?: string;
+}
+
+export type Neural3DProvidersMap = Record<Neural3DBackendId, Neural3DProviderConfig>;
+
 export interface AIAgentEndpointConfig {
   baseUrl: string;
   apiKey: string;
@@ -87,6 +108,7 @@ export interface AIAgentEndpointConfig {
   createTextures?: boolean;
   createNormalMaps?: boolean;
   visualCritique?: boolean;
+  neural3DProviders?: Neural3DProvidersMap;
 }
 
 export interface AIAgentSkillDefinition {

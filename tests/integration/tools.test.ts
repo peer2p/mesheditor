@@ -103,11 +103,11 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
   });
 
   describe('2. ToolRegistry Management', () => {
-    it('initializes default registry with all 37 built-in modeling tools', () => {
+    it('initializes default registry with all 38 built-in modeling tools', () => {
       const registry = createDefaultToolRegistry();
       const allTools = registry.getAll();
 
-      expect(allTools.length).toBe(37);
+      expect(allTools.length).toBe(38);
       expect(registry.has('modeler_get_scene_info')).toBe(true);
       expect(registry.has('modeler_plan_model')).toBe(true);
       expect(registry.has('modeler_create_primitive')).toBe(true);
@@ -145,9 +145,10 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       expect(registry.has('modeler_spawn_base_mesh')).toBe(true);
       expect(registry.has('modeler_retopologize_mesh')).toBe(true);
       expect(registry.has('modeler_sculpt_mesh')).toBe(true);
+      expect(registry.has('modeler_generate_neural_mesh')).toBe(true);
 
       const openAiDefs = registry.getOpenAITools();
-      expect(openAiDefs.length).toBe(37);
+      expect(openAiDefs.length).toBe(38);
       expect(openAiDefs.every((d) => d.type === 'function' && typeof d.function.name === 'string')).toBe(true);
     });
 

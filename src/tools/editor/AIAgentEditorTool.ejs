@@ -21,6 +21,7 @@
                 <button type="button" class="ai-chip-btn" data-preset="gemini-pro">Gemini Pro</button>
                 <button type="button" class="ai-chip-btn" data-preset="openai">OpenAI</button>
                 <button type="button" class="ai-chip-btn" data-preset="openrouter">OpenRouter</button>
+                <button type="button" class="ai-chip-btn" data-preset="omlx">oMLX</button>
                 <button type="button" class="ai-chip-btn" data-preset="ollama">Ollama</button>
                 <button type="button" class="ai-chip-btn" data-preset="lmstudio">LM Studio</button>
               </div>
@@ -166,6 +167,94 @@
                 <span><strong>Multi-View Visual Critique</strong></span>
               </label>
               <div class="ai-slider-subtext">Renders a 4-view + wireframe inspection sheet after modeling so the AI verifies and self-corrects proportions and polygon density.</div>
+            </div>
+
+            <!-- Neural 3D Generators (Optional BYO 3D Delegation) -->
+            <div class="ai-settings-title-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+              <span class="ai-settings-title">Neural 3D Generators (Optional BYO 3D)</span>
+            </div>
+            <div class="ai-slider-subtext" style="margin-bottom: 6px;">
+              Enable one or more external 3D generators (via local oMLX / Gradio / FastAPI or cloud API) so the AI Agent can delegate complex organic assets or subtasks.
+            </div>
+
+            <div id="aiNeural3DProvidersList" class="ai-skills-list" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;">
+              <!-- 1. TRELLIS 2 / TRELLIS -->
+              <div class="ai-neural-provider-card" data-provider-id="trellis" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                  <label class="ai-checkbox-label" for="aiNeuralEnabled_trellis" style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0;">
+                    <input type="checkbox" id="aiNeuralEnabled_trellis" data-neural-enable="trellis" />
+                    <span><strong>TRELLIS 2 / TRELLIS</strong></span>
+                  </label>
+                  <button type="button" class="ai-chip-btn" id="btnTestNeural_trellis" data-neural-test="trellis" title="Test TRELLIS Endpoint Connection">Test</button>
+                </div>
+                <div class="ai-slider-subtext" style="margin-top: 2px;">Clean SLAT mesh structure &amp; high-fidelity Image/Text-to-3D.</div>
+                <div id="aiNeuralConfigBody_trellis" style="display: none; margin-top: 6px; flex-direction: column; gap: 5px;">
+                  <div class="ai-input-row" style="gap: 6px;">
+                    <select id="aiNeuralProtocol_trellis" class="ai-select tool-select" data-neural-protocol="trellis" style="width: 130px;">
+                      <option value="omlx">oMLX (Local)</option>
+                      <option value="local_rest">Local REST</option>
+                      <option value="gradio">Gradio WebUI</option>
+                      <option value="fal">Fal.ai (Cloud)</option>
+                      <option value="replicate">Replicate</option>
+                    </select>
+                    <input type="text" id="aiNeuralModel_trellis" class="ai-input" placeholder="mlx-community/TRELLIS.2-4B" style="flex: 1; min-width: 0;" />
+                  </div>
+                  <input type="text" id="aiNeuralUrl_trellis" class="ai-input" placeholder="http://localhost:8000/v1/3d/generations" />
+                  <input type="password" id="aiNeuralKey_trellis" class="ai-input" placeholder="API Key (optional for local oMLX / Gradio)" autocomplete="off" />
+                </div>
+              </div>
+
+              <!-- 2. Hunyuan3D -->
+              <div class="ai-neural-provider-card" data-provider-id="hunyuan3d" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                  <label class="ai-checkbox-label" for="aiNeuralEnabled_hunyuan3d" style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0;">
+                    <input type="checkbox" id="aiNeuralEnabled_hunyuan3d" data-neural-enable="hunyuan3d" />
+                    <span><strong>Hunyuan3D</strong></span>
+                  </label>
+                  <button type="button" class="ai-chip-btn" id="btnTestNeural_hunyuan3d" data-neural-test="hunyuan3d" title="Test Hunyuan3D Endpoint Connection">Test</button>
+                </div>
+                <div class="ai-slider-subtext" style="margin-top: 2px;">Fast Tencent open-source textured 3D object generation.</div>
+                <div id="aiNeuralConfigBody_hunyuan3d" style="display: none; margin-top: 6px; flex-direction: column; gap: 5px;">
+                  <div class="ai-input-row" style="gap: 6px;">
+                    <select id="aiNeuralProtocol_hunyuan3d" class="ai-select tool-select" data-neural-protocol="hunyuan3d" style="width: 130px;">
+                      <option value="omlx">oMLX (Local)</option>
+                      <option value="local_rest">Local REST</option>
+                      <option value="gradio">Gradio WebUI</option>
+                      <option value="fal">Fal.ai (Cloud)</option>
+                      <option value="replicate">Replicate</option>
+                    </select>
+                    <input type="text" id="aiNeuralModel_hunyuan3d" class="ai-input" placeholder="mlx-community/Hunyuan3D-2.1" style="flex: 1; min-width: 0;" />
+                  </div>
+                  <input type="text" id="aiNeuralUrl_hunyuan3d" class="ai-input" placeholder="http://localhost:8000/v1/3d/generations" />
+                  <input type="password" id="aiNeuralKey_hunyuan3d" class="ai-input" placeholder="API Key (optional for local oMLX / Gradio)" autocomplete="off" />
+                </div>
+              </div>
+
+              <!-- 3. Hi3D (V1.0 to V3.0) -->
+              <div class="ai-neural-provider-card" data-provider-id="hi3d" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                  <label class="ai-checkbox-label" for="aiNeuralEnabled_hi3d" style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0;">
+                    <input type="checkbox" id="aiNeuralEnabled_hi3d" data-neural-enable="hi3d" />
+                    <span><strong>Hi3D (V1.0–V3.0)</strong></span>
+                  </label>
+                  <button type="button" class="ai-chip-btn" id="btnTestNeural_hi3d" data-neural-test="hi3d" title="Test Hi3D Endpoint Connection">Test</button>
+                </div>
+                <div class="ai-slider-subtext" style="margin-top: 2px;">High-resolution 2K watertight meshes optimized for 3D printing.</div>
+                <div id="aiNeuralConfigBody_hi3d" style="display: none; margin-top: 6px; flex-direction: column; gap: 5px;">
+                  <div class="ai-input-row" style="gap: 6px;">
+                    <select id="aiNeuralProtocol_hi3d" class="ai-select tool-select" data-neural-protocol="hi3d" style="width: 130px;">
+                      <option value="omlx">oMLX (Local)</option>
+                      <option value="local_rest">Local REST</option>
+                      <option value="gradio">Gradio WebUI</option>
+                      <option value="fal">Fal.ai (Cloud)</option>
+                      <option value="replicate">Replicate</option>
+                    </select>
+                    <input type="text" id="aiNeuralModel_hi3d" class="ai-input" placeholder="mlx-community/Hi3D-V3.0" style="flex: 1; min-width: 0;" />
+                  </div>
+                  <input type="text" id="aiNeuralUrl_hi3d" class="ai-input" placeholder="http://localhost:8000/v1/3d/generations" />
+                  <input type="password" id="aiNeuralKey_hi3d" class="ai-input" placeholder="API Key (optional for local oMLX / Gradio)" autocomplete="off" />
+                </div>
+              </div>
             </div>
 
             <div class="ai-settings-actions" style="display: flex; gap: 8px;">

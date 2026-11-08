@@ -28,7 +28,22 @@ import {
   AIAgentRequestOptions,
   AIAgentSkillDefinition,
   AIAgentToolExecutionStep,
+  Neural3DBackendId,
+  Neural3DProviderConfig,
+  Neural3DProvidersMap,
 } from './types';
+import {
+  createDefaultNeural3DProviders,
+  NEURAL_3D_PROTOCOL_DEFAULTS,
+  Neural3DGeneratorService,
+  normalizeNeural3DProviders,
+} from './Neural3DGeneratorService';
+export {
+  createDefaultNeural3DProviders,
+  NEURAL_3D_PROTOCOL_DEFAULTS,
+  Neural3DGeneratorService,
+  normalizeNeural3DProviders,
+} from './Neural3DGeneratorService';
 import {
   ToolRegistry,
   ToolInterface,
@@ -62,6 +77,7 @@ export const DEFAULT_AI_AGENT_CONFIG: AIAgentEndpointConfig = {
   createTextures: true,
   createNormalMaps: true,
   visualCritique: false,
+  neural3DProviders: createDefaultNeural3DProviders(),
 };
 
 export interface EndpointPreset {
@@ -109,6 +125,13 @@ export const AI_ENDPOINT_PRESETS: EndpointPreset[] = [
     requiresKey: true,
   },
   {
+    id: 'omlx',
+    label: 'oMLX (Local Apple Silicon)',
+    baseUrl: 'http://localhost:8000/v1',
+    defaultModel: 'mlx-community/Qwen2.5-Coder-32B-Instruct-4bit',
+    requiresKey: false,
+  },
+  {
     id: 'ollama',
     label: 'Ollama (Local)',
     baseUrl: 'http://localhost:11434/v1',
@@ -141,6 +164,9 @@ export class AIAgentService {
   public toolRegistry: ToolRegistry;
   private materialRegistry: Map<string, PBRMaterial> = new Map();
   public customFetch: typeof fetch | null = null;
+  private currentRequestImages: string[] = [];
+  private currentRequestSignal?: AbortSignal;
+  private currentRequestOnStatus?: (statusText: string) => void;
 
   constructor(
     service: MeshEditorService,
@@ -151,10 +177,14 @@ export class AIAgentService {
     this.customFetch = customFetch || null;
     this.skills = discoverSkills();
     this.toolRegistry = createDefaultToolRegistry();
+    const saved = this.loadSavedConfig();
     this.config = {
       ...DEFAULT_AI_AGENT_CONFIG,
-      ...this.loadSavedConfig(),
+      ...saved,
       ...initialConfig,
+      neural3DProviders: normalizeNeural3DProviders(
+        initialConfig?.neural3DProviders || saved.neural3DProviders || DEFAULT_AI_AGENT_CONFIG.neural3DProviders
+      ),
     };
   }
 
@@ -173,6 +203,9 @@ export class AIAgentService {
       service: this.service,
       scene: this.service.scene,
       aiAgent: this,
+      attachedImages: this.currentRequestImages,
+      signal: this.currentRequestSignal,
+      onStatus: this.currentRequestOnStatus,
       materialRegistry: this.materialRegistry,
       findMeshByNameOrId: (id: string) => this.findMeshByNameOrId(id),
       getOrCreateMaterial: (materialName, colorHex, roughness, metallic, fallbackName) =>
@@ -248,6 +281,7 @@ export class AIAgentService {
           typeof parsed.createNormalMaps === 'boolean' ? parsed.createNormalMaps : DEFAULT_AI_AGENT_CONFIG.createNormalMaps,
         visualCritique:
           typeof parsed.visualCritique === 'boolean' ? parsed.visualCritique : DEFAULT_AI_AGENT_CONFIG.visualCritique,
+        neural3DProviders: normalizeNeural3DProviders(parsed.neural3DProviders),
       };
     } catch {
       return {};
@@ -261,11 +295,19 @@ export class AIAgentService {
         ? this.normalizeModelName(newConfig.model, mergedBaseUrl)
         : this.normalizeModelName(this.config.model, mergedBaseUrl);
 
+    const mergedProviders = newConfig.neural3DProviders
+      ? normalizeNeural3DProviders({
+          ...(this.config.neural3DProviders || createDefaultNeural3DProviders()),
+          ...newConfig.neural3DProviders,
+        })
+      : normalizeNeural3DProviders(this.config.neural3DProviders);
+
     this.config = {
       ...this.config,
       ...newConfig,
       baseUrl: mergedBaseUrl,
       model: mergedModel,
+      neural3DProviders: mergedProviders,
     };
     if (typeof localStorage !== 'undefined') {
       try {
@@ -278,7 +320,47 @@ export class AIAgentService {
   }
 
   public getConfig(): AIAgentEndpointConfig {
-    return { ...this.config };
+    return {
+      ...this.config,
+      neural3DProviders: normalizeNeural3DProviders(this.config.neural3DProviders),
+    };
+  }
+
+  public getNeural3DProviders(): Neural3DProvidersMap {
+    return normalizeNeural3DProviders(this.config.neural3DProviders);
+  }
+
+  public getEnabledNeural3DProviders(): Neural3DProviderConfig[] {
+    const map = this.getNeural3DProviders();
+    return (['trellis', 'hunyuan3d', 'hi3d'] as Neural3DBackendId[])
+      .map((id) => map[id])
+      .filter((p) => p && p.enabled);
+  }
+
+  public setNeural3DProviderConfig(
+    id: Neural3DBackendId,
+    partial: Partial<Neural3DProviderConfig>
+  ): Neural3DProviderConfig {
+    const current = this.getNeural3DProviders();
+    const updated: Neural3DProviderConfig = {
+      ...current[id],
+      ...partial,
+      id,
+    };
+    this.saveConfig({
+      neural3DProviders: {
+        ...current,
+        [id]: updated,
+      },
+    });
+    return this.getNeural3DProviders()[id];
+  }
+
+  public async testNeural3DProvider(
+    id: Neural3DBackendId
+  ): Promise<{ ok: boolean; message: string }> {
+    const provider = this.getNeural3DProviders()[id];
+    return await Neural3DGeneratorService.testProviderConnection(provider, this.customFetch);
   }
 
   public getSkills(): AIAgentSkillDefinition[] {
@@ -760,13 +842,28 @@ export class AIAgentService {
       ? `3. **Colors & Materials**: Assign appropriate PBR colors (\`color\` / \`albedoColor\`, \`roughness\`, \`metallic\`) or procedural textures (\`proceduralTexture\` in \`modeler_create_material\`) to each created part so the model looks detailed and polished right away.${normalMapRule}`
       : `3. **Colors & Materials (Textures DISABLED)**: Texturing is turned OFF by the user. Do NOT generate or apply procedural or image textures (\`proceduralTexture\` / \`textureUrl\`). Use ONLY solid PBR colors (\`color\` / \`albedoColor\`, \`roughness\`, \`metallic\`).`;
 
+    const enabledNeural = this.getEnabledNeural3DProviders();
+    const neuralDelegationSection =
+      enabledNeural.length > 0
+        ? `\n## Active Neural 3D Generators (Available via \`modeler_generate_neural_mesh\`)
+The user has configured and enabled the following external Neural 3D Generators:
+${enabledNeural
+  .map(
+    (p) =>
+      `- **\`${p.id}\` (${p.name})** — Protocol: \`${p.protocol}\`, Model: \`${p.modelId || p.id}\`, Endpoint: \`${p.endpointUrl}\``
+  )
+  .join('\n')}
+
+When requested to create complex organic figures, creatures, statues, busts, monsters, detailed props, or Image-to-3D reconstructions, delegate full tasks or organic hero subtasks to \`modeler_generate_neural_mesh\` (\`backend: "trellis" | "hunyuan3d" | "hi3d" | "auto"\`). For architectural or composite scenes, build walls/columns/stairs/pedestals procedurally and delegate only the organic hero elements to \`modeler_generate_neural_mesh\`.\n`
+        : '';
+
     return `You are the built-in 3D AI Mesh Agent in **Mesh Editor**.
 Your mission is to procedurally build high-quality 3D meshes or accurately update existing meshes directly in the active Babylon.js 3D scene from text prompts and/or reference images ("Text-to-Mesh", "Image-to-Mesh", "Text/Image-to-Mesh Update").
 
 You have built-in Babylon.js modeling tools (\`modeler_*\`) and the following built-in skills available:
 
 ${activeSkillsText}
-
+${neuralDelegationSection}
 ## Current 3D Scene State
 \`\`\`json
 ${sceneStateJson}
@@ -1089,6 +1186,9 @@ ${textureRule}
     let finalAssistantText = '';
     let toolsSupported = true;
 
+    this.currentRequestImages = images;
+    this.currentRequestSignal = options.signal;
+    this.currentRequestOnStatus = options.onStatus;
     this.service.events.onStatusChanged?.('AI Agent working...', true);
 
     try {

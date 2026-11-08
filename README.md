@@ -15,16 +15,22 @@ The Mesh Editor is structured into decoupled layers to ensure complete isolation
 ```
 src/
 ├── index.ts                          # Public exports (App, Service, Adapters, Web Component, Plugins, Tools)
-├── types.ts                          # Shared data types, callbacks, and events
+├── types.ts                          # Shared data types, AI & Neural 3D provider configs, callbacks, and events
 ├── plugin.ts                         # Plugin interfaces (MeshEditorPlugin, Context, PluginManager)
 ├── template.ts                       # Self-contained HTML UI template (compiled from mesheditor.ejs & tool views)
 ├── styles.ts                         # Auto-injected CSS stylesheet for Web Component / NPM usage
+├── builtInSkills.ts                  # Auto-compiled AI Agent modeling skills (synced from skills/*.md)
+├── AIAgentService.ts                 # Multi-turn BYO-AI agent orchestrator, OpenAI/oMLX/Ollama/Gemini client & skills
+├── Neural3DGeneratorService.ts       # Multi-provider Neural 3D generator client (TRELLIS 2, Hunyuan3D, Hi3D via oMLX/REST/Gradio/Cloud)
 ├── MeshEditorService.ts              # Core 3D engine: meshes, gizmos, CSG2, facets, materials
 ├── MeshEditorApp.ts                  # UI coordinator: dat.GUI panels, outliner, window management
 ├── tools/                            # Modular tool architecture
 │   ├── ToolInterface.ts              # Tool contracts, metadata, lifecycle hooks, AI function schemas
 │   ├── AbstractTool.ts               # Base class with math & scene helper utilities
-│   ├── ToolRegistry.ts               # Runtime tool registry & execution dispatcher
+│   ├── ToolRegistry.ts               # Runtime tool registry & execution dispatcher (38 AI + editor tools)
+│   ├── builtin/                      # AI-callable 3D modeling, CSG, material, topology & Neural 3D tools
+│   │   ├── GenerateNeuralMeshTool.ts # modeler_generate_neural_mesh (TRELLIS 2, Hunyuan3D, Hi3D delegation + grounding + QEM)
+│   │   └── ...                       # Primitives, CSG2, Lathe, Extrude, Deform, Retopology, PBR Materials, Scene tools
 │   └── editor/                       # Decentralized editor tools & EJS views
 │       ├── AbstractEditorTool.ts     # Base editor tool with auto-template & DOM rendering
 │       ├── toolViews.ts              # Auto-compiled EJS view templates
@@ -49,6 +55,13 @@ src/
 │   └── MeshEditorElement.ts          # <mesh-editor> Custom Element
 ├── mesheditor.ejs                    # Modular HTML entry template with EJS tool includes
 └── mesheditor.css                    # Theme styles, layouts (Floating vs Stackpanel), dialogs
+skills/
+├── 3d-mesh-modeler.md                # Core spatial 3D modeling & proportion skill
+├── csg-boolean-architect.md          # CSG2 boolean sculpting & architectural cutouts skill
+├── pbr-material-stylist.md           # PBR material & procedural normal map skill
+├── mesh-topology-optimizer.md        # Polygon budget & QEM decimation skill
+├── image-to-mesh.md                  # 2D reference image & viewport vision reconstruction skill
+└── neural-3d-generator.md            # Hybrid Neural 3D delegation skill (TRELLIS 2, Hunyuan3D, Hi3D)
 electron/
 ├── main.js                           # Electron main process (macOS, Windows, Linux native dialogs & menu)
 └── preload.js                        # Context-isolated IPC bridge (window.meshEditorElectron)
@@ -99,6 +112,78 @@ electron/
 | **⌘V / Ctrl+V**        | Paste copy at cursor position                               |
 | **⌘D / Ctrl+D**        | Duplicate selected mesh in place                            |
 | **Esc**                | Cancel active Pick & Place placement mode / close dropdowns |
+
+---
+
+## BYO-AI & Hybrid Neural 3D Generators (TRELLIS 2, Hunyuan3D, Hi3D & Local oMLX)
+
+The Mesh Editor is built around a **Bring Your Own AI (BYO-AI)** philosophy with zero vendor lock-in. In addition to procedural 3D construction (primitives, lathe, spline extrusions, CSG2 booleans, PBR materials, and procedural normal maps), the AI Mesh Agent can optionally delegate **full 3D generation tasks** or **organic subtasks** to external **Neural 3D Generators**.
+
+### 1. Supported LLM / VLM Co-Pilot Endpoints
+
+Open **Tools → AI Mesh Agent** (`✨`) and click the **Settings (`⚙`)** button to choose from built-in endpoint presets or any custom OpenAI-compatible API:
+
+| Preset | Default Base URL | Description |
+| :--- | :--- | :--- |
+| **Antigravity Bridge** | `http://127.0.0.1:8317/v1` | Local Antigravity IDE / Proxy bridge |
+| **oMLX (Local)** | `http://localhost:8000/v1` | Local Apple Silicon macOS MLX inference server (`oMLX`) |
+| **Ollama (Local)** | `http://localhost:11434/v1` | Local Ollama server (e.g. `qwen2.5-coder:32b`, `llama3.3`) |
+| **LM Studio** | `http://localhost:1234/v1` | Local LM Studio OpenAI-compatible server |
+| **Google Gemini** | `https://generativelanguage.googleapis.com/v1beta/openai` | Cloud Gemini 2.5 Pro / Flash via OpenAI compatibility layer |
+| **OpenAI** | `https://api.openai.com/v1` | Cloud GPT-4o / o3-mini |
+| **OpenRouter** | `https://openrouter.ai/api/v1` | Unified gateway for Claude Sonnet, DeepSeek, Qwen, etc. |
+
+---
+
+### 2. Optional Neural 3D Generators (Multi-Provider BYO-3D)
+
+Under **Settings (`⚙`) → Neural 3D Generators (Optional BYO 3D)**, you can enable **one, two, or all three** neural 3D backends simultaneously. When enabled, the AI Agent dynamically injects the [`neural-3d-generator`](skills/neural-3d-generator.md) skill and exposes the [`modeler_generate_neural_mesh`](src/tools/builtin/GenerateNeuralMeshTool.ts) tool:
+
+| Generator | Backend ID | Core Strengths & Best Use Cases |
+| :--- | :--- | :--- |
+| **TRELLIS 2 / TRELLIS** | `trellis` | **Clean SLAT Mesh Structures & High Visual Fidelity:** Ideal for Image-to-3D and Text-to-3D hero props, statues, creatures, foliage, and intricate organic geometry. |
+| **Hunyuan3D** | `hunyuan3d` | **Fast Textured Object Generation (`Hunyuan3D-DiT` + `Hunyuan3D-Paint`):** Ideal when rapid generation of pre-textured 3D objects with baked UV albedo textures is desired. |
+| **Hi3D (V1.0–V3.0)** | `hi3d` | **High-Resolution 2K Watertight 3D Printing Meshes:** Optimized for dense, manifold, watertight 2K surface geometry ready for direct STL/OBJ slicing and 3D printing (`resolutionMode: '2k_print'`). |
+
+#### Supported Protocols (`Neural3DProtocol`)
+
+Each Neural 3D Generator card can be configured independently to run **locally** (e.g. via **oMLX** on Apple Silicon) or via **cloud BYO-Key APIs**:
+
+1. **`omlx` (Local oMLX Server — Recommended on Apple Silicon macOS)**:
+   - Default Endpoint: `http://localhost:8000/v1/3d/generations` (with automatic fallback to `/generate`)
+   - Default Model IDs:
+     - TRELLIS 2: `microsoft/TRELLIS-image-large`
+     - Hunyuan3D: `tencent/Hunyuan3D-2`
+     - Hi3D: `Hi3D/Hi3D-V3.0-2K`
+   - Sends JSON requests with `model`, `backend`, `prompt`, `image` (Data URL), `resolution`, `octree_resolution`, `textured`, and `watertight` flags.
+2. **`local_rest` (Local FastAPI / Custom REST Wrapper)**:
+   - Connects to any local microservice (e.g. `http://localhost:8081/generate`) returning binary `.glb`/`.obj`/`.stl`, Base64 JSON (`glb_base64`), raw Wavefront OBJ text, or JSON vertex/index arrays.
+3. **`gradio` (Local Gradio WebUI)**:
+   - Connects directly to official Gradio WebUIs (e.g. `http://127.0.0.1:7860`) via `/api/predict` or `/run/predict` and resolves returned `/file=...` mesh paths automatically.
+4. **`fal` & `replicate` (Cloud BYO-Key Endpoints)**:
+   - Connects to `https://fal.run/fal-ai/...` or `https://api.replicate.com/v1/predictions` using your personal API key stored locally in `localStorage`.
+
+> [!TIP]
+> Click the **Test** button inside any Neural 3D Generator card to verify connectivity against your local `oMLX`, Gradio, or cloud endpoint before starting a modeling prompt.
+
+---
+
+### 3. Hybrid Procedural + Neural Subtask Delegation Workflow
+
+Rather than treating neural 3D generation as an isolated black box, the AI Mesh Agent combines **deterministic Babylon.js procedural geometry** with **neural 3D subtask delegation**:
+
+1. **Full-Task Delegation**:
+   - Prompt: *"Generate a detailed gargoyle statue using TRELLIS"* or *"Create a watertight 2K dragon figurine for 3D printing with Hi3D."*
+   - The AI Agent routes the request directly to `modeler_generate_neural_mesh(provider: 'trellis' | 'hi3d', ...)`.
+2. **Hybrid Scene Composition (Procedural Base + Neural Hero Subtask)**:
+   - Prompt: *"Build a classical marble temple pedestal with fluted columns and place a weathered bronze lion statue on top."*
+   - **Step 1 (Procedural Precision):** The agent constructs the stepped plinth, columns, and pedestal cap (`height = 1.5`) using exact primitives, lathe profiles, and `csg_boolean` operations.
+   - **Step 2 (Neural Subtask Delegation):** The agent invokes `modeler_generate_neural_mesh` with `prompt: "weathered bronze lion statue"`, `targetHeight: 1.8`, and `position: [0, 1.5, 0]`.
+   - **Step 3 (Automatic Normalization, Grounding & Retopology):**
+     - `GenerateNeuralMeshTool` imports the generated `.glb`/`.obj`/`.stl` into the live Babylon.js scene.
+     - Computes the world bounding box across all imported sub-meshes and scales the asset uniformly to match `targetHeight: 1.8`.
+     - Aligns the bottom-most vertices to `Y = 0` prior to applying `position: [0, 1.5, 0]`, guaranteeing the neural statue rests flush on top of the `1.5m` pedestal without floating or clipping.
+     - Optionally runs Quadric Error Metrics (`QEM`) decimation (`targetTriangles`) to match the active game polygon budget—or preserves dense 2K manifold topology when `resolutionMode: '2k_print'` (`Hi3D`) is selected.
 
 ---
 
@@ -508,6 +593,7 @@ bootstrap();
 | **End-to-End Tests (Browser)**       | `npm run test:e2e`                      | Starts the dev server and runs Playwright Chromium E2E tests (`tests/e2e/`)                                                                                                                   |
 | **Full Test Suite**                  | `npm run test:all`                      | Runs all integration tests followed by all Playwright E2E tests                                                                                                                               |
 | **Sync Tool View Templates**         | `npm run sync:templates`                | Synchronizes decentralized `.ejs` tool views into `toolViews.ts` and updates `src/template.ts`                                                                                                |
+| **Sync AI Modeling Skills**          | `npm run sync:skills`                   | Synchronizes markdown skill definitions (`skills/*.md`) into `src/builtInSkills.ts`                                                                                                           |
 | **Clean Build Artifacts**            | `npm run clean`                         | Removes `dist/`, `dist-lib/`, and `release/`                                                                                                                                                  |
 
 ---
@@ -636,7 +722,9 @@ The Mesh Editor uses a **two-tier testing architecture**:
 tests/
 ├── integration/
 │   ├── service.test.ts          # Stage 1: Core 3D service tests (Vitest + Babylon NullEngine)
-│   └── app-and-plugins.test.ts  # Stage 1: UI mounting, Outliner DOM sync, PluginManager & HostAppAdapter
+│   ├── app-and-plugins.test.ts  # Stage 1: UI mounting, Outliner DOM sync, PluginManager & HostAppAdapter
+│   ├── tools.test.ts            # Stage 1: ToolRegistry, 38 built-in & editor tools, execution schemas
+│   └── ai-agent.test.ts         # Stage 1: BYO-AI agent, skills, oMLX & Neural 3D Generator delegation
 └── e2e/
     └── editor.spec.ts           # Stage 2: Full browser E2E smoke & workflow tests (Playwright Chromium)
 ```

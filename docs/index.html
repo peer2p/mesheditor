@@ -25,6 +25,7 @@
         <ul class="nav-links">
           <li><a href="#overview" class="nav-link">Overview</a></li>
           <li><a href="#ai-copilot" class="nav-link">Human + AI</a></li>
+          <li><a href="#neural-3d" class="nav-link">Neural 3D</a></li>
           <li><a href="#adapters" class="nav-link">Adapters</a></li>
           <li><a href="#plugin-system" class="nav-link">Plugin System</a></li>
           <li><a href="#features" class="nav-link">Features</a></li>
@@ -119,7 +120,7 @@
             </li>
             <li class="overview-bullet-item">
               <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span><strong>Co-create with the AI of your choice:</strong> Partner with local or cloud AI models (Gemini, Claude, GPT-4o, Ollama, LM Studio) to generate meshes from text prompts, sketches, or viewport vision snapshots within strict polygon budgets.</span>
+              <span><strong>Co-create with the AI of your choice:</strong> Partner with local or cloud AI models (oMLX, Ollama, LM Studio, Gemini, Claude, GPT-4o) and delegate organic hero subtasks to Neural 3D Generators (TRELLIS 2, Hunyuan3D, Hi3D).</span>
             </li>
             <li class="overview-bullet-item">
               <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -193,8 +194,8 @@
           <div class="stat-label">In-Browser &amp; Zero File Uploads</div>
         </div>
         <div class="stat-item">
-          <div class="stat-val text-gradient-cyan">BYO-AI</div>
-          <div class="stat-label">OpenAI, Gemini, Ollama, Claude, LM Studio</div>
+          <div class="stat-val text-gradient-cyan">BYO-AI + 3D</div>
+          <div class="stat-label">oMLX, Ollama, Gemini + TRELLIS 2, Hunyuan3D, Hi3D</div>
         </div>
         <div class="stat-item">
           <div class="stat-val text-gradient-cyan">3 Adapters</div>
@@ -229,9 +230,10 @@
             </div>
             <h3 class="card-title">Bring Your Own AI (BYO-AI)</h3>
             <p class="card-desc">
-              Connect to any OpenAI-compatible API endpoint with zero vendor lock-in. Use cloud models like <strong>Gemini 3.8 Flash &amp; Pro</strong>, <strong>Claude Sonnet</strong>, or <strong>GPT-4o</strong>, or run 100% private and offline on your own GPU via <strong>Ollama</strong> and <strong>LM Studio</strong>.
+              Connect to any OpenAI-compatible API endpoint with zero vendor lock-in. Use cloud models like <strong>Gemini 3.8 Flash &amp; Pro</strong>, <strong>Claude Sonnet</strong>, or <strong>GPT-4o</strong>, or run 100% private and offline on your own Apple Silicon Mac or GPU via <strong>oMLX</strong>, <strong>Ollama</strong>, and <strong>LM Studio</strong>.
             </p>
             <div class="card-tags">
+              <span class="card-tag">oMLX (Apple Silicon)</span>
               <span class="card-tag">Antigravity Bridge</span>
               <span class="card-tag">Gemini Flash</span>
               <span class="card-tag">OpenAI</span>
@@ -418,6 +420,129 @@
                 <div class="shimmer-progress-fill"></div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         HYBRID PROCEDURAL + NEURAL 3D GENERATORS (TRELLIS 2, HUNYUAN3D, HI3D)
+         ========================================================================= -->
+    <section id="neural-3d" class="section" style="background: rgba(16, 21, 30, 0.32);">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">Hybrid Procedural + Neural 3D</span>
+          <h2 class="section-title">Optional Neural 3D Generator Delegation.</h2>
+          <p class="section-desc">
+            Combine deterministic Babylon.js CSG architecture with open-source <strong>Neural 3D Generators</strong>. 
+            Enable one or all three neural backends simultaneously—locally via <strong>oMLX</strong> on Apple Silicon, FastAPI, or Gradio, or via cloud BYO-Key endpoints—and let the AI Agent automatically route full tasks or complex organic subtasks to the optimal generator.
+          </p>
+        </div>
+
+        <div class="ai-feature-card-grid" style="margin-bottom: 36px;">
+          <!-- Generator 1: TRELLIS 2 / TRELLIS -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            </div>
+            <h3 class="card-title">TRELLIS 2 / TRELLIS</h3>
+            <p class="card-desc">
+              Renowned for outstanding open-source Image-to-3D and Text-to-3D visual fidelity and clean <strong>Structured 3D Latent (SLAT)</strong> mesh structures. Ideal for detailed hero props, statues, creatures, foliage, and organic centerpieces.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">SLAT Topology</span>
+              <span class="card-tag">Image-to-3D &amp; Text-to-3D</span>
+              <span class="card-tag">oMLX / Local / Cloud</span>
+            </div>
+          </div>
+
+          <!-- Generator 2: Hunyuan3D -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="m4.93 4.93 4.24 4.24"></path><path d="m14.83 9.17 4.24-4.24"></path><path d="m14.83 14.83 4.24 4.24"></path><path d="m9.17 14.83-4.24 4.24"></path></svg>
+            </div>
+            <h3 class="card-title">Hunyuan3D (2.0 / 2.5)</h3>
+            <p class="card-desc">
+              Tencent&rsquo;s open-source diffusion and UV synthesis pipeline (<code>Hunyuan3D-DiT</code> + <code>Hunyuan3D-Paint</code>) engineered for rapid generation of complete, UV-textured 3D objects with baked surface albedo maps.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Fast Textured GLB</span>
+              <span class="card-tag">Hunyuan3D-DiT + Paint</span>
+              <span class="card-tag">oMLX / Gradio / Fal</span>
+            </div>
+          </div>
+
+          <!-- Generator 3: Hi3D (V1.0 - V3.0) -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            </div>
+            <h3 class="card-title">Hi3D (V1.0 to V3.0)</h3>
+            <p class="card-desc">
+              Open-source generator specifically optimized for high-resolution <strong>2K watertight manifold meshes</strong> (<code>resolutionMode: '2k_print'</code>) that can be exported directly to STL/OBJ for 3D printing slicers without decimation loss.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">2K Watertight Meshes</span>
+              <span class="card-tag">3D Print Ready</span>
+              <span class="card-tag">Manifold Geometry</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="plugin-section-grid">
+          <div>
+            <span class="section-tag">Subtask Delegation &amp; Local oMLX</span>
+            <h3 class="section-title" style="font-size: 28px;">Procedural Precision Meets Neural Organic Sculpting.</h3>
+            <p class="section-desc" style="margin-bottom: 18px;">
+              When you configure one or more Neural 3D Generators in <strong>Settings &rarr; Neural 3D Generators</strong>, the AI Agent unlocks the <code>neural-3d-generator</code> skill and <code>modeler_generate_neural_mesh</code> tool.
+            </p>
+            <ul class="adapter-list" style="margin-bottom: 20px;">
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Local Apple Silicon Execution via oMLX:</strong> Run TRELLIS 2, Hunyuan3D, and Hi3D locally on macOS via <code>http://localhost:8000/v1/3d/generations</code>, Gradio WebUI, or FastAPI.</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Hybrid Subtask Routing:</strong> The agent builds exact geometric bases, columns, and mechanical housings procedurally, then delegates only the organic statue or creature to the best neural generator.</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Auto-Scaling &amp; Pedestal Grounding (Y = 0):</strong> Imported neural meshes are automatically scaled to <code>targetHeight</code> and bottom-aligned so statues rest flush on procedural pedestals.</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>QEM Retopology or 2K Print Preservation:</strong> Automatically decimates neural meshes into your game polygon budget, or preserves full 2K manifold detail for 3D printing with Hi3D.</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="code-window">
+            <div class="code-header">
+              <div class="code-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+              </div>
+              <span class="code-title">Hybrid Subtask Delegation &bull; oMLX Local</span>
+              <span style="font-size: 11px; color: var(--accent-hover);">Tool Execution</span>
+            </div>
+            <pre class="code-body"><code><span class="code-cm">// 1. Procedural Base: Agent builds exact 1.5m marble pedestal</span>
+<span class="code-fn">modeler_create_primitive</span>({
+  shape: <span class="code-str">'cylinder'</span>, name: <span class="code-str">'Temple_Pedestal'</span>,
+  height: <span class="code-num">1.5</span>, diameter: <span class="code-num">1.4</span>, position: [<span class="code-num">0</span>, <span class="code-num">0.75</span>, <span class="code-num">0</span>]
+});
+
+<span class="code-cm">// 2. Neural Subtask: Delegate organic statue to TRELLIS / Hi3D</span>
+<span class="code-cm">// Automatically scales to 1.8m &amp; grounds bottom at Y = 1.5m</span>
+<span class="code-fn">modeler_generate_neural_mesh</span>({
+  provider: <span class="code-str">'trellis'</span>, <span class="code-cm">// or 'hunyuan3d' | 'hi3d' | 'auto'</span>
+  prompt: <span class="code-str">'weathered bronze guardian lion statue, intricate mane'</span>,
+  name: <span class="code-str">'Guardian_Lion_Statue'</span>,
+  targetHeight: <span class="code-num">1.8</span>,
+  position: [<span class="code-num">0</span>, <span class="code-num">1.5</span>, <span class="code-num">0</span>],
+  resolutionMode: <span class="code-str">'high'</span>,
+  targetTriangles: <span class="code-num">12000</span>
+});</code></pre>
           </div>
         </div>
       </div>
@@ -941,6 +1066,7 @@
         </div>
         <div style="display: flex; gap: 24px;">
           <a href="#ai-copilot" class="nav-link">Human + AI</a>
+          <a href="#neural-3d" class="nav-link">Neural 3D</a>
           <a href="#adapters" class="nav-link">Adapters</a>
           <a href="#plugin-system" class="nav-link">Plugin SDK</a>
           <a href="#roadmap" class="nav-link">Roadmap</a>
