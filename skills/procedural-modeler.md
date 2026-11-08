@@ -21,8 +21,9 @@ Use this skill whenever requested to create or extend 3D models, assets, or geom
    - Refine with Box-Modeling & Topology edits (`modeler_facet_extrude`, `modeler_facet_inset`, `modeler_facet_arc`, `modeler_facet_cut_through`).
    - Apply wall thickness (`modeler_solidify_mesh`) or organic curvature (`modeler_subd_smooth`).
    - Apply materials before or after CSG operations (`modeler_create_material`, `modeler_apply_material`).
-   - Combine or carve shapes using CSG (`modeler_boolean_operation`: `union`, `subtract`, `intersect`).
-   - Apply `modeler_auto_uv_mapping` to CSG, extruded, or modified meshes so textures project cleanly.
+   - Combine or carve shapes using CSG (`modeler_boolean_operation`: `union`, `subtract`, `intersect` with `nonDestructive: true` and optional `bevelWidth` / `bevelProfile` for rounded intersection edges).
+   - Unwrap UVs with Smart Seams, uniform Texel Density (`px/m`), and 2D Island Bin-Packing (`modeler_uv_unwrap`) or quick triplanar projection (`modeler_auto_uv_mapping`).
+   - Bake High-Poly detail into Tangent-Space Normal & Ambient Occlusion maps (`modeler_bake_textures`) or rig/skin characters (`modeler_rig_and_weight`).
 
 ## Box-Modeling & Topology Workflows (Facet Tool Methods)
 
@@ -225,3 +226,10 @@ To avoid crude, wooden, or blocky results, prefer these high-level parametric to
    - Builds `"gable"`, `"hip"`, `"pyramid"`, `"shed"`, or `"dome"` roofs with real fascia slab thickness, eaves `overhang`, ridge cap beam, and triangular gable infill walls. Place at `position: { x: 0, y: wallHeight, z: 0 }`.
 9. **Seamless Organic Clay / Metaball Meshes (`modeler_create_sdf_mesh`)**:
    - Evaluates analytical Signed Distance Fields (`sphere`, `ellipsoid`, `round_cone`, `capsule`, `box`, `torus`, `cylinder`) with polynomial smooth union (`blend: 0.04` to `0.12`), smooth subtraction (`op: "subtract"`), `symmetryX: true`, and smooth vertex color blending.
+10. **Non-Destructive CSG & Bevel Modifier (`modeler_boolean_operation`)**:
+   - Pass `nonDestructive: true` (default) to preserve a lossless base-mesh snapshot for later adjustments or reverts.
+   - Pass `bevelWidth` (e.g. `0.02` to `0.06`), `bevelSegments` (`1` to `3`), `bevelAngleThreshold` (`30`), and `bevelProfile` (`"chamfer"` or `"fillet"`) to automatically round sharp boolean intersection edges.
+11. **Game-Ready UV Unwrapping, Texel Density & Island Packing (`modeler_uv_unwrap`)**:
+   - Marks Smart Seams (`seamMode: "sharp_edges" | "cylindrical" | "box"`), unfolds UV islands (`method: "seam_unwrap"`), normalizes uniform **Texel Density** (`targetTexelDensity: 256` px/m at `textureSize: 1024`), and packs islands into `[0, 1]` UV space without overlaps (`packIslands: true`, `paddingPixels: 4`).
+12. **High-to-Low-Poly Normal Map & AO Baking (`modeler_bake_textures`)**:
+   - Projects micro-details (grooves, bevels, pores, bolts) from a high-poly sculpt onto a low-poly game mesh using an automatic smooth-normal **Projection Cage** (`cageOffset: 0.05`, `bakeNormals: true`, `bakeAO: true`, `dilationPixels: 4`, `applyToMaterial: true`).

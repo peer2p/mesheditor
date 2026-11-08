@@ -2,6 +2,7 @@ import { ToolInterface } from '../ToolInterface';
 import { AbstractEditorTool } from './AbstractEditorTool';
 import { AIAgentEditorTool } from './AIAgentEditorTool';
 import { AnimationPlayerEditorTool } from './AnimationPlayerEditorTool';
+import { BakingEditorTool } from './BakingEditorTool';
 import { CreatePrimitiveEditorTool } from './CreatePrimitiveEditorTool';
 import { CSGEditorTool } from './CSGEditorTool';
 import { FacetEditorTool } from './FacetEditorTool';
@@ -9,9 +10,11 @@ import { MaterialEditorTool } from './MaterialEditorTool';
 import { MeshPropertiesEditorTool } from './MeshPropertiesEditorTool';
 import { OutlinerEditorTool } from './OutlinerEditorTool';
 import { PathExtrusionEditorTool } from './PathExtrusionEditorTool';
+import { RiggingEditorTool } from './RiggingEditorTool';
 import { SceneEnvironmentEditorTool } from './SceneEnvironmentEditorTool';
 import { TextureOptimizerEditorTool } from './TextureOptimizerEditorTool';
 import { CompressModelEditorTool } from './CompressModelEditorTool';
+import { UVUnwrapEditorTool } from './UVUnwrapEditorTool';
 import { VoxelPainterEditorTool } from './VoxelPainterEditorTool';
 import { SculptEditorTool } from './SculptEditorTool';
 import { TOOL_VIEWS, getToolViewTemplate } from './toolViews';
@@ -20,6 +23,7 @@ export {
   AbstractEditorTool,
   AIAgentEditorTool,
   AnimationPlayerEditorTool,
+  BakingEditorTool,
   CreatePrimitiveEditorTool,
   CSGEditorTool,
   FacetEditorTool,
@@ -27,9 +31,11 @@ export {
   MeshPropertiesEditorTool,
   OutlinerEditorTool,
   PathExtrusionEditorTool,
+  RiggingEditorTool,
   SceneEnvironmentEditorTool,
   TextureOptimizerEditorTool,
   CompressModelEditorTool,
+  UVUnwrapEditorTool,
   VoxelPainterEditorTool,
   SculptEditorTool,
   TOOL_VIEWS,
@@ -51,10 +57,13 @@ export function createBuiltinEditorTools(): ToolInterface[] {
     new AIAgentEditorTool(),
     new MeshPropertiesEditorTool(),
     new MaterialEditorTool(),
+    new UVUnwrapEditorTool(),
+    new BakingEditorTool(),
     new TextureOptimizerEditorTool(),
     new CompressModelEditorTool(),
     new SceneEnvironmentEditorTool(),
     new AnimationPlayerEditorTool(),
+    new RiggingEditorTool(),
   ];
 }
 
@@ -62,4 +71,3 @@ export function createBuiltinEditorTools(): ToolInterface[] {
  * Backwards compatibility alias for `createBuiltinEditorTools`.
  */
 export const getBuiltinEditorTools = createBuiltinEditorTools;
-

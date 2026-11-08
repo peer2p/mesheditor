@@ -51,6 +51,16 @@ import {
 } from './voxel';
 import { PathExtrusionController } from './pathExtrusion';
 import { SculptController } from './sculpting/SculptController';
+import { UVUnwrapController } from './uv/UVUnwrapController';
+import { TextureBaker } from './baking/TextureBaker';
+import { WeightPaintController } from './rigging/WeightPaintController';
+import {
+  BevelModifierOptions,
+  NonDestructiveCSGMetadata,
+  captureMeshSnapshot,
+  computeBeveledSnapshot,
+  restoreMeshSnapshot,
+} from './geometry/bevelModifier';
 import { generateNormalMapFromCanvas } from './tools/textureUtils';
 import {
   ModelCompressor,
@@ -88,6 +98,9 @@ export class MeshEditorService {
   public voxelPainter: VoxelPainterController;
   public pathExtrusion: PathExtrusionController;
   public sculptController: SculptController;
+  public uvUnwrapController: UVUnwrapController;
+  public textureBaker: TextureBaker;
+  public weightPaintController: WeightPaintController;
   public get pathWays(): PathExtrusionController {
     return this.pathExtrusion;
   }
@@ -195,6 +208,9 @@ export class MeshEditorService {
     this.voxelPainter = new VoxelPainterController(this, this.textureAtlasManager);
     this.pathExtrusion = new PathExtrusionController(this);
     this.sculptController = new SculptController(this);
+    this.uvUnwrapController = new UVUnwrapController(this);
+    this.textureBaker = new TextureBaker(this);
+    this.weightPaintController = new WeightPaintController(this);
     const defaultAtlas = this.textureAtlasManager.getAtlases()[0];
     if (defaultAtlas) {
       this.voxelPainter.useTextureAtlas(defaultAtlas.id);
@@ -376,6 +392,9 @@ export class MeshEditorService {
     }
     this.voxelPainter?.dispose();
     this.sculptController?.dispose();
+    this.uvUnwrapController?.dispose();
+    this.textureBaker?.dispose();
+    this.weightPaintController?.dispose();
     if (this.engine) {
       this.engine.dispose();
     }
@@ -2533,7 +2552,13 @@ export class MeshEditorService {
     targetMesh: Mesh,
     toolMesh: Mesh,
     op: 'subtract' | 'union' | 'intersect',
-    keepToolMesh: boolean = false
+    keepToolMesh: boolean = false,
+    options?: {
+      nonDestructive?: boolean;
+      bevelWidth?: number;
+      bevelSegments?: number;
+      angleThresholdDeg?: number;
+    }
   ): Promise<Mesh | null> {
     if (!targetMesh || !toolMesh) {
       this.events.onToast?.('Please specify both a target mesh and a cutter mesh.', 'warning');
@@ -2562,6 +2587,11 @@ export class MeshEditorService {
 
     validTarget.computeWorldMatrix(true);
     validTool.computeWorldMatrix(true);
+
+    const originalTargetSnapshot =
+      options?.nonDestructive !== false ? captureMeshSnapshot(validTarget) : undefined;
+    const origTargetName = validTarget.name;
+    const origToolName = validTool.name;
 
     const targetMat = validTarget.material;
     const targetParent = validTarget.parent;
@@ -2635,6 +2665,35 @@ export class MeshEditorService {
     resultMesh.computeWorldMatrix(true);
     this.centerMeshPivot(resultMesh);
 
+    // Store Non-Destructive CSG & Bevel Modifier metadata on resultMesh
+    const unbeveledBaseSnapshot = captureMeshSnapshot(resultMesh);
+    const nonDestructiveMeta: NonDestructiveCSGMetadata = {
+      isNonDestructive: options?.nonDestructive !== false,
+      operation: op,
+      targetMeshName: origTargetName,
+      toolMeshName: origToolName,
+      originalTargetSnapshot,
+      unbeveledBaseSnapshot,
+      bevel: {
+        enabled: (options?.bevelWidth || 0) > 0,
+        width: options?.bevelWidth || 0,
+        segments: options?.bevelSegments || 2,
+        angleThresholdDeg: options?.angleThresholdDeg ?? 30,
+        sharpEdgeCount: 0,
+      },
+    };
+    if (!resultMesh.metadata) resultMesh.metadata = {};
+    resultMesh.metadata.nonDestructiveCSG = nonDestructiveMeta;
+
+    if (options?.bevelWidth && options.bevelWidth > 0) {
+      this.applyNonDestructiveBevel(resultMesh, {
+        width: options.bevelWidth,
+        segments: options.bevelSegments || 2,
+        angleThresholdDeg: options.angleThresholdDeg ?? 30,
+        nonDestructive: nonDestructiveMeta.isNonDestructive,
+      });
+    }
+
     // Detach gizmos and highlights from target before disposal
     this.gizmoManager.attachToMesh(null);
     if (this.selectedMesh === validTarget || this.selectedMesh === targetMesh) {
@@ -2701,6 +2760,119 @@ export class MeshEditorService {
     }
 
     return this.performCSGOperation(meshes[0], meshes[1], op as 'subtract' | 'union' | 'intersect');
+  }
+
+  /**
+   * Applies or updates a Non-Destructive Bevel Modifier (Chamfer / Fillet) on `mesh`
+   * without destroying the underlying base mesh geometry.
+   */
+  public applyNonDestructiveBevel(
+    mesh: Mesh,
+    options: BevelModifierOptions
+  ): { mesh: Mesh; sharpEdgeCount: number } {
+    if (!mesh || mesh.isDisposed()) {
+      return { mesh, sharpEdgeCount: 0 };
+    }
+
+    if (!mesh.metadata) mesh.metadata = {};
+    let ndMeta: NonDestructiveCSGMetadata | undefined = mesh.metadata.nonDestructiveCSG;
+    if (!ndMeta || !ndMeta.unbeveledBaseSnapshot) {
+      const snap = captureMeshSnapshot(mesh);
+      ndMeta = {
+        isNonDestructive: options.nonDestructive !== false,
+        operation: 'bevel_only',
+        targetMeshName: mesh.name,
+        originalTargetSnapshot: snap,
+        unbeveledBaseSnapshot: snap,
+        bevel: {
+          enabled: true,
+          width: options.width,
+          segments: options.segments,
+          angleThresholdDeg: options.angleThresholdDeg ?? 30,
+          sharpEdgeCount: 0,
+        },
+      };
+      mesh.metadata.nonDestructiveCSG = ndMeta;
+    }
+
+    const preBevelSnap = captureMeshSnapshot(mesh);
+    const { snapshot: beveledSnap, sharpEdgeCount } = computeBeveledSnapshot(
+      ndMeta.unbeveledBaseSnapshot,
+      options
+    );
+
+    restoreMeshSnapshot(mesh, beveledSnap);
+    ndMeta.bevel = {
+      enabled: options.width > 0,
+      width: options.width,
+      segments: options.segments,
+      angleThresholdDeg: options.angleThresholdDeg ?? 30,
+      sharpEdgeCount,
+    };
+
+    this.recordAction({
+      name: `Bevel Modifier (${mesh.name}, w=${options.width.toFixed(2)})`,
+      undo: () => {
+        if (!mesh.isDisposed()) {
+          restoreMeshSnapshot(mesh, preBevelSnap);
+          this.updateStats();
+          this.events.onSceneModified?.();
+        }
+      },
+      redo: () => {
+        if (!mesh.isDisposed()) {
+          restoreMeshSnapshot(mesh, beveledSnap);
+          this.updateStats();
+          this.events.onSceneModified?.();
+        }
+      },
+    });
+
+    this.updateStats();
+    this.events.onSceneModified?.();
+    return { mesh, sharpEdgeCount };
+  }
+
+  /**
+   * Non-destructively reverts `mesh` back to its un-beveled base (or pre-CSG original base).
+   */
+  public revertNonDestructiveMesh(mesh: Mesh, restorePreCSG: boolean = false): boolean {
+    if (!mesh || mesh.isDisposed()) return false;
+    const ndMeta: NonDestructiveCSGMetadata | undefined = mesh.metadata?.nonDestructiveCSG;
+    if (!ndMeta) return false;
+
+    const targetSnap =
+      restorePreCSG && ndMeta.originalTargetSnapshot
+        ? ndMeta.originalTargetSnapshot
+        : ndMeta.unbeveledBaseSnapshot;
+    if (!targetSnap) return false;
+
+    const preRevertSnap = captureMeshSnapshot(mesh);
+    restoreMeshSnapshot(mesh, targetSnap);
+    ndMeta.bevel.enabled = false;
+    ndMeta.bevel.width = 0;
+
+    this.recordAction({
+      name: `Revert Non-Destructive Base (${mesh.name})`,
+      undo: () => {
+        if (!mesh.isDisposed()) {
+          restoreMeshSnapshot(mesh, preRevertSnap);
+          this.updateStats();
+          this.events.onSceneModified?.();
+        }
+      },
+      redo: () => {
+        if (!mesh.isDisposed()) {
+          restoreMeshSnapshot(mesh, targetSnap);
+          this.updateStats();
+          this.events.onSceneModified?.();
+        }
+      },
+    });
+
+    this.updateStats();
+    this.events.onSceneModified?.();
+    return true;
   }
 
   /* =========================================================================

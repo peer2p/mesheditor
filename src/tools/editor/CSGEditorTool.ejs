@@ -3,7 +3,7 @@
             <span class="dialog-title"><i class="app-icon" data-lucide="shapes"></i> Constructive Solid Geometry</span>
             <div class="dialog-actions">
               <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
-            <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+              <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
             </div>
           </div>
@@ -20,7 +20,54 @@
             "
           >
             <i class="app-icon" data-lucide="lightbulb" style="color: var(--accent-color)"></i>
-            <span>Use a tool mesh (created or selected) to carve, merge, or intersect with a target mesh!</span>
+            <span>Use a tool mesh (created or selected) to carve, merge, or bevel non-destructively!</span>
           </div>
           <div class="dialog-body" id="gui-csg-container"></div>
+          <!-- Non-Destructive Boolean & Bevel Modifier Section -->
+          <div class="dialog-body" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding: 10px 12px;">
+            <div class="sculpt-section-title" style="margin-bottom: 6px;">
+              <i class="app-icon" data-lucide="sliders"></i> Non-Destructive Bevel Modifier
+            </div>
+            <div class="sculpt-options-row" style="margin-bottom: 8px;">
+              <label class="sculpt-checkbox-label" title="Keep underlying base mesh snapshot so bevels and boolean cuts can be adjusted or reverted non-destructively">
+                <input type="checkbox" id="chkCSGNonDestructive" checked />
+                <span><strong>Non-Destructive Mode</strong></span>
+              </label>
+              <span id="csgNonDestructiveBadge" class="sculpt-badge-pill" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 10px;">
+                Active
+              </span>
+            </div>
+
+            <div class="sculpt-slider-row">
+              <div class="sculpt-slider-header">
+                <span class="sculpt-slider-label">Bevel Width (Radius)</span>
+                <span id="csgBevelWidthVal" class="sculpt-slider-val">0.04</span>
+              </div>
+              <input type="range" id="sliderCSGBevelWidth" min="0.00" max="0.30" step="0.01" value="0.04" class="tool-range" />
+            </div>
+
+            <div class="tool-row" style="margin-top: 6px;">
+              <span class="tool-label">Segments</span>
+              <select id="selectCSGBevelSegments" class="tool-select" style="flex: 1;">
+                <option value="1">1 Segment (Chamfer)</option>
+                <option value="2" selected>2 Segments (Smooth Fillet)</option>
+                <option value="3">3 Segments (Rounded Fillet)</option>
+                <option value="4">4 Segments (Ultra Smooth)</option>
+              </select>
+            </div>
+
+            <div class="tool-row" style="margin-top: 6px;">
+              <span class="tool-label">Edge Angle</span>
+              <input type="number" id="numCSGBevelAngle" class="tool-input" min="10" max="89" step="5" value="30" style="width: 80px;" title="Minimum crease angle in degrees to bevel" />
+            </div>
+
+            <div class="sculpt-grid-2" style="margin-top: 8px;">
+              <button type="button" id="btnApplyCSGBevel" class="tool-btn tool-btn-primary" title="Apply or update non-destructive bevel modifier on selected mesh">
+                <i class="app-icon" data-lucide="sparkles"></i> Apply Bevel
+              </button>
+              <button type="button" id="btnRevertCSGBase" class="tool-btn" title="Restore original un-beveled base mesh non-destructively">
+                <i class="app-icon" data-lucide="rotate-ccw"></i> Revert Base
+              </button>
+            </div>
+          </div>
         </div>

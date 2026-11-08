@@ -39,6 +39,9 @@ import {
   CreateRoofTool,
   PlanModelTool,
   GenerateNeuralMeshTool,
+  UVUnwrapTool,
+  BakeTexturesTool,
+  RigWeightTool,
 } from './builtin';
 
 /**
@@ -161,5 +164,8 @@ export function createDefaultToolRegistry(): ToolRegistry {
     new RetopologizeMeshTool(),
     new SculptMeshTool(),
     new GenerateNeuralMeshTool(),
+    new UVUnwrapTool(),
+    new BakeTexturesTool(),
+    new RigWeightTool(),
   ]);
 }

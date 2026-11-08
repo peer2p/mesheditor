@@ -16,7 +16,11 @@ Use this skill when meshes already exist in the scene and the user wants to adap
    - Use the bounding box of existing meshes to accurately position additions (e.g. roof on a house, handle on a cup, wheels on a vehicle, battlements on a tower).
 3. **Modifying Existing Meshes**:
    - **Transform**: Use `modeler_transform_mesh` to move, rotate, scale, rename, snap to ground (`snapToGround: true`), or center pivot (`centerPivot: true`).
-   - **Carve / Bore Holes / Fuse**: Create a cutter tool mesh and call `modeler_boolean_operation` (`subtract`, `union`, `intersect`) with the target mesh as `baseMeshName`.
+   - **Carve / Bore Holes / Fuse & Bevel**: Create a cutter tool mesh and call `modeler_boolean_operation` (`subtract`, `union`, `intersect`, `nonDestructive: true`, `bevelWidth`, `bevelProfile`) with the target mesh as `baseMeshName`.
+   - **Retopologize, Shrinkwrap & Quad-Draw**: Use `modeler_retopologize_mesh` (`mode: "decimate" | "shrinkwrap" | "quad_cage" | "quad_strip"`) to simplify dense meshes, wrap low-poly meshes onto high-poly targets, or draw quad-flow strips.
+   - **UV Unwrap, Texel Density & Island Packing**: Use `modeler_uv_unwrap` to mark smart seams, unfold UV charts, normalize Texel Density (`px/m`), and pack islands cleanly into `[0, 1]` UV space.
+   - **High-to-Low-Poly Baking**: Use `modeler_bake_textures` to project high-poly surface detail onto low-poly Tangent-Space Normal and Ambient Occlusion maps using a smooth Projection Cage.
+   - **Rigging, Skinning & Weight Painting**: Use `modeler_rig_and_weight` (`action: "auto_rig" | "paint_weights" | "pose_bone" | "reset_pose"`) to generate a `humanoid`, `quadruped`, or `spine` skeleton, bind normalized 4-bone skin weights, paint influence zones, and test joint bending.
    - **Change Material & Texture**: Use `modeler_create_material` (including procedural textures: `wood`, `stone`, `brick`, `marble`, `metal`, etc.) and `modeler_apply_material`.
    - **Patterns & Repetition**: Use `modeler_clone_array` (`linear` or `radial`) to repeat parts along an axis or in a circle (pillars, gear teeth, fence posts, stairs).
    - **Separate / Merge**: Use `modeler_separate_mesh` to break loose parts into separate meshes or `modeler_merge_meshes` to fuse parts.

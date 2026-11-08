@@ -1,0 +1,112 @@
+<div id="dialog-rigging" class="floating-dialog" style="top: 210px; right: 365px; width: 340px; display: none">
+  <div class="dialog-header">
+    <span class="dialog-title"><i class="app-icon" data-lucide="bone"></i> Rigging &amp; Weight Paint</span>
+    <div class="dialog-actions">
+      <button class="dialog-btn btn-help" title="Help &amp; Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+      <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+      <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+    </div>
+  </div>
+  <div class="dialog-body sculpt-tool-body">
+    <!-- 1. Skeleton Auto-Rigging & Bone Selection -->
+    <div class="tool-control-group">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="git-branch"></i> Skeleton &amp; Auto-Rigging</div>
+      <div class="tool-row" style="margin-top: 4px;">
+        <span class="tool-label">Rig Preset</span>
+        <select id="selectRigPreset" class="tool-select" style="flex: 1;">
+          <option value="humanoid" selected>Humanoid Biped (20 Bones)</option>
+          <option value="quadruped">Quadruped Creature (11 Bones)</option>
+          <option value="spine_chain">Spine / Prop Chain (5 Bones)</option>
+        </select>
+      </div>
+
+      <div class="sculpt-grid-2" style="margin-top: 6px;">
+        <button type="button" id="btnCreateAutoRig" class="tool-btn tool-btn-primary" title="Generate skeleton hierarchy and bind automatic envelope skin weights">
+          <i class="app-icon" data-lucide="wand-2"></i> Auto-Rig Mesh
+        </button>
+        <button type="button" id="btnAutoBindWeights" class="tool-btn" title="Recalculate automatic envelope skin weights for all bones">
+          <i class="app-icon" data-lucide="refresh-cw"></i> Reset Weights
+        </button>
+      </div>
+
+      <div class="tool-row" style="margin-top: 8px;">
+        <span class="tool-label">Active Bone</span>
+        <select id="selectRigActiveBone" class="tool-select" style="flex: 1;">
+          <option value="0">None (Create Rig First)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 2. Weight Paint Brushes -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="brush"></i> Weight Paint Brush</div>
+      <div class="sculpt-grid-2">
+        <button type="button" class="sculpt-btn btn-weight-mode active" data-mode="add" title="Add bone influence weight (warmer red)">Add Weight</button>
+        <button type="button" class="sculpt-btn btn-weight-mode" data-mode="subtract" title="Subtract bone influence weight (cooler blue)">Subtract</button>
+        <button type="button" class="sculpt-btn btn-weight-mode" data-mode="smooth" title="Smooth and blend bone weights across joint loops">Smooth</button>
+        <button type="button" class="sculpt-btn btn-weight-mode" data-mode="replace" title="Paint exact target weight value">Replace</button>
+      </div>
+
+      <div class="sculpt-slider-row" style="margin-top: 8px;">
+        <div class="sculpt-slider-header">
+          <span class="sculpt-slider-label">Brush Radius</span>
+          <span id="weightRadiusVal" class="sculpt-slider-val">0.35</span>
+        </div>
+        <input type="range" id="sliderWeightRadius" min="0.05" max="1.50" step="0.02" value="0.35" class="tool-range" />
+      </div>
+
+      <div class="sculpt-slider-row">
+        <div class="sculpt-slider-header">
+          <span class="sculpt-slider-label">Brush Strength</span>
+          <span id="weightStrengthVal" class="sculpt-slider-val">0.50</span>
+        </div>
+        <input type="range" id="sliderWeightStrength" min="0.05" max="1.00" step="0.05" value="0.50" class="tool-range" />
+      </div>
+
+      <div class="sculpt-options-row">
+        <label class="sculpt-checkbox-label">
+          <input type="checkbox" id="chkWeightSymmetry" checked />
+          <span><strong>X-Mirror (_L/&thinsp;_R)</strong></span>
+        </label>
+        <label class="sculpt-checkbox-label">
+          <input type="checkbox" id="chkWeightHeatmap" checked />
+          <span>Weight Heatmap</span>
+        </label>
+      </div>
+
+      <!-- Heatmap Legend Bar -->
+      <div style="margin-top: 6px; padding: 4px 8px; border-radius: 4px; background: linear-gradient(90deg, #1433d9 0%, #0dc7eb 25%, #26e033 50%, #f5dc14 75%, #f52419 100%); display: flex; justify-content: space-between; font-size: 9px; font-weight: 700; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.85);">
+        <span>0.0 (None)</span>
+        <span>0.5 (Mid)</span>
+        <span>1.0 (Full)</span>
+      </div>
+    </div>
+
+    <!-- 3. Interactive Joint Pose Bend Test -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="move-3d"></i> Joint Pose Bend Test</div>
+      <div class="sculpt-slider-row">
+        <div class="sculpt-slider-header">
+          <span class="sculpt-slider-label">Bend Active Bone Angle</span>
+          <span id="rigPoseAngleVal" class="sculpt-slider-val">0°</span>
+        </div>
+        <input type="range" id="sliderRigPoseAngle" min="-90" max="90" step="2" value="0" class="tool-range" />
+      </div>
+      <button type="button" id="btnResetBindPose" class="tool-btn btn-block" style="width: 100%; margin-top: 4px;">
+        <i class="app-icon" data-lucide="rotate-ccw"></i> Reset Bind Pose (0°)
+      </button>
+    </div>
+
+    <!-- 4. Rigging Stats -->
+    <div class="sculpt-stats-card">
+      <div class="sculpt-stats-row">
+        <span style="color: #8b949e;">Skeleton Bones:</span>
+        <span id="rigStatBoneCount" style="color: #58a6ff; font-weight: 600; font-family: monospace;">0 bones</span>
+      </div>
+      <div class="sculpt-stats-row">
+        <span style="color: #8b949e;">Active Bone Verts:</span>
+        <span id="rigStatInfluencedVerts" style="color: #f0f6fc; font-family: monospace;">0 verts (avg 0.00)</span>
+      </div>
+    </div>
+  </div>
+</div>

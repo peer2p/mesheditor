@@ -2,9 +2,9 @@ import { AbstractEditorTool } from './AbstractEditorTool';
 
 /**
  * Figure Sculpt & Retopology Tool.
- * Digital figure sculpting (Clay, Grab, Smooth, Flatten, Inflate, Pinch),
+ * Digital figure sculpting (Clay, Grab, Smooth, Flatten, Inflate, Pinch, Quad-Draw),
  * anatomical humanoid/creature base-mesh blockouts, X-axis symmetry,
- * and game-ready Quadric Error retopology decimation.
+ * Shrinkwrap surface projection, and game-ready Quadric Error retopology decimation.
  */
 export class SculptEditorTool extends AbstractEditorTool {
   public readonly name = 'sculpt_retopo';
@@ -17,13 +17,13 @@ export class SculptEditorTool extends AbstractEditorTool {
   public readonly defaultOpen = false;
   public readonly isExclusive3DTool = true;
   public readonly description =
-    'Digital figure sculpting (Grab, Clay, Smooth, Flatten, Inflate), humanoid & creature base-mesh blocking, symmetry, and game-ready Quad/LOD retopology.';
+    'Digital figure sculpting, Quad-Draw retopology strips, Shrinkwrap mesh projection, humanoid & creature blockouts, and game-ready LOD decimation.';
 
   public readonly helpText = `
 <h4><i class="app-icon" data-lucide="info"></i> Overview</h4>
-<p>The <strong>Figure Sculpt & Retopo</strong> tool brings organic character sculpting, anatomical base-mesh blockouts, and real-time game retopology into Mesh Editor.</p>
+<p>The <strong>Figure Sculpt & Retopo</strong> tool brings organic character sculpting, anatomical base-mesh blockouts, Quad-Draw strip retopology, Shrinkwrap projection, and real-time game decimation into Mesh Editor.</p>
 
-<h4><i class="app-icon" data-lucide="brush"></i> Digital Sculpting Brushes</h4>
+<h4><i class="app-icon" data-lucide="brush"></i> Digital Sculpting &amp; Quad-Draw Brushes</h4>
 <ul>
   <li><strong>Clay:</strong> Pushes and carves surface volume along local face normals with a soft plateau profile.</li>
   <li><strong>Grab:</strong> Pulls vertices smoothly along mouse drag movements (essential for silhouettes and primary forms).</li>
@@ -31,28 +31,14 @@ export class SculptEditorTool extends AbstractEditorTool {
   <li><strong>Flatten:</strong> Projects vertices onto the average contact plane to carve planar bone landmarks and facial planes.</li>
   <li><strong>Inflate:</strong> Expands or deflates mesh volume along individual vertex normals.</li>
   <li><strong>Pinch:</strong> Pulls vertices toward the center of the brush to sculpt sharp creases, muscle cuts, and wrinkles.</li>
+  <li><strong>Quad-Draw (Strips):</strong> Draws clean 4-sided quad polygon strips directly onto the high-poly surface and automatically welds adjacent vertices for animation-ready edge flow.</li>
 </ul>
 
-<h4><i class="app-icon" data-lucide="symmetry"></i> Symmetry & Controls</h4>
+<h4><i class="app-icon" data-lucide="layers"></i> Retopology: Shrinkwrap &amp; Quad Cage</h4>
 <ul>
-  <li><strong>X-Symmetry:</strong> Automatically mirrors brush strokes across the center X = 0 plane for symmetrical humans, faces, and animals.</li>
-  <li><strong>Invert (Alt / Ctrl):</strong> Hold <kbd>Alt</kbd> or <kbd>Ctrl</kbd> while sculpting to invert brush direction (e.g. carve instead of build up).</li>
-  <li><strong>Camera Orbit:</strong> Right-click or middle-click and drag in the viewport to orbit the camera freely while sculpting.</li>
-</ul>
-
-<h4><i class="app-icon" data-lucide="user"></i> Anatomical Base-Mesh Blockouts</h4>
-<ul>
-  <li><strong>Humanoid (8 Heads):</strong> Spawns a 1.80m character mannequin built according to the Loomis canon with articulated joint loops (knees, elbows, hips).</li>
-  <li><strong>Quadruped Beast:</strong> Spawns an animal base with realistic digitigrade leg mechanics (raised hock/ankle joint).</li>
-  <li><strong>Head Bust:</strong> Facial plane mannequin with eye sockets, jawline, and nose bridge.</li>
-  <li><strong>Sculpt Sphere:</strong> High-density subdivided sphere for freeform digital clay sculpting from scratch.</li>
-</ul>
-
-<h4><i class="app-icon" data-lucide="cpu"></i> Game-Ready Retopology</h4>
-<ul>
-  <li><strong>Target Budgets:</strong> Quickly optimize high-poly sculpts down to game-ready polygon counts (Mobile ~4k, Standard Indie ~15k, Hero Asset ~30k).</li>
-  <li><strong>Quadric Error Simplification:</strong> Preserves critical silhouettes, volume, and boundary edges while recalculating smooth normals.</li>
-  <li><strong>Live Topology Health:</strong> Real-time indicator checks vertex and triangle counts to certify game engine readiness.</li>
+  <li><strong>Shrinkwrap (Mesh Projection):</strong> Wraps the selected low-poly mesh tightly onto the target high-poly sculpt like a stretch film with configurable surface offset and tangential relaxation.</li>
+  <li><strong>Generate Quad Cage:</strong> Builds a structured quad-ring retopology cage around the target mesh and shrinkwraps it onto the surface.</li>
+  <li><strong>Quadric Error Simplification:</strong> Decimates high-poly sculpts down to game budgets (Mobile ~4k, Standard ~15k, Hero ~32k) while preserving silhouette and submeshes.</li>
 </ul>
 `.trim();
 
@@ -93,4 +79,3 @@ export class SculptEditorTool extends AbstractEditorTool {
     app.updateSculptUI?.();
   }
 }
-

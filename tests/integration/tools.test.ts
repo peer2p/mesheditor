@@ -103,11 +103,11 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
   });
 
   describe('2. ToolRegistry Management', () => {
-    it('initializes default registry with all 38 built-in modeling tools', () => {
+    it('initializes default registry with all 41 built-in modeling tools', () => {
       const registry = createDefaultToolRegistry();
       const allTools = registry.getAll();
 
-      expect(allTools.length).toBe(38);
+      expect(allTools.length).toBe(41);
       expect(registry.has('modeler_get_scene_info')).toBe(true);
       expect(registry.has('modeler_plan_model')).toBe(true);
       expect(registry.has('modeler_create_primitive')).toBe(true);
@@ -146,9 +146,12 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       expect(registry.has('modeler_retopologize_mesh')).toBe(true);
       expect(registry.has('modeler_sculpt_mesh')).toBe(true);
       expect(registry.has('modeler_generate_neural_mesh')).toBe(true);
+      expect(registry.has('modeler_uv_unwrap')).toBe(true);
+      expect(registry.has('modeler_bake_textures')).toBe(true);
+      expect(registry.has('modeler_rig_and_weight_paint')).toBe(true);
 
       const openAiDefs = registry.getOpenAITools();
-      expect(openAiDefs.length).toBe(38);
+      expect(openAiDefs.length).toBe(41);
       expect(openAiDefs.every((d) => d.type === 'function' && typeof d.function.name === 'string')).toBe(true);
     });
 
@@ -265,9 +268,9 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
   });
 
   describe('4. Tool Abstraction, In-App Help Guides & Dialog Wiring', () => {
-    it('provides unified ToolInterface metadata and comprehensive English help text for all 14 editor tools', () => {
+    it('provides unified ToolInterface metadata and comprehensive English help text for all 17 editor tools', () => {
       const editorTools = getBuiltinEditorTools();
-      expect(editorTools.length).toBe(14);
+      expect(editorTools.length).toBe(17);
 
       const requiredTools = [
         'scene_outliner',
@@ -275,6 +278,8 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
         'csg_sculpting',
         'facet_editor',
         'sculpt_retopo',
+        'uv_unwrap',
+        'texture_baker',
         'texture_optimizer',
         'compress_model',
         'voxel_painter',
@@ -284,6 +289,7 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
         'material_uv',
         'scene_environment',
         'animation_player',
+        'rigging_skinning',
       ];
 
       for (const name of requiredTools) {
@@ -431,7 +437,7 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
 
     it('instantiates all decentralized editor tool classes with self-contained configurations and help guides', () => {
       const tools = createBuiltinEditorTools();
-      expect(tools.length).toBe(14);
+      expect(tools.length).toBe(17);
 
       const outliner = new OutlinerEditorTool();
       expect(outliner.name).toBe('scene_outliner');

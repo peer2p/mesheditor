@@ -279,10 +279,19 @@ When building or updating figures, combine these built-in tools:
    - Use `modeler_facet_extrude` to pull out horns, armor plates, tails, or wings.
    - Use `modeler_facet_inset` to recess eye sockets or wound portals.
    - Call `modeler_subd_smooth` with `iterations: 1` or `2` to relax blockout polygons into smooth organic curvature.
-4. **Step 4: Game-Ready Retopology & Optimization**:
-   - Call `modeler_retopologize_mesh` with `targetFaces` matching the user's polygon budget (e.g. `4000` for WebGL/mobile, `15000` for standard game characters).
-   - This applies Quadric Error Metric simplification, preserves silhouettes, and recalculates smooth vertex normals.
-5. **Step 5: PBR Material & Normal Maps**:
+4. **Step 4: Game-Ready Retopology (Decimation, Shrinkwrap, Quad-Cage & Quad-Draw Strips)**:
+   - Call `modeler_retopologize_mesh`:
+     - **`mode: "decimate"`** (default): Simplifies high-poly geometry to `targetFaces` (e.g. `4000` for WebGL/mobile, `15000` for standard game characters) via Quadric Error Metric decimation.
+     - **`mode: "shrinkwrap"`**: Wraps a low-poly mesh (`meshName`) tightly onto a high-poly sculpt (`targetMeshName`) like a stretch film with configurable `surfaceOffset` and tangential `relaxIterations`.
+     - **`mode: "quad_cage"`**: Generates a structured quad-ring retopology cage (`rings`, `segments`) around a high-poly sculpt (`meshName` / `targetMeshName`) and shrinkwraps it onto the surface.
+     - **`mode: "quad_strip"`**: Draws clean 4-sided quad polygon strips (`stripPoints`, `stripWidth`) directly onto the high-poly surface (`targetMeshName`) with automatic vertex welding (`autoWeld: true`) for animation-ready edge loops.
+5. **Step 5: UV Unwrapping, Texel Density & Baking (`modeler_uv_unwrap` & `modeler_bake_textures`)**:
+   - Call `modeler_uv_unwrap` on the low-poly mesh (`seamMode: "sharp_edges"`, `targetTexelDensity: 256`, `packIslands: true`) so all character parts share uniform texture resolution (`px/m`) without overlapping islands.
+   - When both a high-poly sculpt and a low-poly retopologized mesh exist, call `modeler_bake_textures` (`lowPolyMeshName`, `highPolyMeshName`, `cageOffset: 0.05`, `bakeNormals: true`, `bakeAO: true`, `applyToMaterial: true`) to project high-poly pores, wrinkles, and armor relief onto the low-poly PBR material.
+6. **Step 6: Skeleton Rigging, Skinning & Weight Painting (`modeler_rig_and_weight`)**:
+   - Call `modeler_rig_and_weight` with `action: "auto_rig"`, `template: "humanoid"` (20-bone hierarchy), `"quadruped"` (11-bone hierarchy), or `"spine"` (5-bone chain), and `autoBindSkin: true` to bind normalized 4-bone skin weights (`matricesIndices` & `matricesWeights`) ready for Unreal, Unity, and glTF export.
+   - Fine-tune joint deformation zones using `action: "paint_weights"` (`boneName`, `mode: "add" | "subtract" | "smooth" | "replace"`, `strokes`, `symmetryX: true`) and verify deformations with `action: "pose_bone"` (`pitchDeg`, `yawDeg`, `rollDeg`).
+7. **Step 7: PBR Material & Normal Maps**:
    - Call `modeler_create_material` with PBR skin/clay parameters:
      - Skin / Clay: `albedoColor: "#d9b38c"`, `roughness: 0.65`, `metallic: 0.0`.
-     - Normal maps: Use `normalMapUrl` or procedural surface relief with `bumpLevel: 1.2` to retain fine wrinkles and skin pores without polygon overhead.
+     - Normal maps: Use `normalMapUrl`, `modeler_bake_textures`, or procedural surface relief with `bumpLevel: 1.2` to retain fine wrinkles and skin pores without polygon overhead.

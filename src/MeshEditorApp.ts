@@ -76,6 +76,7 @@ import {
   AppWindow,
   ArrowLeft,
   BarChart2,
+  Bone,
   Bot,
   Box,
   Boxes,
@@ -100,11 +101,14 @@ import {
   FileArchive,
   FileCheck,
   Film,
+  Flame,
   Folder,
   FolderInput,
   FolderMinus,
   FolderOpen,
   FolderPlus,
+  GitBranch,
+  Grid,
   Grid2x2,
   Grid3x3,
   GripVertical,
@@ -114,18 +118,23 @@ import {
   Info,
   Keyboard,
   Layers,
+  LayoutGrid,
   Library,
   Lightbulb,
   ListTree,
   Loader2,
+  Map as LucideMap,
   Maximize2,
   Mic,
   MicOff,
+  Minimize2,
   Minus,
+  Move3d,
   Network,
   Mouse,
   MousePointer,
   Move,
+  Package,
   Palette,
   Paintbrush,
   PanelRight,
@@ -135,6 +144,7 @@ import {
   PlusCircle,
   Redo2,
   RefreshCw,
+  RotateCcw,
   RotateCw,
   Route,
   Save,
@@ -146,6 +156,7 @@ import {
   Shapes,
   Shield,
   ShieldCheck,
+  Sliders,
   Smile,
   Sparkles,
   Square,
@@ -160,6 +171,7 @@ import {
   UploadCloud,
   User,
   UserCheck,
+  Wand2,
   Waves,
   Wrench,
   X,
@@ -174,6 +186,7 @@ export const editorIcons = {
   AppWindow,
   ArrowLeft,
   BarChart2,
+  Bone,
   Bot,
   Box,
   Boxes,
@@ -197,11 +210,14 @@ export const editorIcons = {
   FileArchive,
   FileCheck,
   Film,
+  Flame,
   Folder,
   FolderInput,
   FolderMinus,
   FolderOpen,
   FolderPlus,
+  GitBranch,
+  Grid,
   Grid2x2,
   Grid3x3,
   GripVertical,
@@ -211,18 +227,23 @@ export const editorIcons = {
   Info,
   Keyboard,
   Layers,
+  LayoutGrid,
   Library,
   Lightbulb,
   ListTree,
   Loader2,
+  Map: LucideMap,
   Maximize2,
   Mic,
   MicOff,
+  Minimize2,
   Minus,
+  Move3d,
   Network,
   Mouse,
   MousePointer,
   Move,
+  Package,
   Palette,
   Paintbrush,
   PanelRight,
@@ -232,6 +253,7 @@ export const editorIcons = {
   PlusCircle,
   Redo2,
   RefreshCw,
+  RotateCcw,
   RotateCw,
   Route,
   Save,
@@ -243,6 +265,7 @@ export const editorIcons = {
   Shapes,
   Shield,
   ShieldCheck,
+  Sliders,
   Smile,
   Sparkles,
   Square,
@@ -257,6 +280,7 @@ export const editorIcons = {
   UploadCloud,
   User,
   UserCheck,
+  Wand2,
   Waves,
   Wrench,
   X,
@@ -616,6 +640,9 @@ export class MeshEditorApp {
         this.updateOutliner();
         this.updateCSGGUI();
         this.updateSculptUI();
+        this.updateUVUnwrapUI();
+        this.updateBakingUI();
+        this.updateRiggingUI();
         const statsSelection = this.getElement<HTMLElement>('statsSelection');
         if (statsSelection) {
           statsSelection.textContent = activeMesh
@@ -631,6 +658,9 @@ export class MeshEditorApp {
         this.updateMeshGUI();
         this.updateCSGGUI();
         this.updateSculptUI();
+        this.updateUVUnwrapUI();
+        this.updateBakingUI();
+        this.updateRiggingUI();
         options.events?.onSceneModified?.();
       },
       onHistoryChanged: (canUndo, canRedo) => {
@@ -1114,6 +1144,10 @@ export class MeshEditorApp {
     this.initPathExtrusionUI();
     this.initCompressModelUI();
     this.initSculptUI();
+    this.initCSGBevelUI();
+    this.initUVUnwrapUI();
+    this.initBakingUI();
+    this.initRiggingUI();
 
     // Restore saved window layout and active tools from localStorage
     this.restoreDialogLayout();
@@ -1799,6 +1833,10 @@ export class MeshEditorApp {
           if (id === 'dialog-compress-model') {
             this.initCompressModelUI();
     this.initSculptUI();
+    this.initCSGBevelUI();
+    this.initUVUnwrapUI();
+    this.initBakingUI();
+    this.initRiggingUI();
           }
         }
       }
@@ -3946,7 +3984,28 @@ export class MeshEditorApp {
       return;
     }
 
-    const result = await this.service.performCSGOperation(targetMesh, toolMesh, op, this.csgParams.keepToolMesh);
+    const chkNonDestructive = this.getElement<HTMLInputElement>('chkCSGNonDestructive');
+    const sliderBevelWidth = this.getElement<HTMLInputElement>('sliderCSGBevelWidth');
+    const selectBevelSegments = this.getElement<HTMLSelectElement>('selectCSGBevelSegments');
+    const numBevelAngle = this.getElement<HTMLInputElement>('numCSGBevelAngle');
+
+    const nonDestructive = chkNonDestructive ? chkNonDestructive.checked : true;
+    const bevelWidth = sliderBevelWidth ? parseFloat(sliderBevelWidth.value) || 0 : 0;
+    const bevelSegments = selectBevelSegments ? parseInt(selectBevelSegments.value, 10) || 2 : 2;
+    const angleThresholdDeg = numBevelAngle ? parseFloat(numBevelAngle.value) || 30 : 30;
+
+    const result = await this.service.performCSGOperation(
+      targetMesh,
+      toolMesh,
+      op,
+      this.csgParams.keepToolMesh,
+      {
+        nonDestructive,
+        bevelWidth,
+        bevelSegments,
+        angleThresholdDeg,
+      }
+    );
     if (result) {
       this.csgParams.targetMesh = result.name;
       if (!this.csgParams.keepToolMesh) {
@@ -3991,6 +4050,77 @@ export class MeshEditorApp {
       this.updateDropdownOptions(this.csgControllers['toolMesh'], options, this.csgParams.toolMesh);
       this.csgControllers['toolMesh'].updateDisplay();
     }
+
+    const badge = this.getElement('csgNonDestructiveBadge');
+    const selMesh = this.service.selectedMesh;
+    if (badge) {
+      const ndMeta = selMesh?.metadata?.nonDestructiveCSG;
+      if (ndMeta?.isNonDestructive) {
+        badge.textContent = ndMeta.bevel?.enabled
+          ? `Beveled (${ndMeta.bevel.sharpEdgeCount} edges)`
+          : 'Non-Destructive Ready';
+      } else {
+        badge.textContent = 'Active';
+      }
+    }
+  }
+
+  public initCSGBevelUI(): void {
+    const sliderWidth = this.getElement<HTMLInputElement>('sliderCSGBevelWidth');
+    const widthVal = this.getElement('csgBevelWidthVal');
+    const selectSegments = this.getElement<HTMLSelectElement>('selectCSGBevelSegments');
+    const numAngle = this.getElement<HTMLInputElement>('numCSGBevelAngle');
+    const chkNonDestructive = this.getElement<HTMLInputElement>('chkCSGNonDestructive');
+
+    if (sliderWidth) {
+      sliderWidth.addEventListener('input', () => {
+        const val = parseFloat(sliderWidth.value);
+        if (widthVal) widthVal.textContent = val.toFixed(2);
+      });
+    }
+
+    this.getElement('btnApplyCSGBevel')?.addEventListener('click', () => {
+      const target =
+        this.service.selectedMesh ||
+        this.service.importedMeshes.find((m) => m.name === this.csgParams.targetMesh);
+      if (!target) {
+        this.showToast('Please select a mesh to apply the Bevel Modifier.', 'warning');
+        return;
+      }
+      const width = sliderWidth ? parseFloat(sliderWidth.value) || 0.04 : 0.04;
+      const segments = selectSegments ? parseInt(selectSegments.value, 10) || 2 : 2;
+      const angleThresholdDeg = numAngle ? parseFloat(numAngle.value) || 30 : 30;
+      const nonDestructive = chkNonDestructive ? chkNonDestructive.checked : true;
+
+      const { sharpEdgeCount } = this.service.applyNonDestructiveBevel(target, {
+        width,
+        segments,
+        angleThresholdDeg,
+        nonDestructive,
+      });
+      this.showToast(
+        `Applied Non-Destructive Bevel (w=${width.toFixed(2)}, ${segments} segs) across ${sharpEdgeCount} sharp edges on "${target.name}".`,
+        'success'
+      );
+      this.updateCSGGUI();
+    });
+
+    this.getElement('btnRevertCSGBase')?.addEventListener('click', () => {
+      const target =
+        this.service.selectedMesh ||
+        this.service.importedMeshes.find((m) => m.name === this.csgParams.targetMesh);
+      if (!target) {
+        this.showToast('Please select a mesh to revert.', 'warning');
+        return;
+      }
+      const reverted = this.service.revertNonDestructiveMesh(target);
+      if (reverted) {
+        this.showToast(`Reverted "${target.name}" to its original un-beveled base geometry.`, 'info');
+        this.updateCSGGUI();
+      } else {
+        this.showToast(`Mesh "${target.name}" has no non-destructive modifier state to revert.`, 'warning');
+      }
+    });
   }
 
   public playAnimation(): void {
@@ -6889,6 +7019,9 @@ export class MeshEditorApp {
     // Retopology presets & execution
     const selectPreset = this.getElement<HTMLSelectElement>('selectRetopoPreset');
     const numTargetFaces = this.getElement<HTMLInputElement>('numRetopoTargetFaces');
+    const selectHighPoly = this.getElement<HTMLSelectElement>('selectRetopoHighPolyTarget');
+    const numSurfaceOffset = this.getElement<HTMLInputElement>('numRetopoSurfaceOffset');
+
     if (selectPreset && numTargetFaces) {
       selectPreset.addEventListener('change', () => {
         if (selectPreset.value !== 'custom') {
@@ -6896,6 +7029,53 @@ export class MeshEditorApp {
         }
       });
     }
+
+    if (numSurfaceOffset) {
+      numSurfaceOffset.addEventListener('change', () => {
+        const val = parseFloat(numSurfaceOffset.value) || 0.004;
+        this.service.sculptController.quadSurfaceOffset = val;
+      });
+    }
+
+    this.getElement('btnShrinkwrapMesh')?.addEventListener('click', () => {
+      const lowMesh = this.service.selectedMesh;
+      if (!lowMesh) {
+        this.showToast('Please select a low-poly mesh in the viewport to Shrinkwrap.', 'warning');
+        return;
+      }
+      const targetVal = selectHighPoly?.value || 'auto';
+      const highMesh =
+        targetVal !== 'auto'
+          ? this.service.importedMeshes.find((m) => m.name === targetVal) || lowMesh
+          : this.service.importedMeshes.find((m) => m !== lowMesh && !this.service.isEditorHelper(m)) ||
+            lowMesh;
+      const offset = numSurfaceOffset ? parseFloat(numSurfaceOffset.value) || 0.004 : 0.004;
+      const analysis = this.service.sculptController.shrinkwrapMesh(lowMesh, highMesh, {
+        offset,
+        mode: 'nearest',
+        smoothIterations: 1,
+      });
+      this.showToast(
+        `Shrinkwrapped "${lowMesh.name}" onto "${highMesh.name}" (${analysis.triangleCount} tris).`,
+        'success'
+      );
+      this.updateSculptUI();
+    });
+
+    this.getElement('btnGenerateQuadCage')?.addEventListener('click', () => {
+      const targetMesh =
+        this.service.selectedMesh ||
+        this.service.importedMeshes.find((m) => !this.service.isEditorHelper(m));
+      if (!targetMesh) {
+        this.showToast('Please select a target sculpt mesh first.', 'warning');
+        return;
+      }
+      const offset = numSurfaceOffset ? parseFloat(numSurfaceOffset.value) || 0.004 : 0.004;
+      const cage = this.service.sculptController.generateQuadFlowCage(targetMesh, 14, 16, offset);
+      this.service.selectMesh(cage);
+      this.showToast(`Generated Quad-Flow Retopology Cage "${cage.name}".`, 'success');
+      this.updateSculptUI();
+    });
 
     this.getElement('btnExecuteRetopology')?.addEventListener('click', async () => {
       const targetMesh = this.service.selectedMesh;
@@ -6966,6 +7146,569 @@ export class MeshEditorApp {
           : analysis.gameReadinessClass === 'warning'
             ? '1px solid rgba(210, 153, 34, 0.3)'
             : '1px solid rgba(248, 81, 73, 0.3)';
+    }
+
+    const selectHighPoly = this.getElement<HTMLSelectElement>('selectRetopoHighPolyTarget');
+    if (selectHighPoly) {
+      const prevVal = selectHighPoly.value;
+      const validMeshes = this.service.importedMeshes.filter(
+        (m) => !this.service.isEditorHelper(m) && !m.isDisposed()
+      );
+      selectHighPoly.innerHTML = `<option value="auto">Auto / Active High-Poly</option>`;
+      for (const m of validMeshes) {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = m.name;
+        selectHighPoly.appendChild(opt);
+      }
+      if (prevVal && Array.from(selectHighPoly.options).some((o) => o.value === prevVal)) {
+        selectHighPoly.value = prevVal;
+      }
+    }
+  }
+
+  /* =========================================================================
+     UV UNWRAP & TEXEL DENSITY STUDIO UI
+     ========================================================================= */
+  public initUVUnwrapUI(): void {
+    const dialog = this.getElement('dialog-uv-unwrap');
+    if (!dialog) return;
+
+    this.service.uvUnwrapController.onUVModified = () => {
+      this.updateUVUnwrapUI();
+    };
+
+    const sliderAngle = this.getElement<HTMLInputElement>('sliderUVSeamAngle');
+    const valAngle = this.getElement('uvSeamAngleVal');
+    if (sliderAngle) {
+      sliderAngle.addEventListener('input', () => {
+        const deg = parseInt(sliderAngle.value, 10) || 60;
+        if (valAngle) valAngle.textContent = `${deg}°`;
+        this.service.uvUnwrapController.angleThresholdDeg = deg;
+      });
+    }
+
+    const chkSeamPick = this.getElement<HTMLInputElement>('chkUVInteractiveSeamPick');
+    if (chkSeamPick) {
+      chkSeamPick.addEventListener('change', () => {
+        this.service.uvUnwrapController.seamPickMode = chkSeamPick.checked;
+        if (chkSeamPick.checked) {
+          this.service.uvUnwrapController.setActive(true);
+        }
+      });
+    }
+
+    this.getElement('btnUVMarkSmartSeams')?.addEventListener('click', () => {
+      const mesh = this.service.uvUnwrapController.getActiveTargetMesh();
+      if (!mesh) {
+        this.showToast('Please select a 3D mesh to mark UV seams.', 'warning');
+        return;
+      }
+      const res = this.service.uvUnwrapController.markSmartSeams(
+        mesh,
+        this.service.uvUnwrapController.angleThresholdDeg
+      );
+      this.showToast(`Marked ${res.seamEdgeCount} Smart UV Seam edges on "${mesh.name}".`, 'success');
+      this.updateUVUnwrapUI();
+    });
+
+    this.getElement('btnUVClearSeams')?.addEventListener('click', () => {
+      const mesh = this.service.uvUnwrapController.getActiveTargetMesh();
+      if (!mesh) return;
+      this.service.uvUnwrapController.clearSeams(mesh);
+      this.showToast(`Cleared UV seams on "${mesh.name}".`, 'info');
+      this.updateUVUnwrapUI();
+    });
+
+    const selectMethod = this.getElement<HTMLSelectElement>('selectUVUnwrapMethod');
+    const selectMargin = this.getElement<HTMLSelectElement>('selectUVIslandMargin');
+    const chkRotate = this.getElement<HTMLInputElement>('chkUVRotateOptimal');
+    const chkChecker = this.getElement<HTMLInputElement>('chkUVCheckerPreview');
+    const selectRes = this.getElement<HTMLSelectElement>('selectUVTextureRes');
+    const numTargetDensity = this.getElement<HTMLInputElement>('numUVTargetTexelDensity');
+
+    if (chkChecker) {
+      chkChecker.addEventListener('change', () => {
+        const mesh = this.service.uvUnwrapController.getActiveTargetMesh();
+        if (mesh) {
+          this.service.uvUnwrapController.toggleCheckerPreview(mesh, chkChecker.checked);
+        }
+      });
+    }
+
+    this.getElement('btnExecuteUVUnwrap')?.addEventListener('click', () => {
+      const mesh = this.service.uvUnwrapController.getActiveTargetMesh();
+      if (!mesh) {
+        this.showToast('Please select a 3D mesh to unwrap.', 'warning');
+        return;
+      }
+      const method = (selectMethod?.value || 'smart_seams') as
+        | 'smart_seams'
+        | 'angle_project'
+        | 'cylindrical';
+      const marginPx = parseInt(selectMargin?.value || '6', 10);
+      const textureResolution = parseInt(selectRes?.value || '1024', 10);
+      const rotateOptimal = chkRotate ? chkRotate.checked : true;
+
+      const stats = this.service.uvUnwrapController.unwrapMesh(mesh, {
+        method,
+        angleThresholdDeg: this.service.uvUnwrapController.angleThresholdDeg,
+        marginPx,
+        textureResolution,
+        rotateOptimal,
+      });
+      this.showToast(
+        `Unwrapped "${mesh.name}" into ${stats.islandCount} UV islands (${stats.texelDensityPxPerMeter} px/m, ${stats.uvCoveragePercent}% coverage).`,
+        'success'
+      );
+      this.updateUVUnwrapUI();
+    });
+
+    this.getElement('btnPackUVIslands')?.addEventListener('click', () => {
+      const mesh = this.service.uvUnwrapController.getActiveTargetMesh();
+      if (!mesh) {
+        this.showToast('Please select a 3D mesh to pack UV islands.', 'warning');
+        return;
+      }
+      const marginPx = parseInt(selectMargin?.value || '6', 10);
+      const textureResolution = parseInt(selectRes?.value || '1024', 10);
+      const rotateOptimal = chkRotate ? chkRotate.checked : true;
+      const stats = this.service.uvUnwrapController.packUVIslands(mesh, {
+        marginPx,
+        textureResolution,
+        rotateOptimal,
+        normalizeScale: true,
+      });
+      this.showToast(
+        `Packed ${stats.islandCount} UV islands (${stats.uvCoveragePercent}% UV space utilization).`,
+        'success'
+      );
+      this.updateUVUnwrapUI();
+    });
+
+    this.getElement('btnApplyTexelDensity')?.addEventListener('click', () => {
+      const mesh = this.service.uvUnwrapController.getActiveTargetMesh();
+      if (!mesh) {
+        this.showToast('Please select a 3D mesh to equalize Texel Density.', 'warning');
+        return;
+      }
+      const targetPx = parseInt(numTargetDensity?.value || '512', 10) || 512;
+      const textureResolution = parseInt(selectRes?.value || '1024', 10) || 1024;
+      const stats = this.service.uvUnwrapController.normalizeTexelDensity(
+        mesh,
+        targetPx,
+        textureResolution,
+        false
+      );
+      this.showToast(
+        `Normalized Texel Density on "${mesh.name}" to ${stats.texelDensityPxPerMeter} px/m.`,
+        'success'
+      );
+      this.updateUVUnwrapUI();
+    });
+
+    this.updateUVUnwrapUI();
+  }
+
+  public updateUVUnwrapUI(): void {
+    const dialog = this.getElement('dialog-uv-unwrap');
+    if (!dialog) return;
+
+    const mesh = this.service.uvUnwrapController.getActiveTargetMesh();
+    const selectRes = this.getElement<HTMLSelectElement>('selectUVTextureRes');
+    const res = parseInt(selectRes?.value || '1024', 10) || 1024;
+    const stats = mesh
+      ? this.service.uvUnwrapController.analyzeUVs(mesh, res)
+      : {
+          islandCount: 0,
+          seamEdgeCount: 0,
+          texelDensityPxPerMeter: 0,
+          worldSurfaceAreaM2: 0,
+          uvCoveragePercent: 0,
+        };
+
+    const islandsEl = this.getElement('uvStatIslandsSeams');
+    const densityEl = this.getElement('uvStatTexelDensity');
+    const areaEl = this.getElement('uvStatSurfaceArea');
+    const covEl = this.getElement('uvCoverageBadge');
+    const canvas = this.getElement<HTMLCanvasElement>('uvPreviewCanvas');
+
+    if (islandsEl) {
+      islandsEl.textContent = `${stats.islandCount} islands / ${stats.seamEdgeCount} seams`;
+    }
+    if (densityEl) {
+      densityEl.textContent = `${stats.texelDensityPxPerMeter} px/m`;
+    }
+    if (areaEl) {
+      areaEl.textContent = `${stats.worldSurfaceAreaM2.toFixed(2)} m²`;
+    }
+    if (covEl) {
+      covEl.textContent = `Coverage: ${stats.uvCoveragePercent}%`;
+    }
+    if (canvas) {
+      this.service.uvUnwrapController.renderUVLayoutToCanvas(mesh, canvas);
+    }
+  }
+
+  /* =========================================================================
+     NORMAL & AO TEXTURE BAKER STUDIO UI
+     ========================================================================= */
+  public initBakingUI(): void {
+    const dialog = this.getElement('dialog-baking');
+    if (!dialog) return;
+
+    const sliderCage = this.getElement<HTMLInputElement>('sliderBakeCageOffset');
+    const valCage = this.getElement('bakeCageOffsetVal');
+    const chkShowCage = this.getElement<HTMLInputElement>('chkBakeShowCage');
+    const selectLow = this.getElement<HTMLSelectElement>('selectBakeLowPoly');
+    const selectHigh = this.getElement<HTMLSelectElement>('selectBakeHighPoly');
+    const selectRes = this.getElement<HTMLSelectElement>('selectBakeResolution');
+    const selectPad = this.getElement<HTMLSelectElement>('selectBakePadding');
+    const chkFlipY = this.getElement<HTMLInputElement>('chkBakeFlipY');
+    const chkApply = this.getElement<HTMLInputElement>('chkBakeApplyMaterial');
+    const selectPreviewChannel = this.getElement<HTMLSelectElement>('selectBakePreviewChannel');
+    const previewCanvas = this.getElement<HTMLCanvasElement>('bakePreviewCanvas');
+
+    const resolveLowPoly = (): Mesh | null => {
+      const val = selectLow?.value || 'selected';
+      if (val !== 'selected') {
+        const found = this.service.importedMeshes.find((m) => m.name === val && !m.isDisposed());
+        if (found) return found;
+      }
+      return (
+        this.service.selectedMesh ||
+        this.service.importedMeshes.find((m) => !this.service.isEditorHelper(m) && !m.isDisposed()) ||
+        null
+      );
+    };
+
+    const resolveHighPoly = (low: Mesh | null): Mesh | null => {
+      const val = selectHigh?.value || 'self';
+      if (val !== 'self') {
+        const found = this.service.importedMeshes.find((m) => m.name === val && !m.isDisposed());
+        if (found) return found;
+      }
+      return low;
+    };
+
+    if (sliderCage) {
+      sliderCage.addEventListener('input', () => {
+        const dist = parseFloat(sliderCage.value) || 0.04;
+        if (valCage) valCage.textContent = dist.toFixed(3);
+        this.service.textureBaker.cageExtrusion = dist;
+        if (chkShowCage?.checked) {
+          this.service.textureBaker.updateCagePreview(resolveLowPoly(), dist, true);
+        }
+      });
+    }
+
+    if (chkShowCage) {
+      chkShowCage.addEventListener('change', () => {
+        const dist = sliderCage ? parseFloat(sliderCage.value) || 0.04 : 0.04;
+        this.service.textureBaker.updateCagePreview(resolveLowPoly(), dist, chkShowCage.checked);
+      });
+    }
+
+    this.getElement('btnBakeAutoCage')?.addEventListener('click', () => {
+      const low = resolveLowPoly();
+      if (!low) {
+        this.showToast('Please select a Low-Poly mesh first.', 'warning');
+        return;
+      }
+      const high = resolveHighPoly(low);
+      const optimal = this.service.textureBaker.computeAutoCageDistance(low, high);
+      if (sliderCage) sliderCage.value = optimal.toString();
+      if (valCage) valCage.textContent = optimal.toFixed(3);
+      if (chkShowCage?.checked) {
+        this.service.textureBaker.updateCagePreview(low, optimal, true);
+      }
+      this.showToast(`Auto-calculated optimal Cage extrusion: ${optimal.toFixed(3)}m.`, 'info');
+    });
+
+    if (selectPreviewChannel && previewCanvas) {
+      selectPreviewChannel.addEventListener('change', () => {
+        const ch = selectPreviewChannel.value === 'ao' ? 'ao' : 'normal';
+        this.service.textureBaker.renderBakePreviewToCanvas(previewCanvas, ch);
+      });
+    }
+
+    this.getElement('btnExecuteBake')?.addEventListener('click', async () => {
+      const low = resolveLowPoly();
+      if (!low) {
+        this.showToast('Please select a target Low-Poly mesh to bake.', 'warning');
+        return;
+      }
+      const high = resolveHighPoly(low);
+      const resolution = (parseInt(selectRes?.value || '512', 10) || 512) as
+        | 128
+        | 256
+        | 512
+        | 1024
+        | 2048;
+      const cageExtrusion = sliderCage ? parseFloat(sliderCage.value) || 0.04 : 0.04;
+      const paddingPx = parseInt(selectPad?.value || '4', 10) || 4;
+      const flipNormalY = !!chkFlipY?.checked;
+      const applyToMaterial = chkApply ? chkApply.checked : true;
+
+      try {
+        const res = await this.service.textureBaker.bakeTextures({
+          lowPolyMesh: low,
+          highPolyMesh: high,
+          resolution,
+          cageExtrusion,
+          paddingPx,
+          flipNormalY,
+          applyToMaterial,
+        });
+
+        const statusEl = this.getElement('bakeStatusText');
+        const statsEl = this.getElement('bakeRayStats');
+        if (statusEl) statusEl.textContent = `Baked ${res.resolution}×${res.resolution}`;
+        if (statsEl) {
+          statsEl.textContent = `${res.rayHitCount.toLocaleString()} rays (${res.coveragePercent}%)`;
+        }
+        if (previewCanvas) {
+          const ch = selectPreviewChannel?.value === 'ao' ? 'ao' : 'normal';
+          this.service.textureBaker.renderBakePreviewToCanvas(previewCanvas, ch);
+        }
+        this.showToast(
+          `Baked Normal & AO Maps (${res.resolution}×${res.resolution}) onto "${low.name}".`,
+          'success'
+        );
+      } catch (err: any) {
+        this.showToast(`Baking failed: ${err.message || err}`, 'error');
+      }
+    });
+
+    const downloadDataUrl = (url: string, filename: string) => {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    };
+
+    this.getElement('btnDownloadNormalMap')?.addEventListener('click', () => {
+      const last = this.service.textureBaker.lastBakeResult;
+      if (!last) {
+        this.showToast('Please run Bake Normal & AO Maps first.', 'warning');
+        return;
+      }
+      downloadDataUrl(last.normalMapDataUrl, `${last.lowPolyMeshName}_NormalMap.png`);
+    });
+
+    this.getElement('btnDownloadAOMap')?.addEventListener('click', () => {
+      const last = this.service.textureBaker.lastBakeResult;
+      if (!last) {
+        this.showToast('Please run Bake Normal & AO Maps first.', 'warning');
+        return;
+      }
+      downloadDataUrl(last.aoMapDataUrl, `${last.lowPolyMeshName}_AOMap.png`);
+    });
+
+    this.updateBakingUI();
+  }
+
+  public updateBakingUI(): void {
+    const dialog = this.getElement('dialog-baking');
+    if (!dialog) return;
+
+    const selectLow = this.getElement<HTMLSelectElement>('selectBakeLowPoly');
+    const selectHigh = this.getElement<HTMLSelectElement>('selectBakeHighPoly');
+    const validMeshes = this.service.importedMeshes.filter(
+      (m) => !this.service.isEditorHelper(m) && !m.isDisposed()
+    );
+
+    if (selectLow) {
+      const prev = selectLow.value;
+      selectLow.innerHTML = `<option value="selected">Selected Mesh</option>`;
+      for (const m of validMeshes) {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = m.name;
+        selectLow.appendChild(opt);
+      }
+      if (prev && Array.from(selectLow.options).some((o) => o.value === prev)) {
+        selectLow.value = prev;
+      }
+    }
+
+    if (selectHigh) {
+      const prev = selectHigh.value;
+      selectHigh.innerHTML = `<option value="self">Self (Bevel & Cavity Detail)</option>`;
+      for (const m of validMeshes) {
+        const opt = document.createElement('option');
+        opt.value = m.name;
+        opt.textContent = m.name;
+        selectHigh.appendChild(opt);
+      }
+      if (prev && Array.from(selectHigh.options).some((o) => o.value === prev)) {
+        selectHigh.value = prev;
+      }
+    }
+  }
+
+  /* =========================================================================
+     RIGGING, SKELETON & WEIGHT PAINTING STUDIO UI
+     ========================================================================= */
+  public initRiggingUI(): void {
+    const dialog = this.getElement('dialog-rigging');
+    if (!dialog) return;
+
+    this.service.weightPaintController.onWeightsModified = () => {
+      this.updateRiggingUI();
+    };
+
+    const selectPreset = this.getElement<HTMLSelectElement>('selectRigPreset');
+    const selectBone = this.getElement<HTMLSelectElement>('selectRigActiveBone');
+    const sliderRadius = this.getElement<HTMLInputElement>('sliderWeightRadius');
+    const valRadius = this.getElement('weightRadiusVal');
+    const sliderStrength = this.getElement<HTMLInputElement>('sliderWeightStrength');
+    const valStrength = this.getElement('weightStrengthVal');
+    const chkSymmetry = this.getElement<HTMLInputElement>('chkWeightSymmetry');
+    const chkHeatmap = this.getElement<HTMLInputElement>('chkWeightHeatmap');
+    const sliderPose = this.getElement<HTMLInputElement>('sliderRigPoseAngle');
+    const valPose = this.getElement('rigPoseAngleVal');
+
+    this.getElement('btnCreateAutoRig')?.addEventListener('click', () => {
+      const mesh = this.service.weightPaintController.getActiveTargetMesh();
+      if (!mesh) {
+        this.showToast('Please select a 3D mesh to rig.', 'warning');
+        return;
+      }
+      const preset = (selectPreset?.value || 'humanoid') as 'humanoid' | 'quadruped' | 'spine_chain';
+      const skel = this.service.weightPaintController.createAutoRig(mesh, preset);
+      this.service.weightPaintController.setActive(true);
+      this.showToast(
+        `Created ${preset} skeleton "${skel.name}" (${skel.bones.length} bones) and bound envelope skin weights!`,
+        'success'
+      );
+      this.updateRiggingUI();
+      this.updatePanelButtonStates();
+    });
+
+    this.getElement('btnAutoBindWeights')?.addEventListener('click', () => {
+      const mesh = this.service.weightPaintController.getActiveTargetMesh();
+      if (!mesh || !mesh.skeleton) {
+        this.showToast('Please create an Auto-Rig skeleton on the mesh first.', 'warning');
+        return;
+      }
+      this.service.weightPaintController.autoBindSkinWeights(mesh, mesh.skeleton);
+      this.showToast(`Recalculated smooth envelope skin weights for "${mesh.name}".`, 'info');
+      this.updateRiggingUI();
+    });
+
+    if (selectBone) {
+      selectBone.addEventListener('change', () => {
+        const idx = parseInt(selectBone.value, 10) || 0;
+        this.service.weightPaintController.setActiveBoneIndex(idx);
+        if (sliderPose) sliderPose.value = '0';
+        if (valPose) valPose.textContent = '0°';
+      });
+    }
+
+    const modeButtons = dialog.querySelectorAll<HTMLButtonElement>('.btn-weight-mode');
+    modeButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        modeButtons.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = (btn.dataset.mode || 'add') as 'add' | 'subtract' | 'smooth' | 'replace';
+        this.service.weightPaintController.setBrushMode(mode);
+        this.service.weightPaintController.setActive(true);
+        this.updatePanelButtonStates();
+      });
+    });
+
+    if (sliderRadius) {
+      sliderRadius.addEventListener('input', () => {
+        const v = parseFloat(sliderRadius.value) || 0.35;
+        if (valRadius) valRadius.textContent = v.toFixed(2);
+        this.service.weightPaintController.setRadius(v);
+      });
+    }
+
+    if (sliderStrength) {
+      sliderStrength.addEventListener('input', () => {
+        const v = parseFloat(sliderStrength.value) || 0.5;
+        if (valStrength) valStrength.textContent = v.toFixed(2);
+        this.service.weightPaintController.setStrength(v);
+      });
+    }
+
+    if (chkSymmetry) {
+      chkSymmetry.addEventListener('change', () => {
+        this.service.weightPaintController.symmetryX = chkSymmetry.checked;
+      });
+    }
+
+    if (chkHeatmap) {
+      chkHeatmap.addEventListener('change', () => {
+        this.service.weightPaintController.showHeatmap = chkHeatmap.checked;
+        const mesh = this.service.weightPaintController.getActiveTargetMesh();
+        if (mesh) {
+          if (chkHeatmap.checked) {
+            this.service.weightPaintController.updateWeightHeatmap(mesh);
+          } else {
+            this.service.weightPaintController.restoreOriginalVertexColors(mesh);
+          }
+        }
+      });
+    }
+
+    if (sliderPose) {
+      sliderPose.addEventListener('input', () => {
+        const angle = parseFloat(sliderPose.value) || 0;
+        if (valPose) valPose.textContent = `${angle}°`;
+        const mesh = this.service.weightPaintController.getActiveTargetMesh();
+        if (mesh) {
+          this.service.weightPaintController.poseActiveBone(mesh, angle, 0, 0);
+        }
+      });
+    }
+
+    this.getElement('btnResetBindPose')?.addEventListener('click', () => {
+      const mesh = this.service.weightPaintController.getActiveTargetMesh();
+      if (mesh) {
+        this.service.weightPaintController.resetBindPose(mesh);
+      }
+      if (sliderPose) sliderPose.value = '0';
+      if (valPose) valPose.textContent = '0°';
+    });
+
+    this.updateRiggingUI();
+  }
+
+  public updateRiggingUI(): void {
+    const dialog = this.getElement('dialog-rigging');
+    if (!dialog) return;
+
+    const mesh = this.service.weightPaintController.getActiveTargetMesh();
+    const stats = this.service.weightPaintController.analyzeWeights(mesh);
+
+    const selectBone = this.getElement<HTMLSelectElement>('selectRigActiveBone');
+    if (selectBone) {
+      if (mesh && mesh.skeleton && mesh.skeleton.bones.length > 0) {
+        selectBone.innerHTML = '';
+        mesh.skeleton.bones.forEach((b, idx) => {
+          const opt = document.createElement('option');
+          opt.value = idx.toString();
+          opt.textContent = `${idx}: ${b.name}`;
+          selectBone.appendChild(opt);
+        });
+        selectBone.value = stats.activeBoneIndex.toString();
+      } else {
+        selectBone.innerHTML = `<option value="0">None (Create Rig First)</option>`;
+      }
+    }
+
+    const boneCountEl = this.getElement('rigStatBoneCount');
+    const influencedEl = this.getElement('rigStatInfluencedVerts');
+    if (boneCountEl) {
+      boneCountEl.textContent = `${stats.boneCount} bones`;
+    }
+    if (influencedEl) {
+      influencedEl.textContent = `${stats.influencedVertexCount} verts (avg ${stats.averageActiveWeight.toFixed(2)})`;
     }
   }
 }

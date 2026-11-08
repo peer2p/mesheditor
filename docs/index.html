@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mesh Editor — 3D Model Studio &amp; AI Mesh Manipulation Workbench</title>
-  <meta name="description" content="Mesh Editor is a modern, modular 3D model studio and mesh manipulation workbench. Co-create 3D meshes with the AI of your choice, sculpt with CSG booleans, paint voxels, and deploy across Web, Desktop, and Web Components.">
+  <meta name="description" content="Mesh Editor is a modern, modular 3D model studio and game asset pipeline workbench. Co-create 3D meshes with the AI of your choice, sculpt with non-destructive CSG booleans &amp; bevels, retopologize with Shrinkwrap &amp; Quad-Draw, unwrap UVs, bake Normal &amp; AO maps, rig skeletons with weight painting, and deploy across Web, Desktop, and Web Components.">
   <link rel="icon" type="image/svg+xml" href="app-icon.svg">
   <link rel="stylesheet" href="style.css">
   <!-- Babylon.js CDN for Realtime 3D Model Viewport & GLB Sandbox Previews -->
@@ -29,6 +29,7 @@
           <li><a href="#overview" class="nav-link">Overview</a></li>
           <li><a href="#ai-copilot" class="nav-link">Human + AI</a></li>
           <li><a href="#neural-3d" class="nav-link">Neural 3D</a></li>
+          <li><a href="#game-pipeline" class="nav-link">Game Pipeline</a></li>
           <li><a href="#adapters" class="nav-link">Adapters</a></li>
           <li><a href="#plugin-system" class="nav-link">Plugin System</a></li>
           <li><a href="#features" class="nav-link">Features</a></li>
@@ -57,8 +58,8 @@
             Where Human Artistry Meets <span class="text-gradient">AI Precision.</span>
           </h1>
           <p class="hero-subtitle">
-            Mesh Editor is an open, modular 3D model studio and geometric workbench. 
-            Co-sculpt 3D meshes side-by-side with the <strong>AI of your choice</strong>, build with CSG booleans, extrude spline paths, paint voxels, and deploy seamlessly as a <strong>Browser App</strong>, native <strong>Desktop Studio</strong>, or embeddable <strong>Web Component</strong>.
+            Mesh Editor is an open, modular 3D model studio and complete game asset workbench. 
+            Co-sculpt 3D meshes side-by-side with the <strong>AI of your choice</strong>, build with non-destructive CSG booleans &amp; bevels, retopologize with Shrinkwrap &amp; Quad-Draw, unwrap UVs with uniform Texel Density, bake High-to-Low-Poly Normal &amp; AO maps, rig skeletons with Weight Painting, and deploy seamlessly as a <strong>Browser App</strong>, native <strong>Desktop Studio</strong>, or embeddable <strong>Web Component</strong>.
           </p>
 
           <div class="hero-cta-group">
@@ -181,7 +182,23 @@
             </li>
             <li class="overview-bullet-item">
               <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span><strong>Combine shapes with CSG2 Booleans:</strong> Combine meshes with editable Union, Subtract, and Intersect Boolean stacks. Adjust operands interactively in the 3D viewport before applying the result.</span>
+              <span><strong>Combine shapes with non-destructive CSG2 &amp; Bevels:</strong> Combine meshes with editable Union, Subtract, and Intersect Boolean stacks, lossless base-mesh snapshots (Revert to Base), and a live Chamfer/Fillet Bevel Modifier.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Retopologize with Shrinkwrap &amp; Quad-Draw:</strong> Project low-poly cages onto high-poly sculpts like stretch film, draw clean 4-sided Quad-Draw polygon strips with auto-welding, or decimate via Quadric Error Metrics.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Unwrap UVs, Texel Density &amp; Island Packing:</strong> Mark Smart Seams automatically or interactively, unfold 2D charts with harmonic relaxation, enforce uniform Texel Density (<code>px/m</code>), and pack islands without overlaps.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Bake High-to-Low-Poly Normal &amp; AO Maps:</strong> Project micro-relief (pores, creases, bolts) from high-poly sculpts onto low-poly game meshes using an automatic smooth-normal Projection Cage and UV seam dilation.</span>
+            </li>
+            <li class="overview-bullet-item">
+              <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span><strong>Rig skeletons &amp; paint skin weights:</strong> Generate Humanoid, Quadruped, or Spine skeletons, auto-bind normalized 4-bone capsule skin weights, paint vertex influence heatmaps with X-symmetry, and test joint poses live.</span>
             </li>
             <li class="overview-bullet-item">
               <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -606,6 +623,183 @@
     </section>
 
     <!-- =========================================================================
+         END-TO-END GAME ASSET PIPELINE (CSG BEVEL, RETOPO, UV, BAKING, RIGGING)
+         ========================================================================= -->
+    <section id="game-pipeline" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">End-to-End Game Asset Pipeline</span>
+          <h2 class="section-title">From High-Poly Sculpt to Rigged Game Character.</h2>
+          <p class="section-desc">
+            Every stage of the real-time game production pipeline—non-destructive boolean beveling, Shrinkwrap &amp; Quad-Draw retopology, uniform Texel Density UV unwrapping, High-to-Low-Poly Normal &amp; AO baking, and skeletal Weight Painting—is built directly into Mesh Editor and controllable by both human artists and AI skills.
+          </p>
+        </div>
+
+        <div class="ai-feature-card-grid" style="margin-bottom: 36px;">
+          <!-- Pipeline Stage 1: Non-Destructive CSG & Bevel Modifier -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="7"></circle><circle cx="15" cy="15" r="7"></circle></svg>
+            </div>
+            <h3 class="card-title">Non-Destructive CSG2 &amp; Bevel Modifier</h3>
+            <p class="card-desc">
+              Execute complex Union, Subtract, and Intersect operations while preserving lossless base-mesh snapshots (<strong>Revert to Base</strong>). Round sharp intersection creases non-destructively with a live <strong>Chamfer / Fillet Bevel Modifier</strong> controlled by width, segments, and crease angle threshold.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Base Snapshot</span>
+              <span class="card-tag">Chamfer &amp; Fillet</span>
+              <span class="card-tag">modeler_boolean_operation</span>
+            </div>
+          </div>
+
+          <!-- Pipeline Stage 2: Retopology (Shrinkwrap & Quad-Draw) -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            </div>
+            <h3 class="card-title">Shrinkwrap &amp; Quad-Draw Retopology</h3>
+            <p class="card-desc">
+              Project low-poly meshes tightly onto million-polygon sculpts like stretch film using <strong>Shrinkwrap</strong> with surface offset and tangential relaxation. Draw clean 4-sided <strong>Quad-Draw Strips</strong> directly on high-poly surfaces with automatic vertex welding for animation-ready edge loops.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Shrinkwrap Projection</span>
+              <span class="card-tag">Quad-Draw Strips</span>
+              <span class="card-tag">modeler_retopologize_mesh</span>
+            </div>
+          </div>
+
+          <!-- Pipeline Stage 3: UV Unwrapping, Texel Density & Island Packing -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
+            </div>
+            <h3 class="card-title">Smart UV Unwrapping &amp; Texel Density</h3>
+            <p class="card-desc">
+              Mark cutting seams automatically by sharp crease angles or interactively via 3D edge picking. Unfold charts with harmonic relaxation, enforce uniform <strong>Texel Density (<code>px/m</code>)</strong> across all parts, and pack 2D islands via Skyline/Shelf bin-packing with pixel margin padding.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Smart Seams</span>
+              <span class="card-tag">Uniform px/m</span>
+              <span class="card-tag">modeler_uv_unwrap</span>
+            </div>
+          </div>
+
+          <!-- Pipeline Stage 4: High-to-Low-Poly Normal & AO Baking -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>
+            </div>
+            <h3 class="card-title">Normal Map, AO &amp; Cage Baking</h3>
+            <p class="card-desc">
+              Transfer microscopic sculpt details (pores, wrinkles, rivets, bevels) onto flat low-poly game meshes. Generates an averaged, gap-free <strong>3D Projection Cage</strong> and raycasts <strong>Tangent-Space Normal Maps</strong> &amp; <strong>Ambient Occlusion (AO)</strong> with UV seam dilation.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Projection Cage</span>
+              <span class="card-tag">Tangent Normal + AO</span>
+              <span class="card-tag">modeler_bake_textures</span>
+            </div>
+          </div>
+
+          <!-- Pipeline Stage 5: Skeleton Rigging & Weight Painting -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 10c.7-.7 1.69 0 2.5 0a2.5 2.5 0 1 0 0-5 .5.5 0 0 1-.5-.5 2.5 2.5 0 1 0-5 0c0 .81.7 1.8 0 2.5l-7 7c-.7.7-1.69 0-2.5 0a2.5 2.5 0 0 0 0 5c.28 0 .5.22.5.5a2.5 2.5 0 1 0 5 0c0-.81-.7-1.8 0-2.5Z"></path></svg>
+            </div>
+            <h3 class="card-title">Skeleton Rigging &amp; 3D Weight Painting</h3>
+            <p class="card-desc">
+              Generate <strong>Humanoid (20-bone)</strong>, <strong>Quadruped (11-bone)</strong>, or <strong>Spine (5-bone)</strong> skeletons fitted to your mesh bounds. Auto-bind capsule skin envelopes, paint normalized 4-bone weights with a live Blue-to-Red heatmap brush (Add, Subtract, Smooth, X-Symmetry), and test joint poses.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Auto-Skeleton</span>
+              <span class="card-tag">Weight Heatmap</span>
+              <span class="card-tag">modeler_rig_and_weight</span>
+            </div>
+          </div>
+
+          <!-- Pipeline Stage 6: AI Skill Integration -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path></svg>
+            </div>
+            <h3 class="card-title">100% AI &amp; Skill Programmable</h3>
+            <p class="card-desc">
+              All five pipeline stages are exposed both as interactive floating studio dialogs and as OpenAI-compatible tools in <code>ToolRegistry</code> and <code>BUILT_IN_AGENT_SKILLS</code>—enabling autonomous multi-step asset preparation from a single prompt.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Interactive GUI</span>
+              <span class="card-tag">AI Function Calling</span>
+              <span class="card-tag">Unreal / Unity / Godot Ready</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="plugin-section-grid">
+          <div>
+            <span class="section-tag">Automated AI Game Pipeline</span>
+            <h3 class="section-title" style="font-size: 28px;">Retopologize, Unwrap, Bake &amp; Rig via AI Skills.</h3>
+            <p class="section-desc" style="margin-bottom: 18px;">
+              Built-in skills (<code>procedural-modeler</code>, <code>figure-sculptor</code>, and <code>mesh-updater</code>) instruct the AI Agent on how to chain retopology, UV unwrapping, texture baking, and skeletal rigging into a seamless game-ready workflow:
+            </p>
+            <ul class="adapter-list" style="margin-bottom: 20px;">
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Shrinkwrap &amp; Quad-Flow Cage:</strong> Wraps low-poly topology onto high-poly sculpts while relaxing edge loops for clean joint articulation.</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Uniform Texel Density &amp; Packing:</strong> Prevents blurry armor next to crisp faces by normalizing every UV island to the exact same <code>px/m</code> density.</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Raytraced Normal &amp; AO Projection:</strong> Automatically builds a smooth cage, bakes high-res surface relief, dilates UV borders, and assigns maps to the PBR material.</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Normalized 4-Bone Skinning:</strong> Binds vertices to a Humanoid or Quadruped rig with weights summing strictly to <code>1.0</code> for artifact-free engine deformations.</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="code-window">
+            <div class="code-header">
+              <div class="code-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+              </div>
+              <span class="code-title">AI Game Asset Pipeline &bull; Tool Chain</span>
+              <span style="font-size: 11px; color: var(--accent-hover);">Skill Execution</span>
+            </div>
+            <pre class="code-body"><code><span class="code-cm">// 1. Generate &amp; Shrinkwrap Low-Poly Quad Cage onto High-Poly Sculpt</span>
+<span class="code-fn">modeler_retopologize_mesh</span>({
+  meshName: <span class="code-str">'Warrior_HighPoly'</span>, mode: <span class="code-str">'quad_cage'</span>,
+  rings: <span class="code-num">24</span>, segments: <span class="code-num">24</span>, surfaceOffset: <span class="code-num">0.002</span>, relaxIterations: <span class="code-num">3</span>
+});
+
+<span class="code-cm">// 2. Smart Seam Unwrap, 256 px/m Texel Density &amp; Island Packing</span>
+<span class="code-fn">modeler_uv_unwrap</span>({
+  meshName: <span class="code-str">'Warrior_HighPoly_retopo_cage'</span>, seamMode: <span class="code-str">'sharp_edges'</span>,
+  targetTexelDensity: <span class="code-num">256</span>, textureSize: <span class="code-num">1024</span>, packIslands: <span class="code-kw">true</span>
+});
+
+<span class="code-cm">// 3. Bake High-to-Low-Poly Tangent Normal Map &amp; Ambient Occlusion</span>
+<span class="code-fn">modeler_bake_textures</span>({
+  lowPolyMeshName: <span class="code-str">'Warrior_HighPoly_retopo_cage'</span>,
+  highPolyMeshName: <span class="code-str">'Warrior_HighPoly'</span>,
+  cageOffset: <span class="code-num">0.05</span>, bakeNormals: <span class="code-kw">true</span>, bakeAO: <span class="code-kw">true</span>, applyToMaterial: <span class="code-kw">true</span>
+});
+
+<span class="code-cm">// 4. Auto-Rig 20-Bone Humanoid Skeleton &amp; Bind Normalized Skin Weights</span>
+<span class="code-fn">modeler_rig_and_weight</span>({
+  meshName: <span class="code-str">'Warrior_HighPoly_retopo_cage'</span>,
+  action: <span class="code-str">'auto_rig'</span>, template: <span class="code-str">'humanoid'</span>, autoBindSkin: <span class="code-kw">true</span>
+});</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
          ADAPTER ARCHITECTURE
          ========================================================================= -->
     <section id="adapters" class="section" style="background: rgba(16, 21, 30, 0.4);">
@@ -838,9 +1032,9 @@
             <div class="feature-box-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="7"></circle><circle cx="15" cy="15" r="7"></circle></svg>
             </div>
-            <h4 class="feature-box-title">Interactive CSG2 Booleans</h4>
+            <h4 class="feature-box-title">Non-Destructive CSG2 &amp; Bevels</h4>
             <p class="feature-box-desc">
-              Combine meshes with non-destructive Union, Subtract, and Intersect operations. Adjust operands in real-time before baking results.
+              Combine meshes with Union, Subtract, and Intersect operations, lossless base-mesh snapshots, and a live Chamfer/Fillet Bevel Modifier.
             </p>
           </div>
 
@@ -953,6 +1147,50 @@
               Import and export GLB, GLTF, OBJ, STL, PLY, and Babylon scenes with automatic companion buffer resolution and embedded texture packaging.
             </p>
           </div>
+
+          <!-- Feature 13 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            </div>
+            <h4 class="feature-box-title">Shrinkwrap &amp; Quad-Draw Retopo</h4>
+            <p class="feature-box-desc">
+              Wrap low-poly cages onto high-poly sculpts like stretch film and draw 4-sided Quad-Draw polygon strips with auto-welding for clean edge flow.
+            </p>
+          </div>
+
+          <!-- Feature 14 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
+            </div>
+            <h4 class="feature-box-title">Smart UV Unwrapping &amp; Packing</h4>
+            <p class="feature-box-desc">
+              Mark cutting seams automatically or interactively, enforce uniform Texel Density (<code>px/m</code>), and pack 2D UV islands with pixel padding.
+            </p>
+          </div>
+
+          <!-- Feature 15 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>
+            </div>
+            <h4 class="feature-box-title">Normal Map &amp; Cage Baker</h4>
+            <p class="feature-box-desc">
+              Generate smooth-normal 3D Projection Cages and raycast High-to-Low-Poly Tangent-Space Normal Maps &amp; Ambient Occlusion with seam dilation.
+            </p>
+          </div>
+
+          <!-- Feature 16 -->
+          <div class="feature-box">
+            <div class="feature-box-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 10c.7-.7 1.69 0 2.5 0a2.5 2.5 0 1 0 0-5 .5.5 0 0 1-.5-.5 2.5 2.5 0 1 0-5 0c0 .81.7 1.8 0 2.5l-7 7c-.7.7-1.69 0-2.5 0a2.5 2.5 0 0 0 0 5c.28 0 .5.22.5.5a2.5 2.5 0 1 0 5 0c0-.81-.7-1.8 0-2.5Z"></path></svg>
+            </div>
+            <h4 class="feature-box-title">Skeleton Rigging &amp; Weight Paint</h4>
+            <p class="feature-box-desc">
+              Spawn Humanoid, Quadruped, or Spine skeletons, auto-bind 4-bone capsule weights, paint vertex heatmaps with X-symmetry, and test joint poses.
+            </p>
+          </div>
         </div>
       </div>
     </section>
@@ -974,14 +1212,14 @@
           <div class="feature-card">
             <h3 class="card-title">Game Developers &amp; Indies</h3>
             <p class="card-desc">
-              Prototype level geometry and game props rapidly. Generate low-poly assets with your local AI, clean non-manifold geometry, compress with Draco into binary GLB, and import directly into Unity, Unreal Engine, or Godot.
+              Complete high-to-low-poly production in one window: sculpt characters or hard-surface props, retopologize with Shrinkwrap &amp; Quad-Draw, unwrap UVs to uniform Texel Density, bake Normal &amp; AO maps, rig with 4-bone Weight Painting, compress with Draco, and export to Unity, Unreal Engine, or Godot.
             </p>
           </div>
 
           <div class="feature-card">
             <h3 class="card-title">3D Printing &amp; Prototyping</h3>
             <p class="card-desc">
-              Construct watertight solids using CSG2 boolean subtraction. Export clean STL or OBJ files with metric unit scaling, verified normals, and inspected manifold topology ready for Cura, PrusaSlicer, or Bambu Studio.
+              Construct watertight solids using CSG2 boolean subtraction and non-destructive Chamfer/Fillet bevels. Export clean STL or OBJ files with metric unit scaling, verified normals, and inspected manifold topology ready for Cura, PrusaSlicer, or Bambu Studio.
             </p>
           </div>
 
@@ -1035,24 +1273,24 @@
 
           <!-- Step 2 -->
           <div class="roadmap-card">
-            <span class="roadmap-badge badge-upcoming">Upcoming</span>
+            <span class="roadmap-badge badge-in-progress">Shipped &amp; Expanding</span>
             <div class="roadmap-step-num">Milestone 02</div>
-            <h3 class="roadmap-title">2. Skeletons &amp; Rigging</h3>
+            <h3 class="roadmap-title">2. Rigging, Weight Paint &amp; IK</h3>
             <p class="roadmap-desc">
-              Comprehensive skeletal structure creation and bone rigging system. Add joint hierarchies, visualize bone chains directly in the 3D viewport, configure Inverse Kinematics (IK), and bind meshes with automatic vertex weight painting.
+              Humanoid, Quadruped, and Spine auto-rigging, automatic 4-bone capsule skin binding, and interactive 3D Weight Painting with live heatmaps are now built in. Next up: full-body Inverse Kinematics (IK) solver handles and facial morph targets.
             </p>
             <ul class="roadmap-items">
               <li>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                <span>Interactive 3D bone &amp; joint hierarchy builder</span>
+                <span>Humanoid (20-bone), Quadruped &amp; Spine auto-rigs (Shipped)</span>
               </li>
               <li>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                <span>Inverse Kinematics (IK) solver handles</span>
+                <span>Interactive 3D vertex weight brush &amp; heatmap (Shipped)</span>
               </li>
               <li>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                <span>Interactive vertex weight brush &amp; skin binding</span>
+                <span>Full-body Inverse Kinematics (IK) &amp; blendshapes (Upcoming)</span>
               </li>
             </ul>
           </div>
@@ -1124,6 +1362,7 @@
         <div style="display: flex; gap: 24px;">
           <a href="#ai-copilot" class="nav-link">Human + AI</a>
           <a href="#neural-3d" class="nav-link">Neural 3D</a>
+          <a href="#game-pipeline" class="nav-link">Game Pipeline</a>
           <a href="#adapters" class="nav-link">Adapters</a>
           <a href="#plugin-system" class="nav-link">Plugin SDK</a>
           <a href="#roadmap" class="nav-link">Roadmap</a>

@@ -48,9 +48,9 @@
       </div>
     </div>
 
-    <!-- Sculpting Brushes -->
+    <!-- Sculpting & Quad-Draw Brushes -->
     <div class="tool-control-group">
-      <div class="sculpt-section-title"><i class="app-icon" data-lucide="brush"></i> Sculpting Brush</div>
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="brush"></i> Sculpt &amp; Quad-Draw Brushes</div>
       <div class="sculpt-grid-3">
         <button class="sculpt-btn btn-sculpt-brush active" data-brush="clay" title="Add or carve surface clay along normals">Clay</button>
         <button class="sculpt-btn btn-sculpt-brush" data-brush="grab" title="Pull geometry smoothly along mouse drag (Primary forms)">Grab</button>
@@ -59,13 +59,16 @@
         <button class="sculpt-btn btn-sculpt-brush" data-brush="inflate" title="Expand or contract volume along vertex normals">Inflate</button>
         <button class="sculpt-btn btn-sculpt-brush" data-brush="pinch" title="Pinch vertices towards center for sharp creases">Pinch</button>
       </div>
+      <button class="sculpt-btn btn-sculpt-brush" data-brush="quaddraw" style="width: 100%; margin-top: 6px;" title="Draw surface-snapped Quad Strips directly onto the High-Poly surface for clean animation edge flow">
+        <i class="app-icon" data-lucide="grid"></i> Quad-Draw / Retopo Strips
+      </button>
     </div>
 
     <!-- Brush Settings -->
     <div class="tool-control-group">
       <div class="sculpt-slider-row">
         <div class="sculpt-slider-header">
-          <span class="sculpt-slider-label">Brush Radius</span>
+          <span class="sculpt-slider-label">Brush / Strip Radius</span>
           <span id="sculptRadiusValue" class="sculpt-slider-val">0.35</span>
         </div>
         <input type="range" id="sliderSculptRadius" min="0.05" max="1.50" step="0.02" value="0.35" class="tool-range">
@@ -91,12 +94,33 @@
       </div>
     </div>
 
-    <!-- Game-Ready Retopology -->
+    <!-- Game-Ready Retopology & Shrinkwrap Projection -->
     <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
-      <div class="sculpt-section-title"><i class="app-icon" data-lucide="layers"></i> Game-Ready Retopology</div>
-      <div class="tool-sublabel">Decimate sculpt into clean, performance-friendly game mesh</div>
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="layers"></i> Retopology &amp; Shrinkwrap</div>
+      <div class="tool-sublabel">Project low-poly meshes onto high-poly sculpts or decimate</div>
+
+      <div class="tool-row" style="margin-top: 6px;">
+        <span class="tool-label">High-Poly Target</span>
+        <select id="selectRetopoHighPolyTarget" class="tool-select" style="flex: 1;">
+          <option value="auto" selected>Selected / Active Mesh</option>
+        </select>
+      </div>
 
       <div class="tool-row" style="margin-top: 4px;">
+        <span class="tool-label">Surface Offset</span>
+        <input type="number" id="numRetopoSurfaceOffset" class="tool-input" min="0.000" max="0.100" step="0.002" value="0.004" style="flex: 1;" title="Normal offset for Shrinkwrap and Quad-Draw strips" />
+      </div>
+
+      <div class="sculpt-grid-2" style="margin-top: 6px;">
+        <button type="button" id="btnShrinkwrapMesh" class="sculpt-btn" title="Project selected low-poly mesh vertices onto the High-Poly target surface (Shrinkwrap)">
+          <i class="app-icon" data-lucide="minimize-2"></i> Shrinkwrap
+        </button>
+        <button type="button" id="btnGenerateQuadCage" class="sculpt-btn" title="Generate a clean Quad-Dominant Edge-Flow Cage wrapped onto the High-Poly mesh">
+          <i class="app-icon" data-lucide="box-select"></i> Quad Cage
+        </button>
+      </div>
+
+      <div class="tool-row" style="margin-top: 8px;">
         <span class="tool-label">Target Budget</span>
         <select id="selectRetopoPreset" class="tool-select" style="flex: 1;">
           <option value="4000">Mobile / WebGL (~4,000)</option>

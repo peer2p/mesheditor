@@ -25,7 +25,20 @@ import {
 import { MeshEditorService } from '../MeshEditorService';
 import { ModelCompressor } from '../compression/ModelCompressor';
 
-export type SculptBrushType = 'clay' | 'grab' | 'smooth' | 'flatten' | 'inflate' | 'pinch';
+export type SculptBrushType =
+  | 'clay'
+  | 'grab'
+  | 'smooth'
+  | 'flatten'
+  | 'inflate'
+  | 'pinch'
+  | 'quaddraw';
+
+export interface ShrinkwrapOptions {
+  offset?: number;
+  mode?: 'nearest' | 'normal';
+  smoothIterations?: number;
+}
 
 export interface TopologyAnalysis {
   vertexCount: number;
@@ -77,6 +90,11 @@ export class SculptController {
   private grabInitialPositions: Nullable<FloatArray> = null;
   private grabWeights: Map<number, number> = new Map();
   private grabWeightsSym: Map<number, number> = new Map();
+
+  // Quad-Draw & Shrinkwrap tracking state
+  public quadSurfaceOffset: number = 0.005;
+  public quadAutoWeld: boolean = true;
+  private quadStrokePoints: Vector3[] = [];
 
   // Listeners
   public onStateChanged?: (isActive: boolean) => void;
@@ -347,9 +365,11 @@ export class SculptController {
     const invWorld = mesh.getWorldMatrix().clone().invert();
     this.lastLocalPick = Vector3.TransformCoordinates(hitPoint, invWorld);
 
-    // Apply immediate initial brush stamp or initialize Grab tracking
+    // Apply immediate initial brush stamp or initialize Grab / Quad-Draw tracking
     if (this.brushType === 'grab') {
       this.initGrabStroke(mesh, hitPoint);
+    } else if (this.brushType === 'quaddraw') {
+      this.quadStrokePoints = [hitPoint.clone()];
     } else {
       this.applyBrushStroke(mesh, hitPoint, hitNormal);
     }
@@ -423,7 +443,14 @@ export class SculptController {
 
     if (hitPoint) {
       this.updateCursorTransform(hitPoint, hitNormal || Vector3.Up());
-      this.applyBrushStroke(this.activeMesh, hitPoint, hitNormal);
+      if (this.brushType === 'quaddraw') {
+        const lastPt = this.quadStrokePoints[this.quadStrokePoints.length - 1];
+        if (!lastPt || Vector3.Distance(lastPt, hitPoint) >= Math.max(0.03, this.radius * 0.25)) {
+          this.quadStrokePoints.push(hitPoint.clone());
+        }
+      } else {
+        this.applyBrushStroke(this.activeMesh, hitPoint, hitNormal);
+      }
     }
   }
 
@@ -595,6 +622,18 @@ export class SculptController {
     this.grabInitialPositions = null;
     this.grabWeights.clear();
     this.grabWeightsSym.clear();
+
+    if (this.brushType === 'quaddraw' && this.quadStrokePoints.length >= 1) {
+      const pts = this.quadStrokePoints.slice();
+      this.quadStrokePoints = [];
+      if (pts.length === 1) {
+        // Single click places a single quad patch centered at the pick point
+        const half = Math.max(0.05, this.radius * 0.5);
+        pts.push(pts[0].add(new Vector3(0, 0, half)));
+      }
+      this.drawQuadStripOnMesh(mesh, pts, this.radius, this.quadSurfaceOffset);
+      return;
+    }
 
     if (preSnapshot) {
       this.service.recordAction({
@@ -1931,6 +1970,477 @@ export class SculptController {
       gameReadiness,
       gameReadinessClass,
     };
+  }
+
+  /**
+   * Projects all vertices of `lowPolyMesh` onto the closest surface triangles of `highPolyTarget`
+   * (Shrinkwrap modifier), with optional tangential smoothing and surface normal offset.
+   */
+  public shrinkwrapMesh(
+    lowPolyMesh: Mesh,
+    highPolyTarget: Mesh,
+    options: ShrinkwrapOptions = {}
+  ): TopologyAnalysis {
+    const offset = options.offset ?? this.quadSurfaceOffset;
+    const smoothIterations = Math.max(0, Math.min(options.smoothIterations ?? 1, 5));
+
+    const lowPosRaw = lowPolyMesh.getVerticesData(VertexBuffer.PositionKind);
+    const lowInd = lowPolyMesh.getIndices();
+    if (!lowPosRaw || !lowInd) {
+      return this.analyzeTopology(lowPolyMesh);
+    }
+
+    const preSnapshot = VertexData.ExtractFromMesh(lowPolyMesh);
+    this.ensureMeshUpdatable(lowPolyMesh);
+
+    lowPolyMesh.computeWorldMatrix(true);
+    highPolyTarget.computeWorldMatrix(true);
+    const lowWorldMat = lowPolyMesh.getWorldMatrix();
+    const lowInvWorldMat = lowWorldMat.clone().invert();
+    const highTris = this.extractWorldTriangles(highPolyTarget);
+
+    if (highTris.length === 0) {
+      return this.analyzeTopology(lowPolyMesh);
+    }
+
+    const numVerts = Math.floor(lowPosRaw.length / 3);
+    const worldVerts: Vector3[] = new Array(numVerts);
+    const worldNormals: Vector3[] = new Array(numVerts);
+
+    for (let i = 0; i < numVerts; i++) {
+      const localP = new Vector3(lowPosRaw[i * 3], lowPosRaw[i * 3 + 1], lowPosRaw[i * 3 + 2]);
+      const worldP = Vector3.TransformCoordinates(localP, lowWorldMat);
+      const proj = this.findClosestPointOnTriangles(worldP, highTris);
+      worldVerts[i] = proj.point.add(proj.normal.scale(offset));
+      worldNormals[i] = proj.normal;
+    }
+
+    // Optional tangential relaxation + re-projection for clean quad edge flow
+    if (smoothIterations > 0 && numVerts > 3) {
+      const neighbors: Array<Set<number>> = Array.from({ length: numVerts }, () => new Set<number>());
+      for (let f = 0; f < lowInd.length; f += 3) {
+        const a = lowInd[f];
+        const b = lowInd[f + 1];
+        const c = lowInd[f + 2];
+        neighbors[a].add(b);
+        neighbors[a].add(c);
+        neighbors[b].add(a);
+        neighbors[b].add(c);
+        neighbors[c].add(a);
+        neighbors[c].add(b);
+      }
+
+      for (let iter = 0; iter < smoothIterations; iter++) {
+        const relaxed: Vector3[] = new Array(numVerts);
+        for (let i = 0; i < numVerts; i++) {
+          const nbrs = neighbors[i];
+          if (nbrs.size === 0) {
+            relaxed[i] = worldVerts[i];
+            continue;
+          }
+          const avg = new Vector3(0, 0, 0);
+          for (const nb of nbrs) {
+            avg.addInPlace(worldVerts[nb]);
+          }
+          avg.scaleInPlace(1 / nbrs.size);
+          // Tangential relaxation
+          const delta = avg.subtract(worldVerts[i]);
+          const n = worldNormals[i];
+          const tangDelta = delta.subtract(n.scale(Vector3.Dot(delta, n)));
+          const cand = worldVerts[i].add(tangDelta.scale(0.45));
+          const reproj = this.findClosestPointOnTriangles(cand, highTris);
+          relaxed[i] = reproj.point.add(reproj.normal.scale(offset));
+          worldNormals[i] = reproj.normal;
+        }
+        for (let i = 0; i < numVerts; i++) {
+          worldVerts[i] = relaxed[i];
+        }
+      }
+    }
+
+    const newLocalPositions = new Float32Array(lowPosRaw.length);
+    for (let i = 0; i < numVerts; i++) {
+      const lp = Vector3.TransformCoordinates(worldVerts[i], lowInvWorldMat);
+      newLocalPositions[i * 3] = lp.x;
+      newLocalPositions[i * 3 + 1] = lp.y;
+      newLocalPositions[i * 3 + 2] = lp.z;
+    }
+
+    const newNormals: number[] = [];
+    VertexData.ComputeNormals(newLocalPositions, lowInd, newNormals);
+    lowPolyMesh.setVerticesData(VertexBuffer.PositionKind, newLocalPositions, true);
+    lowPolyMesh.setVerticesData(VertexBuffer.NormalKind, newNormals, true);
+    lowPolyMesh.refreshBoundingInfo();
+
+    const postSnapshot = VertexData.ExtractFromMesh(lowPolyMesh);
+    this.service.recordAction({
+      name: `Shrinkwrap (${lowPolyMesh.name} -> ${highPolyTarget.name})`,
+      undo: () => {
+        if (!lowPolyMesh.isDisposed()) {
+          preSnapshot.applyToMesh(lowPolyMesh, true);
+          lowPolyMesh.refreshBoundingInfo();
+          this.onMeshModified?.(lowPolyMesh);
+        }
+      },
+      redo: () => {
+        if (!lowPolyMesh.isDisposed()) {
+          postSnapshot.applyToMesh(lowPolyMesh, true);
+          lowPolyMesh.refreshBoundingInfo();
+          this.onMeshModified?.(lowPolyMesh);
+        }
+      },
+    });
+
+    this.service.updateStats();
+    this.onMeshModified?.(lowPolyMesh);
+    return this.analyzeTopology(lowPolyMesh);
+  }
+
+  /**
+   * Draws a surface-snapped Quad Strip along `worldStrokePoints` on `targetHighPoly`
+   * and welds adjacent quad vertices to build clean animation-ready edge loops.
+   */
+  public drawQuadStripOnMesh(
+    targetHighPoly: Mesh,
+    worldStrokePoints: Vector3[],
+    stripWidth: number = this.radius,
+    offset: number = this.quadSurfaceOffset
+  ): Mesh {
+    const width = Math.max(0.04, stripWidth);
+    const stepLen = Math.max(0.04, width * 0.85);
+    const highTris = this.extractWorldTriangles(targetHighPoly);
+
+    // Resample stroke points into evenly spaced steps
+    const samples: Vector3[] = [];
+    if (worldStrokePoints.length === 0) {
+      targetHighPoly.computeWorldMatrix(true);
+      const c = targetHighPoly.getBoundingInfo().boundingBox.centerWorld;
+      samples.push(c.add(new Vector3(0, -width, 0)), c.add(new Vector3(0, width, 0)));
+    } else if (worldStrokePoints.length === 1) {
+      samples.push(
+        worldStrokePoints[0].clone(),
+        worldStrokePoints[0].add(new Vector3(0, 0, stepLen))
+      );
+    } else {
+      samples.push(worldStrokePoints[0].clone());
+      let accum = 0;
+      for (let i = 1; i < worldStrokePoints.length; i++) {
+        const pPrev = samples[samples.length - 1];
+        const pCurr = worldStrokePoints[i];
+        const dist = Vector3.Distance(pPrev, pCurr);
+        if (dist >= stepLen) {
+          const steps = Math.max(1, Math.min(24, Math.floor(dist / stepLen)));
+          for (let s = 1; s <= steps; s++) {
+            samples.push(Vector3.Lerp(pPrev, pCurr, s / steps));
+          }
+          accum = 0;
+        } else {
+          accum += dist;
+        }
+      }
+      if (samples.length < 2) {
+        samples.push(worldStrokePoints[worldStrokePoints.length - 1].clone());
+      }
+    }
+
+    const retopoName = `${targetHighPoly.name}_RetopoQuads`;
+    let retopoMesh = this.service.importedMeshes.find(
+      (m) => m.name === retopoName && !m.isDisposed()
+    ) as Nullable<Mesh>;
+
+    let existingPos: number[] = [];
+    let existingInd: number[] = [];
+    let existingUVs: number[] = [];
+
+    if (retopoMesh) {
+      existingPos = Array.from(retopoMesh.getVerticesData(VertexBuffer.PositionKind) || []);
+      existingInd = Array.from(retopoMesh.getIndices() || []);
+      existingUVs = Array.from(retopoMesh.getVerticesData(VertexBuffer.UVKind) || []);
+    } else {
+      retopoMesh = new Mesh(retopoName, this.scene);
+      const mat = new PBRMaterial(`${retopoName}_Mat`, this.scene);
+      mat.albedoColor = new Color3(0.22, 0.78, 0.95);
+      mat.metallic = 0.05;
+      mat.roughness = 0.45;
+      mat.backFaceCulling = false;
+      retopoMesh.material = mat;
+      this.service.addMesh(retopoMesh);
+    }
+
+    const weldTol = this.quadAutoWeld ? width * 0.35 : 0;
+    const weldTolSq = weldTol * weldTol;
+
+    const addOrWeldVertex = (worldPos: Vector3, u: number, v: number): number => {
+      if (weldTol > 0) {
+        const numExisting = Math.floor(existingPos.length / 3);
+        for (let i = 0; i < numExisting; i++) {
+          const dx = existingPos[i * 3] - worldPos.x;
+          const dy = existingPos[i * 3 + 1] - worldPos.y;
+          const dz = existingPos[i * 3 + 2] - worldPos.z;
+          if (dx * dx + dy * dy + dz * dz <= weldTolSq) {
+            return i;
+          }
+        }
+      }
+      const newIdx = Math.floor(existingPos.length / 3);
+      existingPos.push(worldPos.x, worldPos.y, worldPos.z);
+      existingUVs.push(u, v);
+      return newIdx;
+    };
+
+    const rowPairs: Array<[number, number]> = [];
+    for (let i = 0; i < samples.length; i++) {
+      const pt = samples[i];
+      const proj =
+        highTris.length > 0
+          ? this.findClosestPointOnTriangles(pt, highTris)
+          : { point: pt.clone(), normal: Vector3.Up() };
+
+      let tangent: Vector3;
+      if (i < samples.length - 1) {
+        tangent = samples[i + 1].subtract(pt);
+      } else {
+        tangent = pt.subtract(samples[i - 1]);
+      }
+      if (tangent.lengthSquared() < 1e-8) {
+        tangent = Vector3.Forward();
+      } else {
+        tangent.normalize();
+      }
+
+      let binormal = Vector3.Cross(tangent, proj.normal);
+      if (binormal.lengthSquared() < 1e-8) {
+        binormal = Vector3.Right();
+      } else {
+        binormal.normalize();
+      }
+
+      const halfW = width * 0.5;
+      const leftCand = proj.point.subtract(binormal.scale(halfW));
+      const rightCand = proj.point.add(binormal.scale(halfW));
+
+      const leftProj =
+        highTris.length > 0
+          ? this.findClosestPointOnTriangles(leftCand, highTris)
+          : { point: leftCand, normal: proj.normal };
+      const rightProj =
+        highTris.length > 0
+          ? this.findClosestPointOnTriangles(rightCand, highTris)
+          : { point: rightCand, normal: proj.normal };
+
+      const leftFinal = leftProj.point.add(leftProj.normal.scale(offset));
+      const rightFinal = rightProj.point.add(rightProj.normal.scale(offset));
+
+      const vCoord = i / Math.max(1, samples.length - 1);
+      const lIdx = addOrWeldVertex(leftFinal, 0, vCoord);
+      const rIdx = addOrWeldVertex(rightFinal, 1, vCoord);
+      rowPairs.push([lIdx, rIdx]);
+    }
+
+    for (let i = 0; i < rowPairs.length - 1; i++) {
+      const [l0, r0] = rowPairs[i];
+      const [l1, r1] = rowPairs[i + 1];
+      existingInd.push(l0, r0, r1);
+      existingInd.push(l0, r1, l1);
+    }
+
+    const normals: number[] = [];
+    VertexData.ComputeNormals(existingPos, existingInd, normals);
+
+    const vd = new VertexData();
+    vd.positions = existingPos;
+    vd.indices = existingInd;
+    vd.normals = normals;
+    vd.uvs = existingUVs;
+    vd.applyToMesh(retopoMesh, true);
+    retopoMesh.refreshBoundingInfo();
+
+    this.service.updateStats();
+    this.onMeshModified?.(retopoMesh);
+    return retopoMesh;
+  }
+
+  /**
+   * Generates a complete Quad-Dominant Edge-Flow Cage wrapped tightly onto `targetHighPoly`.
+   */
+  public generateQuadFlowCage(
+    targetHighPoly: Mesh,
+    rings: number = 14,
+    segmentsPerRing: number = 16,
+    offset: number = this.quadSurfaceOffset
+  ): Mesh {
+    targetHighPoly.computeWorldMatrix(true);
+    targetHighPoly.refreshBoundingInfo();
+    const bbox = targetHighPoly.getBoundingInfo().boundingBox;
+    const min = bbox.minimumWorld;
+    const max = bbox.maximumWorld;
+    const center = bbox.centerWorld;
+    const rx = Math.max(0.15, (max.x - min.x) * 0.6);
+    const ry = Math.max(0.15, (max.y - min.y) * 0.52);
+    const rz = Math.max(0.15, (max.z - min.z) * 0.6);
+
+    const cageName = `${targetHighPoly.name}_QuadCage`;
+    const positions: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+
+    const rCount = Math.max(4, Math.min(48, rings));
+    const sCount = Math.max(6, Math.min(48, segmentsPerRing));
+
+    for (let r = 0; r <= rCount; r++) {
+      const v = r / rCount;
+      const phi = v * Math.PI;
+      const sinPhi = Math.sin(phi);
+      const cosPhi = Math.cos(phi);
+
+      for (let s = 0; s <= sCount; s++) {
+        const u = s / sCount;
+        const theta = u * Math.PI * 2;
+        const x = center.x + rx * sinPhi * Math.cos(theta);
+        const y = center.y - ry * cosPhi;
+        const z = center.z + rz * sinPhi * Math.sin(theta);
+        positions.push(x, y, z);
+        uvs.push(u, v);
+      }
+    }
+
+    const stride = sCount + 1;
+    for (let r = 0; r < rCount; r++) {
+      for (let s = 0; s < sCount; s++) {
+        const i0 = r * stride + s;
+        const i1 = i0 + 1;
+        const i2 = (r + 1) * stride + s;
+        const i3 = i2 + 1;
+        indices.push(i0, i2, i3);
+        indices.push(i0, i3, i1);
+      }
+    }
+
+    const normals: number[] = [];
+    VertexData.ComputeNormals(positions, indices, normals);
+
+    const cageMesh = new Mesh(cageName, this.scene);
+    const vd = new VertexData();
+    vd.positions = positions;
+    vd.indices = indices;
+    vd.normals = normals;
+    vd.uvs = uvs;
+    vd.applyToMesh(cageMesh, true);
+
+    const mat = new PBRMaterial(`${cageName}_Mat`, this.scene);
+    mat.albedoColor = new Color3(0.28, 0.82, 0.58);
+    mat.metallic = 0.05;
+    mat.roughness = 0.45;
+    cageMesh.material = mat;
+
+    this.service.addMesh(cageMesh);
+    this.shrinkwrapMesh(cageMesh, targetHighPoly, {
+      offset,
+      mode: 'nearest',
+      smoothIterations: 2,
+    });
+    return cageMesh;
+  }
+
+  private extractWorldTriangles(
+    mesh: Mesh
+  ): Array<{ p0: Vector3; p1: Vector3; p2: Vector3; normal: Vector3 }> {
+    const pos = mesh.getVerticesData(VertexBuffer.PositionKind);
+    const ind = mesh.getIndices();
+    if (!pos || !ind || ind.length < 3) return [];
+
+    mesh.computeWorldMatrix(true);
+    const wMat = mesh.getWorldMatrix();
+    const numTris = Math.floor(ind.length / 3);
+    const step = Math.max(1, Math.floor(numTris / 2500));
+    const out: Array<{ p0: Vector3; p1: Vector3; p2: Vector3; normal: Vector3 }> = [];
+
+    for (let f = 0; f < numTris; f += step) {
+      const i0 = ind[f * 3];
+      const i1 = ind[f * 3 + 1];
+      const i2 = ind[f * 3 + 2];
+      const p0 = Vector3.TransformCoordinates(
+        new Vector3(pos[i0 * 3], pos[i0 * 3 + 1], pos[i0 * 3 + 2]),
+        wMat
+      );
+      const p1 = Vector3.TransformCoordinates(
+        new Vector3(pos[i1 * 3], pos[i1 * 3 + 1], pos[i1 * 3 + 2]),
+        wMat
+      );
+      const p2 = Vector3.TransformCoordinates(
+        new Vector3(pos[i2 * 3], pos[i2 * 3 + 1], pos[i2 * 3 + 2]),
+        wMat
+      );
+      const normal = Vector3.Cross(p1.subtract(p0), p2.subtract(p0));
+      if (normal.lengthSquared() > 1e-12) normal.normalize();
+      else normal.set(0, 1, 0);
+      out.push({ p0, p1, p2, normal });
+    }
+    return out;
+  }
+
+  private findClosestPointOnTriangles(
+    point: Vector3,
+    tris: Array<{ p0: Vector3; p1: Vector3; p2: Vector3; normal: Vector3 }>
+  ): { point: Vector3; normal: Vector3 } {
+    let bestDistSq = Infinity;
+    let bestPoint = point.clone();
+    let bestNormal = Vector3.Up();
+
+    for (let i = 0; i < tris.length; i++) {
+      const t = tris[i];
+      const cp = this.closestPointOnTriangle(point, t.p0, t.p1, t.p2);
+      const dSq = Vector3.DistanceSquared(point, cp);
+      if (dSq < bestDistSq) {
+        bestDistSq = dSq;
+        bestPoint = cp;
+        bestNormal = t.normal;
+      }
+    }
+    return { point: bestPoint, normal: bestNormal.clone() };
+  }
+
+  private closestPointOnTriangle(p: Vector3, a: Vector3, b: Vector3, c: Vector3): Vector3 {
+    const ab = b.subtract(a);
+    const ac = c.subtract(a);
+    const ap = p.subtract(a);
+
+    const d1 = Vector3.Dot(ab, ap);
+    const d2 = Vector3.Dot(ac, ap);
+    if (d1 <= 0 && d2 <= 0) return a.clone();
+
+    const bp = p.subtract(b);
+    const d3 = Vector3.Dot(ab, bp);
+    const d4 = Vector3.Dot(ac, bp);
+    if (d3 >= 0 && d4 <= d3) return b.clone();
+
+    const vc = d1 * d4 - d3 * d2;
+    if (vc <= 0 && d1 >= 0 && d3 <= 0) {
+      const v = d1 / (d1 - d3);
+      return a.add(ab.scale(v));
+    }
+
+    const cp = p.subtract(c);
+    const d5 = Vector3.Dot(ab, cp);
+    const d6 = Vector3.Dot(ac, cp);
+    if (d6 >= 0 && d5 <= d6) return c.clone();
+
+    const vb = d5 * d2 - d1 * d6;
+    if (vb <= 0 && d2 >= 0 && d6 <= 0) {
+      const w = d2 / (d2 - d6);
+      return a.add(ac.scale(w));
+    }
+
+    const va = d3 * d6 - d5 * d4;
+    if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
+      const w = (d4 - d3) / (d4 - d3 + (d5 - d6));
+      return b.add(c.subtract(b).scale(w));
+    }
+
+    const denom = 1.0 / (va + vb + vc);
+    const v = vb * denom;
+    const w = vc * denom;
+    return a.add(ab.scale(v)).add(ac.scale(w));
   }
 
   public dispose(): void {

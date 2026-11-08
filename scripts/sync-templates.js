@@ -19,10 +19,13 @@ const TOOLS = [
   { className: 'AIAgentEditorTool', file: 'AIAgentEditorTool.ejs', id: 'dialog-ai-agent' },
   { className: 'MeshPropertiesEditorTool', file: 'MeshPropertiesEditorTool.ejs', id: 'dialog-mesh' },
   { className: 'MaterialEditorTool', file: 'MaterialEditorTool.ejs', id: 'dialog-material' },
+  { className: 'UVUnwrapEditorTool', file: 'UVUnwrapEditorTool.ejs', id: 'dialog-uv-unwrap' },
+  { className: 'BakingEditorTool', file: 'BakingEditorTool.ejs', id: 'dialog-baking' },
   { className: 'TextureOptimizerEditorTool', file: 'TextureOptimizerEditorTool.ejs', id: 'dialog-textures' },
   { className: 'CompressModelEditorTool', file: 'CompressModelEditorTool.ejs', id: 'dialog-compress-model' },
   { className: 'SceneEnvironmentEditorTool', file: 'SceneEnvironmentEditorTool.ejs', id: 'dialog-scene' },
   { className: 'AnimationPlayerEditorTool', file: 'AnimationPlayerEditorTool.ejs', id: 'dialog-anim' },
+  { className: 'RiggingEditorTool', file: 'RiggingEditorTool.ejs', id: 'dialog-rigging' },
 ];
 
 function syncTemplates() {

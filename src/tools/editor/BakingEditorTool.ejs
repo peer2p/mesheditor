@@ -1,0 +1,121 @@
+<div id="dialog-baking" class="floating-dialog" style="top: 180px; right: 365px; width: 340px; display: none">
+  <div class="dialog-header">
+    <span class="dialog-title"><i class="app-icon" data-lucide="flame"></i> Normal &amp; AO Baker</span>
+    <div class="dialog-actions">
+      <button class="dialog-btn btn-help" title="Help &amp; Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+      <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+      <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+    </div>
+  </div>
+  <div class="dialog-body sculpt-tool-body">
+    <!-- 1. Source & Target Meshes -->
+    <div class="tool-control-group">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="layers"></i> High-Poly to Low-Poly Setup</div>
+      <div class="tool-row" style="margin-top: 4px;">
+        <span class="tool-label">Low-Poly Target</span>
+        <select id="selectBakeLowPoly" class="tool-select" style="flex: 1;">
+          <option value="selected" selected>Selected Mesh</option>
+        </select>
+      </div>
+      <div class="tool-row" style="margin-top: 4px;">
+        <span class="tool-label">High-Poly Source</span>
+        <select id="selectBakeHighPoly" class="tool-select" style="flex: 1;">
+          <option value="self" selected>Self (Bevel &amp; Cavity Detail)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 2. Projection Cage Controls -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="box"></i> Projection Cage Generation</div>
+      <div class="sculpt-slider-row">
+        <div class="sculpt-slider-header">
+          <span class="sculpt-slider-label">Cage Extrusion Offset</span>
+          <span id="bakeCageOffsetVal" class="sculpt-slider-val">0.040</span>
+        </div>
+        <input type="range" id="sliderBakeCageOffset" min="0.005" max="0.300" step="0.005" value="0.040" class="tool-range" />
+      </div>
+
+      <div class="sculpt-options-row" style="margin-top: 6px;">
+        <label class="sculpt-checkbox-label">
+          <input type="checkbox" id="chkBakeShowCage" />
+          <span><strong>Show 3D Cage Preview</strong></span>
+        </label>
+        <button type="button" id="btnBakeAutoCage" class="tool-btn" style="padding: 3px 8px; font-size: 11px;" title="Automatically calculate optimal cage extrusion distance">
+          Auto Fit Cage
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. Bake Settings -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="settings"></i> Map Output Settings</div>
+      <div class="tool-row" style="margin-top: 4px;">
+        <span class="tool-label">Resolution</span>
+        <select id="selectBakeResolution" class="tool-select" style="flex: 1;">
+          <option value="256">256 × 256 (Fast Preview)</option>
+          <option value="512" selected>512 × 512 (Standard)</option>
+          <option value="1024">1024 × 1024 (1K HD)</option>
+          <option value="2048">2048 × 2048 (2K Ultra)</option>
+        </select>
+      </div>
+
+      <div class="tool-row" style="margin-top: 4px;">
+        <span class="tool-label">Seam Dilation</span>
+        <select id="selectBakePadding" class="tool-select" style="flex: 1;">
+          <option value="2">2 px Padding</option>
+          <option value="4" selected>4 px Padding (Standard)</option>
+          <option value="8">8 px Padding (Wide)</option>
+        </select>
+      </div>
+
+      <div class="sculpt-options-row" style="margin-top: 6px;">
+        <label class="sculpt-checkbox-label" title="Invert Green (-Y) channel for DirectX normal maps (leave unchecked for OpenGL/Babylon/glTF)">
+          <input type="checkbox" id="chkBakeFlipY" />
+          <span>Flip Green (-Y DirectX)</span>
+        </label>
+        <label class="sculpt-checkbox-label">
+          <input type="checkbox" id="chkBakeApplyMaterial" checked />
+          <span>Apply to Mesh</span>
+        </label>
+      </div>
+
+      <button type="button" id="btnExecuteBake" class="tool-btn tool-btn-primary btn-block" style="width: 100%; height: 32px; margin-top: 8px;">
+        <i class="app-icon" data-lucide="flame"></i> Bake Normal &amp; AO Maps
+      </button>
+    </div>
+
+    <!-- 4. Baked Map Preview & Export -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 8px;">
+      <div class="tool-row" style="margin-bottom: 6px;">
+        <span class="sculpt-slider-label">Baked Texture Preview</span>
+        <select id="selectBakePreviewChannel" class="tool-select" style="width: 140px;">
+          <option value="normal" selected>Normal Map (RGB)</option>
+          <option value="ao">Ambient Occlusion</option>
+        </select>
+      </div>
+      <div style="display: flex; justify-content: center; background: #0d1117; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px; padding: 4px;">
+        <canvas id="bakePreviewCanvas" width="200" height="200" style="width: 200px; height: 200px; border-radius: 4px;"></canvas>
+      </div>
+      <div class="sculpt-grid-2" style="margin-top: 6px;">
+        <button type="button" id="btnDownloadNormalMap" class="sculpt-btn" title="Download Baked Tangent-Space Normal Map">
+          <i class="app-icon" data-lucide="download"></i> Normal Map
+        </button>
+        <button type="button" id="btnDownloadAOMap" class="sculpt-btn" title="Download Baked Ambient Occlusion Map">
+          <i class="app-icon" data-lucide="download"></i> AO Map
+        </button>
+      </div>
+    </div>
+
+    <div class="sculpt-stats-card">
+      <div class="sculpt-stats-row">
+        <span style="color: #8b949e;">Bake Status:</span>
+        <span id="bakeStatusText" style="color: #58a6ff; font-weight: 600;">Ready</span>
+      </div>
+      <div class="sculpt-stats-row">
+        <span style="color: #8b949e;">Ray Hits / Coverage:</span>
+        <span id="bakeRayStats" style="color: #f0f6fc; font-family: monospace;">0 rays (0%)</span>
+      </div>
+    </div>
+  </div>
+</div>

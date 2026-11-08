@@ -36,3 +36,6 @@ export * from './CreateStairsTool';
 export * from './CreateRoofTool';
 export * from './PlanModelTool';
 export * from './GenerateNeuralMeshTool';
+export * from './UVUnwrapTool';
+export * from './BakeTexturesTool';
+export * from './RigWeightTool';
