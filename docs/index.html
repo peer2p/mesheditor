@@ -7,6 +7,9 @@
   <meta name="description" content="Mesh Editor is a modern, modular 3D model studio and mesh manipulation workbench. Co-create 3D meshes with the AI of your choice, sculpt with CSG booleans, paint voxels, and deploy across Web, Desktop, and Web Components.">
   <link rel="icon" type="image/svg+xml" href="app-icon.svg">
   <link rel="stylesheet" href="style.css">
+  <!-- Babylon.js CDN for Realtime 3D Model Viewport & GLB Sandbox Previews -->
+  <script src="https://cdn.babylonjs.com/babylon.js" defer></script>
+  <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js" defer></script>
 </head>
 <body>
 
@@ -78,10 +81,10 @@
           </div>
         </div>
 
-        <!-- Hero Screenshot Showcase Window Frame -->
+        <!-- Hero Screenshot Showcase Window Frame (Jumbotron Carousel) -->
         <div class="hero-screenshot-wrapper">
           <div class="hero-screenshot-glow"></div>
-          <div class="hero-screenshot-frame">
+          <div class="hero-screenshot-frame" id="heroShowcaseFrame">
             <div class="hero-window-header">
               <div class="hero-window-dots">
                 <span class="dot dot-red"></span>
@@ -90,11 +93,65 @@
               </div>
               <span class="hero-window-title">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                Mesh Editor Studio &bull; Human + AI Collaborative Session (Ancient Fluted Pillar)
+                Mesh Editor Studio &bull; <span id="heroShowcaseTitle">Ancient Fluted Pillar</span>
               </span>
-              <span class="hero-window-badge">Live Viewport</span>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <button type="button" class="hero-open-3d-btn" id="heroOpen3dTrigger" title="Click to inspect this 3D model in Babylon.js">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                  <span>Inspect in 3D</span>
+                </button>
+                <span class="hero-window-badge">Live Showcase</span>
+              </div>
             </div>
-            <img src="app-screenshot.jpg" alt="Mesh Editor 3D studio interface showing AI Mesh Agent generating an ancient fluted stone pillar with PBR marble material" class="hero-screenshot-img" loading="eager" fetchpriority="high">
+
+            <!-- Jumbotron Slide Display -->
+            <div class="hero-carousel-viewport" id="heroCarouselViewport" role="region" aria-label="3D Model Screenshots Showcase">
+              <div class="hero-carousel-slides" id="heroCarouselSlides">
+                <!-- Slides will be rendered dynamically -->
+              </div>
+
+              <!-- Click for 3D Overlay Badge on Hover -->
+              <div class="hero-hover-overlay">
+                <div class="hero-hover-pill">
+                  <div class="hero-hover-cube-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                  </div>
+                  <div class="hero-hover-text">
+                    <strong>Click to Open Babylon.js 3D Preview</strong>
+                    <span>Interactive Realtime GLB Viewport</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Carousel Edge Navigation Controls -->
+              <button type="button" class="hero-carousel-arrow hero-arrow-prev" id="btnHeroPrev" aria-label="Previous Slide" title="Previous model screenshot">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <button type="button" class="hero-carousel-arrow hero-arrow-next" id="btnHeroNext" aria-label="Next Slide" title="Next model screenshot">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+
+              <!-- Jumbotron Bottom Bar -->
+              <div class="hero-carousel-bar">
+                <div class="hero-slide-info">
+                  <span class="hero-slide-index" id="heroSlideIndex">1 / 10</span>
+                  <div class="hero-slide-desc-wrap">
+                    <span class="hero-slide-title" id="heroBarTitle">Ancient Fluted Pillar</span>
+                    <span class="hero-slide-sub" id="heroBarSub">Procedural Fluted Column &amp; Marble PBR</span>
+                  </div>
+                </div>
+
+                <div class="hero-carousel-indicators" id="heroCarouselDots">
+                  <!-- Dots generated dynamically -->
+                </div>
+
+                <div class="hero-carousel-actions">
+                  <button type="button" class="hero-play-btn" id="btnHeroPlayPause" aria-label="Pause Slideshow" title="Pause / Play Slideshow">
+                    <svg id="heroPlayIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1080,8 +1137,75 @@
     </div>
   </footer>
 
-  <!-- Interactive JavaScript for Copy Commands & Smooth Toggles -->
+  <!-- =========================================================================
+       BABYLON.JS 3D MODEL PREVIEW MODAL
+       ========================================================================= -->
+  <div id="babylonModal" class="babylon-modal" role="dialog" aria-modal="true" aria-labelledby="modalActiveTitle" aria-hidden="true">
+    <div class="babylon-modal-backdrop" id="babylonModalBackdrop"></div>
+    <div class="babylon-modal-window">
+      <div class="babylon-modal-header">
+        <div class="hero-window-dots">
+          <button type="button" class="dot dot-red" id="btnModalCloseDot" title="Close preview" aria-label="Close"></button>
+          <button type="button" class="dot dot-yellow" id="btnModalResetDot" title="Reset camera view" aria-label="Reset View"></button>
+          <button type="button" class="dot dot-green" id="btnModalFullscreenDot" title="Toggle Fullscreen" aria-label="Toggle Fullscreen"></button>
+        </div>
+        <div class="babylon-modal-title">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          <span>Babylon.js 3D Viewport:</span>
+          <strong id="modalActiveTitle">Ancient Fluted Pillar</strong>
+        </div>
+        <div class="babylon-modal-actions">
+          <button type="button" class="modal-action-btn active" id="btnModalAutoRotate" title="Toggle Auto-Rotation" aria-pressed="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+            <span class="btn-text-responsive">Auto-Rotate</span>
+          </button>
+          <button type="button" class="modal-action-btn" id="btnModalResetCamera" title="Reset Camera View">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+            <span class="btn-text-responsive">Center View</span>
+          </button>
+          <a id="btnModalSandbox" href="#" target="_blank" rel="noopener noreferrer" class="modal-action-btn modal-btn-sandbox" title="Open model directly in official Babylon.js Sandbox">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+            <span>Babylon Sandbox</span>
+          </a>
+          <button type="button" class="modal-action-btn modal-close-btn" id="btnModalClose" title="Close Preview (Esc)" aria-label="Close Preview">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+      <div class="babylon-modal-viewport">
+        <canvas id="babylonModalCanvas"></canvas>
+        <div id="babylonLoadingOverlay" class="babylon-loading-overlay">
+          <div class="babylon-spinner"></div>
+          <div class="babylon-loading-text">Loading 3D Mesh (<span id="babylonLoadingModelName">...</span>)...</div>
+        </div>
+        <div class="babylon-viewport-controls">
+          <button type="button" class="viewport-nav-btn viewport-nav-prev" id="btnModalPrev" title="Previous 3D Model">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button type="button" class="viewport-nav-btn viewport-nav-next" id="btnModalNext" title="Next 3D Model">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+        <div class="babylon-viewport-footer">
+          <div class="viewport-info-tag">
+            <span class="info-dot"></span>
+            <span id="babylonMeshInfo">Direct GLB Preview &bull; PBR Material</span>
+          </div>
+          <div class="viewport-hints">
+            <span><kbd>Left-drag</kbd> Orbit</span>
+            <span><kbd>Right-drag</kbd> Pan</span>
+            <span><kbd>Scroll</kbd> Zoom</span>
+          </div>
+        </div>
+      </div>
+      <!-- Model Selector Strip in Modal -->
+      <div class="babylon-modal-strip" id="babylonModalStrip"></div>
+    </div>
+  </div>
+
+  <!-- Interactive JavaScript for Showcase Carousel, Babylon 3D Viewport & Copy Commands -->
   <script>
+    // Copy NPM install command
     document.getElementById('btnCopyNpm').addEventListener('click', function() {
       navigator.clipboard.writeText('npm install mesheditor').then(() => {
         this.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3fb950" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>';
@@ -1090,6 +1214,479 @@
         }, 2000);
       });
     });
+
+    // Showcase Models & Screenshots (matching docs/models and docs/screenshots)
+    const SHOWCASE_ITEMS = [
+      {
+        id: 'stone_pillar',
+        title: 'Ancient Fluted Pillar',
+        sub: 'Procedural Fluted Column & Marble PBR',
+        screenshot: 'screenshots/stone_pillar.jpg',
+        model: 'models/stone_pillar.glb'
+      },
+      {
+        id: 'temple_portico',
+        title: 'Classical Temple Portico',
+        sub: 'Monumental Colonnade & Classical Pediment',
+        screenshot: 'screenshots/temple_portico.jpg',
+        model: 'models/temple_portico.glb'
+      },
+      {
+        id: 'alchemist_flask',
+        title: "Alchemist's Glass Flask",
+        sub: 'Translucent Glass Vial & Brass Fittings',
+        screenshot: 'screenshots/alchemist_flask.jpg',
+        model: 'models/alchemist_flask.glb'
+      },
+      {
+        id: 'treasure_chest',
+        title: 'Fantasy Treasure Chest',
+        sub: 'Carved Wood Texture & Iron Reinforcements',
+        screenshot: 'screenshots/treasure_chest.jpg',
+        model: 'models/treasure_chest.glb'
+      },
+      {
+        id: 'gear',
+        title: 'Mechanical Spur Gear',
+        sub: 'Parametric Involute Gear Wheel',
+        screenshot: 'screenshots/gear.jpg',
+        model: 'models/gear.glb'
+      },
+      {
+        id: 'cinema_chair',
+        title: 'Cinema Theater Chair',
+        sub: 'Velvet Theater Seating & Folding Mechanism',
+        screenshot: 'screenshots/cinema_chair.jpg',
+        model: 'models/cinema_chair.glb'
+      },
+      {
+        id: 'courtyard',
+        title: 'Medieval Castle Courtyard',
+        sub: 'Modular Stone Architecture & Archways',
+        screenshot: 'screenshots/courtyard.jpg',
+        model: 'models/courtyard.glb'
+      },
+      {
+        id: 'mario',
+        title: 'Retro Hero Figurine',
+        sub: 'Iconic Stylized Platformer Character',
+        screenshot: 'screenshots/mario.jpg',
+        model: 'models/mario.glb'
+      },
+      {
+        id: 'mario_bathrobe',
+        title: 'Hero in Cozy Bathrobe',
+        sub: 'Sculpted Custom Character Attire',
+        screenshot: 'screenshots/mario_bathrobe.jpg',
+        model: 'models/mario_bathrobe.glb'
+      },
+      {
+        id: 'voxel_island',
+        title: 'Floating Voxel Island',
+        sub: 'Stylized Floating Sky Island Terrain',
+        screenshot: 'screenshots/voxel_island.jpg',
+        model: 'models/voxel_island.glb'
+      }
+    ];
+
+    let currentSlide = 0;
+    let isAutoplayActive = true;
+    let autoplayTimer = null;
+    const AUTOPLAY_INTERVAL = 4500;
+
+    // Carousel DOM Elements
+    const heroSlidesContainer = document.getElementById('heroCarouselSlides');
+    const heroDotsContainer = document.getElementById('heroCarouselDots');
+    const heroShowcaseTitle = document.getElementById('heroShowcaseTitle');
+    const heroBarTitle = document.getElementById('heroBarTitle');
+    const heroBarSub = document.getElementById('heroBarSub');
+    const heroSlideIndex = document.getElementById('heroSlideIndex');
+    const heroPlayIcon = document.getElementById('heroPlayIcon');
+    const btnHeroPlayPause = document.getElementById('btnHeroPlayPause');
+    const heroCarouselViewport = document.getElementById('heroCarouselViewport');
+    const heroOpen3dTrigger = document.getElementById('heroOpen3dTrigger');
+
+    // Build Carousel Slides & Indicator Dots
+    SHOWCASE_ITEMS.forEach((item, idx) => {
+      // Slide container
+      const slide = document.createElement('div');
+      slide.className = 'hero-slide' + (idx === 0 ? ' active' : '');
+      slide.setAttribute('data-index', idx);
+      const img = document.createElement('img');
+      img.src = item.screenshot;
+      img.alt = item.title + ' — Mesh Editor 3D Model Studio';
+      if (idx === 0) {
+        img.loading = 'eager';
+        img.fetchPriority = 'high';
+      } else {
+        img.loading = 'lazy';
+      }
+      slide.appendChild(img);
+      heroSlidesContainer.appendChild(slide);
+
+      // Indicator Dot
+      const dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = 'carousel-dot' + (idx === 0 ? ' active' : '');
+      dot.setAttribute('aria-label', `Go to slide ${idx + 1}: ${item.title}`);
+      dot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        goToSlide(idx);
+      });
+      heroDotsContainer.appendChild(dot);
+    });
+
+    function updateSlideDisplay() {
+      const slides = heroSlidesContainer.querySelectorAll('.hero-slide');
+      const dots = heroDotsContainer.querySelectorAll('.carousel-dot');
+      slides.forEach((s, idx) => {
+        s.classList.toggle('active', idx === currentSlide);
+      });
+      dots.forEach((d, idx) => {
+        d.classList.toggle('active', idx === currentSlide);
+      });
+
+      const currentItem = SHOWCASE_ITEMS[currentSlide];
+      heroShowcaseTitle.textContent = currentItem.title;
+      heroBarTitle.textContent = currentItem.title;
+      heroBarSub.textContent = currentItem.sub;
+      heroSlideIndex.textContent = `${currentSlide + 1} / ${SHOWCASE_ITEMS.length}`;
+    }
+
+    function goToSlide(idx) {
+      currentSlide = (idx + SHOWCASE_ITEMS.length) % SHOWCASE_ITEMS.length;
+      updateSlideDisplay();
+    }
+
+    function nextSlide() {
+      goToSlide(currentSlide + 1);
+    }
+
+    function prevSlide() {
+      goToSlide(currentSlide - 1);
+    }
+
+    function startAutoplay() {
+      stopAutoplay();
+      if (isAutoplayActive) {
+        autoplayTimer = setInterval(nextSlide, AUTOPLAY_INTERVAL);
+      }
+    }
+
+    function stopAutoplay() {
+      if (autoplayTimer) {
+        clearInterval(autoplayTimer);
+        autoplayTimer = null;
+      }
+    }
+
+    document.getElementById('btnHeroPrev').addEventListener('click', (e) => {
+      e.stopPropagation();
+      prevSlide();
+    });
+
+    document.getElementById('btnHeroNext').addEventListener('click', (e) => {
+      e.stopPropagation();
+      nextSlide();
+    });
+
+    btnHeroPlayPause.addEventListener('click', (e) => {
+      e.stopPropagation();
+      isAutoplayActive = !isAutoplayActive;
+      if (isAutoplayActive) {
+        heroPlayIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
+        startAutoplay();
+      } else {
+        heroPlayIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+        stopAutoplay();
+      }
+    });
+
+    heroCarouselViewport.addEventListener('mouseenter', stopAutoplay);
+    heroCarouselViewport.addEventListener('mouseleave', () => {
+      if (isAutoplayActive) startAutoplay();
+    });
+
+    startAutoplay();
+
+    // Trigger Babylon 3D Preview modal on viewport click or button
+    heroCarouselViewport.addEventListener('click', () => {
+      openBabylonModal(currentSlide);
+    });
+
+    heroOpen3dTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openBabylonModal(currentSlide);
+    });
+
+    // =========================================================================
+    // BABYLON.JS REALTIME 3D VIEWPORT MODAL ENGINE
+    // =========================================================================
+
+    const babylonModal = document.getElementById('babylonModal');
+    const babylonModalBackdrop = document.getElementById('babylonModalBackdrop');
+    const btnModalClose = document.getElementById('btnModalClose');
+    const btnModalCloseDot = document.getElementById('btnModalCloseDot');
+    const btnModalResetDot = document.getElementById('btnModalResetDot');
+    const btnModalFullscreenDot = document.getElementById('btnModalFullscreenDot');
+    const btnModalResetCamera = document.getElementById('btnModalResetCamera');
+    const btnModalAutoRotate = document.getElementById('btnModalAutoRotate');
+    const btnModalSandbox = document.getElementById('btnModalSandbox');
+    const btnModalPrev = document.getElementById('btnModalPrev');
+    const btnModalNext = document.getElementById('btnModalNext');
+    const modalActiveTitle = document.getElementById('modalActiveTitle');
+    const babylonMeshInfo = document.getElementById('babylonMeshInfo');
+    const babylonLoadingOverlay = document.getElementById('babylonLoadingOverlay');
+    const babylonLoadingModelName = document.getElementById('babylonLoadingModelName');
+    const babylonModalStrip = document.getElementById('babylonModalStrip');
+
+    let activeModalIndex = 0;
+    let babylonEngine = null;
+    let babylonScene = null;
+    let activeCamera = null;
+    let isAutoRotateActive = true;
+    let defaultCameraPosition = null;
+    let defaultCameraTarget = null;
+    let defaultCameraRadius = null;
+
+    // Populate modal thumbnail strip
+    SHOWCASE_ITEMS.forEach((item, idx) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'modal-strip-chip' + (idx === 0 ? ' active' : '');
+      chip.innerHTML = `<img src="${item.screenshot}" alt=""><span>${item.title}</span>`;
+      chip.addEventListener('click', () => {
+        loadModelInBabylon(idx);
+      });
+      babylonModalStrip.appendChild(chip);
+    });
+
+    function updateModalStripActive() {
+      const chips = babylonModalStrip.querySelectorAll('.modal-strip-chip');
+      chips.forEach((c, idx) => {
+        c.classList.toggle('active', idx === activeModalIndex);
+        if (idx === activeModalIndex) {
+          c.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+      });
+    }
+
+    function openBabylonModal(index) {
+      stopAutoplay();
+      activeModalIndex = index;
+      babylonModal.classList.add('active');
+      babylonModal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+
+      initBabylonEngineAndLoad(index);
+    }
+
+    function closeBabylonModal() {
+      babylonModal.classList.remove('active');
+      babylonModal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+      if (babylonEngine) {
+        babylonEngine.stopRenderLoop();
+      }
+      if (isAutoplayActive) {
+        startAutoplay();
+      }
+    }
+
+    babylonModalBackdrop.addEventListener('click', closeBabylonModal);
+    btnModalClose.addEventListener('click', closeBabylonModal);
+    btnModalCloseDot.addEventListener('click', closeBabylonModal);
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && babylonModal.classList.contains('active')) {
+        closeBabylonModal();
+      } else if (babylonModal.classList.contains('active')) {
+        if (e.key === 'ArrowLeft') {
+          loadModelInBabylon((activeModalIndex - 1 + SHOWCASE_ITEMS.length) % SHOWCASE_ITEMS.length);
+        } else if (e.key === 'ArrowRight') {
+          loadModelInBabylon((activeModalIndex + 1) % SHOWCASE_ITEMS.length);
+        }
+      }
+    });
+
+    btnModalPrev.addEventListener('click', () => {
+      loadModelInBabylon((activeModalIndex - 1 + SHOWCASE_ITEMS.length) % SHOWCASE_ITEMS.length);
+    });
+
+    btnModalNext.addEventListener('click', () => {
+      loadModelInBabylon((activeModalIndex + 1) % SHOWCASE_ITEMS.length);
+    });
+
+    btnModalResetCamera.addEventListener('click', resetCameraView);
+    btnModalResetDot.addEventListener('click', resetCameraView);
+
+    btnModalFullscreenDot.addEventListener('click', () => {
+      const win = babylonModal.querySelector('.babylon-modal-window');
+      if (!document.fullscreenElement) {
+        win.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+
+    btnModalAutoRotate.addEventListener('click', () => {
+      isAutoRotateActive = !isAutoRotateActive;
+      btnModalAutoRotate.classList.toggle('active', isAutoRotateActive);
+      btnModalAutoRotate.setAttribute('aria-pressed', isAutoRotateActive ? 'true' : 'false');
+      if (activeCamera && activeCamera.autoRotationBehavior) {
+        activeCamera.useAutoRotationBehavior = isAutoRotateActive;
+      }
+    });
+
+    function resetCameraView() {
+      if (!activeCamera) return;
+      if (defaultCameraRadius !== null) activeCamera.radius = defaultCameraRadius;
+      if (defaultCameraTarget) activeCamera.setTarget(defaultCameraTarget.clone());
+      activeCamera.alpha = -Math.PI / 2;
+      activeCamera.beta = Math.PI / 2.5;
+    }
+
+    function initBabylonEngineAndLoad(index) {
+      if (typeof BABYLON === 'undefined') {
+        babylonLoadingOverlay.style.display = 'flex';
+        babylonLoadingModelName.textContent = 'Downloading Babylon.js runtime...';
+        const waitInterval = setInterval(() => {
+          if (typeof BABYLON !== 'undefined') {
+            clearInterval(waitInterval);
+            setupBabylon(index);
+          }
+        }, 150);
+        return;
+      }
+      setupBabylon(index);
+    }
+
+    function setupBabylon(index) {
+      const canvas = document.getElementById('babylonModalCanvas');
+      if (!babylonEngine) {
+        babylonEngine = new BABYLON.Engine(canvas, true, {
+          preserveDrawingBuffer: true,
+          stencil: true,
+          antialias: true,
+          powerPreference: 'high-performance'
+        });
+        window.addEventListener('resize', () => {
+          if (babylonEngine) babylonEngine.resize();
+        });
+      }
+
+      loadModelInBabylon(index);
+    }
+
+    function loadModelInBabylon(index) {
+      activeModalIndex = index;
+      updateModalStripActive();
+      const item = SHOWCASE_ITEMS[index];
+      modalActiveTitle.textContent = item.title;
+      babylonLoadingModelName.textContent = item.title;
+      babylonLoadingOverlay.style.display = 'flex';
+
+      // Update Sandbox button link
+      try {
+        const fullModelUrl = new URL(item.model, window.location.href).href;
+        if (fullModelUrl.startsWith('http')) {
+          btnModalSandbox.href = `https://sandbox.babylonjs.com/?asset=${encodeURIComponent(fullModelUrl)}&autoRotate=true`;
+        } else {
+          btnModalSandbox.href = 'https://sandbox.babylonjs.com/';
+        }
+      } catch (e) {
+        btnModalSandbox.href = 'https://sandbox.babylonjs.com/';
+      }
+
+      if (babylonScene) {
+        babylonScene.dispose();
+      }
+
+      babylonScene = new BABYLON.Scene(babylonEngine);
+      babylonScene.clearColor = new BABYLON.Color4(0.06, 0.08, 0.12, 1);
+
+      const canvas = document.getElementById('babylonModalCanvas');
+      const camera = new BABYLON.ArcRotateCamera('camera', -Math.PI / 2, Math.PI / 2.5, 5, BABYLON.Vector3.Zero(), babylonScene);
+      camera.attachControl(canvas, true);
+      camera.wheelPrecision = 30;
+      camera.minZ = 0.05;
+      camera.maxZ = 1000;
+      camera.useAutoRotationBehavior = isAutoRotateActive;
+      if (camera.autoRotationBehavior) {
+        camera.autoRotationBehavior.idleRotationSpeed = 0.25;
+        camera.autoRotationBehavior.idleRotationWaitTime = 1200;
+        camera.autoRotationBehavior.idleRotationSpinupTime = 1500;
+      }
+      activeCamera = camera;
+
+      // Professional Studio Lighting Setup
+      const hemiLight = new BABYLON.HemisphericLight('hemiLight', new BABYLON.Vector3(0, 1, 0), babylonScene);
+      hemiLight.intensity = 0.85;
+      hemiLight.diffuse = new BABYLON.Color3(0.95, 0.98, 1.0);
+      hemiLight.groundColor = new BABYLON.Color3(0.12, 0.15, 0.2);
+
+      const keyLight = new BABYLON.DirectionalLight('keyLight', new BABYLON.Vector3(-1, -2, -1), babylonScene);
+      keyLight.position = new BABYLON.Vector3(6, 12, 6);
+      keyLight.intensity = 1.35;
+
+      const fillLight = new BABYLON.DirectionalLight('fillLight', new BABYLON.Vector3(1, -1, 1), babylonScene);
+      fillLight.position = new BABYLON.Vector3(-6, 8, -6);
+      fillLight.intensity = 0.6;
+
+      const rimLight = new BABYLON.DirectionalLight('rimLight', new BABYLON.Vector3(0, -1, -2), babylonScene);
+      rimLight.intensity = 0.5;
+
+      // Load GLB model asynchronously
+      BABYLON.SceneLoader.ImportMeshAsync('', '', item.model, babylonScene)
+        .then((result) => {
+          babylonLoadingOverlay.style.display = 'none';
+
+          if (result.meshes && result.meshes.length > 0) {
+            let min = new BABYLON.Vector3(Infinity, Infinity, Infinity);
+            let max = new BABYLON.Vector3(-Infinity, -Infinity, -Infinity);
+            let totalVertices = 0;
+            let totalIndices = 0;
+
+            result.meshes.forEach((mesh) => {
+              if (mesh.getTotalVertices && mesh.getTotalVertices() > 0) {
+                totalVertices += mesh.getTotalVertices();
+                totalIndices += mesh.getTotalIndices();
+                const bInfo = mesh.getBoundingInfo();
+                min = BABYLON.Vector3.Minimize(min, bInfo.boundingBox.minimumWorld);
+                max = BABYLON.Vector3.Maximize(max, bInfo.boundingBox.maximumWorld);
+              }
+            });
+
+            if (min.x !== Infinity) {
+              const center = BABYLON.Vector3.Center(min, max);
+              const size = BABYLON.Vector3.Distance(min, max);
+              defaultCameraTarget = center;
+              defaultCameraRadius = Math.max(size * 1.5, 1.8);
+
+              camera.setTarget(center);
+              camera.radius = defaultCameraRadius;
+              camera.lowerRadiusLimit = size * 0.15;
+              camera.upperRadiusLimit = size * 8;
+            }
+
+            const triangles = Math.round(totalIndices / 3);
+            babylonMeshInfo.innerHTML = `<strong>${item.title}</strong> &bull; ${totalVertices.toLocaleString()} vertices &bull; ${triangles.toLocaleString()} triangles &bull; Babylon.js PBR`;
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to load model:', err);
+          babylonLoadingOverlay.style.display = 'flex';
+          babylonLoadingModelName.textContent = 'Error loading GLB: ' + (err.message || err);
+        });
+
+      babylonEngine.stopRenderLoop();
+      babylonEngine.runRenderLoop(() => {
+        if (babylonScene) {
+          babylonScene.render();
+        }
+      });
+      babylonEngine.resize();
+    }
   </script>
 </body>
 </html>
