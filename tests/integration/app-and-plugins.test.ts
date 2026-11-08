@@ -341,6 +341,73 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
 
     expect(menuToolNames[0]).toBe('scene_outliner');
     expect(menuToolNames.slice(1)).toEqual(sidebarToolNames);
+
+    // Verify Drag Handle existence and draggable attribute on sidebar dialog headers in stackpanel mode
+    const firstSidebarDialog = sidebarDialogs[0];
+    const firstHeader = firstSidebarDialog.querySelector('.dialog-header') as HTMLElement;
+    expect(firstHeader.getAttribute('draggable')).toBe('true');
+    const dragHandle = firstSidebarDialog.querySelector('.dialog-drag-handle');
+    expect(dragHandle).not.toBeNull();
+
+    // Verify Drag & Drop reordering in the stackpanel and localStorage persistence
+    const sidebarContainer = container.querySelector('#stackpanelRightSidebar') as HTMLElement;
+    const initialFirstDialog = sidebarContainer.firstElementChild as HTMLElement;
+    const initialLastDialog = sidebarContainer.lastElementChild as HTMLElement;
+    expect(initialFirstDialog).not.toBe(initialLastDialog);
+
+    // Simulate drag and drop: move the last dialog to the very top (before first dialog)
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      setData(k: string, v: string) {
+        this.data[k] = v;
+      },
+      getData(k: string) {
+        return this.data[k] || '';
+      },
+      effectAllowed: 'move',
+      dropEffect: 'none',
+    };
+
+    const dragStartEvent = new Event('dragstart', { bubbles: true }) as any;
+    dragStartEvent.dataTransfer = dataTransfer;
+    initialLastDialog.querySelector('.dialog-header')?.dispatchEvent(dragStartEvent);
+
+    // Verify that dragging a tool does NOT trigger the full-page file drop backdrop
+    const dropOverlay = container.querySelector('#dropOverlay') as HTMLElement | null;
+    if (dropOverlay) {
+      expect(dropOverlay.classList.contains('active')).toBe(false);
+    }
+
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true }) as any;
+    dropEvent.dataTransfer = dataTransfer;
+    dropEvent.clientY = initialFirstDialog.getBoundingClientRect().top; // Top half -> insert before
+    initialFirstDialog.dispatchEvent(dropEvent);
+
+    // Verify DOM was reordered: the moved dialog is now the first child
+    expect(sidebarContainer.firstElementChild?.id).toBe(initialLastDialog.id);
+
+    // Verify the new order was persisted to localStorage
+    const savedOrderJson = localStorage.getItem('mesheditor_stackpanel_order');
+    expect(savedOrderJson).not.toBeNull();
+    const savedOrder = JSON.parse(savedOrderJson!);
+    expect(savedOrder[0]).toBe(initialLastDialog.id);
+
+    // Verify that the Tools menu was dynamically synchronized with the new order
+    const updatedMenuButtons = Array.from(menuTools?.querySelectorAll('.dropdown-item[data-tool-name]') || []) as HTMLElement[];
+    const updatedMenuToolNames = updatedMenuButtons.map((b) => b.getAttribute('data-tool-name'));
+    expect(updatedMenuToolNames[1]).toBe(app.getToolByDialogId(initialLastDialog.id)?.name);
+
+    // Verify restoring from localStorage in a fresh app instance
+    const freshApp = new MeshEditorApp({
+      container,
+      engine,
+      layoutMode: 'stackpanel',
+    });
+    const freshSidebarDialogs = Array.from(container.querySelectorAll('.stackpanel-sidebar .floating-dialog')) as HTMLElement[];
+    expect(freshSidebarDialogs[0].id).toBe(initialLastDialog.id);
+
+    // Clean up localStorage for subsequent tests
+    localStorage.removeItem('mesheditor_stackpanel_order');
   });
 
   it('renders btnMergeMeshes in Actions menu and triggers service.mergeSelectedMeshes()', () => {

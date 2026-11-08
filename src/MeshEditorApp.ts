@@ -107,6 +107,7 @@ import {
   FolderPlus,
   Grid2x2,
   Grid3x3,
+  GripVertical,
   Hash,
   HelpCircle,
   Image,
@@ -203,6 +204,7 @@ export const editorIcons = {
   FolderPlus,
   Grid2x2,
   Grid3x3,
+  GripVertical,
   Hash,
   HelpCircle,
   Image,
@@ -364,6 +366,10 @@ export class MeshEditorApp {
       (dialog.style.display !== '' || window.getComputedStyle(dialog).display !== 'none')
     );
   }
+
+  // Stackpanel Tool Drag & Drop Reordering State
+  private currentDraggedStackpanelDialog: HTMLElement | null = null;
+  private justFinishedStackpanelDrag: boolean = false;
 
   // AI Agent UI State
   private aiPendingImages: string[] = [];
@@ -1097,6 +1103,10 @@ export class MeshEditorApp {
       if (dialog) this.setupFloatingDialog(dialog);
     }
 
+    // Initialize stackpanel tool drag & drop and restore tool order
+    this.initStackpanelDragAndDrop();
+    this.restoreStackpanelOrder();
+
     // Initialize AI Agent Panel UI
     this.initAIAgentUI();
     this.initVoxelPainterUI();
@@ -1187,9 +1197,14 @@ export class MeshEditorApp {
     if (mode === 'stackpanel') {
       document.body.classList.add('layout-stackpanel');
       this.rootContainer?.classList.add('layout-stackpanel');
+      this.restoreStackpanelOrder();
       const sidebarPanels = Array.from(
         (this.rootContainer || document).querySelectorAll('.stackpanel-sidebar .floating-dialog')
       ) as HTMLElement[];
+      sidebarPanels.forEach((p) => {
+        const h = p.querySelector('.dialog-header');
+        h?.setAttribute('draggable', 'true');
+      });
       const openPanels = sidebarPanels.filter((d) => d.style.display !== 'none');
       if (openPanels.length > 0) {
         // Find if one is already expanded, or take the first open one
@@ -1218,6 +1233,13 @@ export class MeshEditorApp {
     } else {
       document.body.classList.remove('layout-stackpanel');
       this.rootContainer?.classList.remove('layout-stackpanel');
+      const sidebarPanels = Array.from(
+        (this.rootContainer || document).querySelectorAll('.stackpanel-sidebar .floating-dialog')
+      ) as HTMLElement[];
+      sidebarPanels.forEach((p) => {
+        const h = p.querySelector('.dialog-header');
+        h?.removeAttribute('draggable');
+      });
       this.restoreDialogLayout();
       if (save) {
         this.showToast('Switched to Floating windows layout', 'info');
@@ -1236,7 +1258,7 @@ export class MeshEditorApp {
     const btnClose = dialog.querySelector('.btn-close');
     const btnMin = dialog.querySelector('.btn-min');
     let btnHelp = dialog.querySelector('.btn-help') as HTMLElement | null;
-    const title = dialog.querySelector('.dialog-title');
+    const title = dialog.querySelector('.dialog-title') as HTMLElement | null;
     const actions = dialog.querySelector('.dialog-actions');
 
     // Ensure Help button exists directly to the left of Minimize button
@@ -1247,6 +1269,32 @@ export class MeshEditorApp {
       btnHelp.setAttribute('aria-label', 'Help');
       btnHelp.innerHTML = '<i class="app-icon" data-lucide="help-circle"></i>';
       actions.insertBefore(btnHelp, btnMin);
+    }
+
+    // Ensure drag handle exists in title for stackpanel reordering
+    let dragHandle = header?.querySelector('.dialog-drag-handle') as HTMLElement | null;
+    if (!dragHandle && header && title) {
+      dragHandle = document.createElement('span');
+      dragHandle.className = 'dialog-drag-handle';
+      dragHandle.title = 'Drag to reorder tools';
+      dragHandle.setAttribute('aria-label', 'Drag to reorder tools');
+      dragHandle.innerHTML = '<i class="app-icon" data-lucide="grip-vertical"></i>';
+      title.insertBefore(dragHandle, title.firstChild);
+    }
+
+    dragHandle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // Configure draggable attribute on header according to current layout mode
+    const isStack = this.layoutMode === 'stackpanel' || document.body.classList.contains('layout-stackpanel');
+    const inSidebar = dialog.closest('.stackpanel-sidebar') !== null;
+    if (header) {
+      if (isStack && inSidebar) {
+        header.setAttribute('draggable', 'true');
+      } else {
+        header.removeAttribute('draggable');
+      }
     }
 
     btnHelp?.addEventListener('click', (e) => {
@@ -1266,14 +1314,23 @@ export class MeshEditorApp {
 
     title?.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (this.justFinishedStackpanelDrag) return;
       this.toggleDialogMinimize(dialog);
     });
 
-    // In stackpanel mode, clicking anywhere in header (except buttons) toggles collapse
+    // In stackpanel mode, clicking anywhere in header (except buttons and drag handle) toggles collapse
     if (header) {
       header.addEventListener('click', (e: MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.tagName === 'BUTTON' || target.closest('button')) return;
+        if (
+          target.tagName === 'BUTTON' ||
+          target.closest('button') ||
+          target.closest('.dialog-btn') ||
+          target.closest('.dialog-drag-handle')
+        ) {
+          return;
+        }
+        if (this.justFinishedStackpanelDrag) return;
         if (this.layoutMode === 'stackpanel') {
           this.toggleDialogMinimize(dialog);
         }
@@ -1285,7 +1342,50 @@ export class MeshEditorApp {
       this.bringDialogToFront(dialog);
     });
 
-    // Dragging
+    // Stackpanel Drag & Drop Reordering
+    if (header) {
+      header.addEventListener('dragstart', (e: DragEvent) => {
+        const isCurrentStack =
+          this.layoutMode === 'stackpanel' || document.body.classList.contains('layout-stackpanel');
+        const inSide = dialog.closest('.stackpanel-sidebar') !== null;
+        if (!isCurrentStack || !inSide) {
+          e.preventDefault();
+          return;
+        }
+
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'BUTTON' || target.closest('button') || target.closest('.dialog-btn')) {
+          e.preventDefault();
+          return;
+        }
+
+        this.currentDraggedStackpanelDialog = dialog;
+        this.justFinishedStackpanelDrag = true;
+        dialog.classList.add('is-dragging');
+
+        // Ensure file drop overlay is hidden and never triggered for internal tool dragging
+        const dropOverlay = document.getElementById('dropOverlay') || document.getElementById('drop-zone');
+        if (dropOverlay) dropOverlay.classList.remove('active');
+
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', dialog.id);
+        }
+      });
+
+      header.addEventListener('dragend', () => {
+        this.currentDraggedStackpanelDialog = null;
+        dialog.classList.remove('is-dragging');
+        this.clearStackpanelDragIndicators();
+        const dropOverlay = document.getElementById('dropOverlay') || document.getElementById('drop-zone');
+        if (dropOverlay) dropOverlay.classList.remove('active');
+        setTimeout(() => {
+          this.justFinishedStackpanelDrag = false;
+        }, 200);
+      });
+    }
+
+    // Floating Mode 2D Window Dragging
     if (header) {
       let isDragging = false;
       let startX = 0;
@@ -1336,6 +1436,200 @@ export class MeshEditorApp {
         window.addEventListener('mouseup', onMouseUp);
       });
     }
+  }
+
+  /**
+   * Clears drag position indicators from all dialogs in the stackpanel sidebar.
+   */
+  public clearStackpanelDragIndicators(): void {
+    const container = this.getElement('stackpanelRightSidebar') || document.getElementById('stackpanelRightSidebar');
+    if (!container) return;
+    const dialogs = container.querySelectorAll('.floating-dialog');
+    dialogs.forEach((d) => d.classList.remove('drag-target-above', 'drag-target-below'));
+  }
+
+  /**
+   * Initializes drag & drop reordering handlers on the stackpanel container.
+   */
+  public initStackpanelDragAndDrop(): void {
+    const container = this.getElement('stackpanelRightSidebar') || document.getElementById('stackpanelRightSidebar');
+    if (!container) return;
+
+    container.addEventListener('dragover', (e: DragEvent) => {
+      const isStack = this.layoutMode === 'stackpanel' || document.body.classList.contains('layout-stackpanel');
+      if (!isStack || !this.currentDraggedStackpanelDialog) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'move';
+      }
+
+      const targetDialog = (e.target as HTMLElement).closest('.stackpanel-sidebar .floating-dialog') as HTMLElement | null;
+      if (targetDialog && targetDialog !== this.currentDraggedStackpanelDialog) {
+        const rect = targetDialog.getBoundingClientRect();
+        const isAfter = e.clientY - rect.top > rect.height / 2;
+        this.clearStackpanelDragIndicators();
+        if (isAfter) {
+          targetDialog.classList.add('drag-target-below');
+        } else {
+          targetDialog.classList.add('drag-target-above');
+        }
+      } else {
+        this.clearStackpanelDragIndicators();
+      }
+    });
+
+    container.addEventListener('dragenter', (e: DragEvent) => {
+      e.stopPropagation();
+    });
+
+    container.addEventListener('dragleave', (e: DragEvent) => {
+      e.stopPropagation();
+      if (!e.relatedTarget || !container.contains(e.relatedTarget as any)) {
+        this.clearStackpanelDragIndicators();
+      }
+    });
+
+    container.addEventListener('drop', (e: DragEvent) => {
+      const isStack = this.layoutMode === 'stackpanel' || document.body.classList.contains('layout-stackpanel');
+      if (!isStack) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      this.clearStackpanelDragIndicators();
+
+      const draggedId = e.dataTransfer?.getData('text/plain');
+      const draggedEl =
+        this.currentDraggedStackpanelDialog ||
+        (draggedId ? container.querySelector<HTMLElement>(`#${draggedId}`) : null);
+
+      if (!draggedEl) return;
+
+      const targetDialog = (e.target as HTMLElement).closest('.stackpanel-sidebar .floating-dialog') as HTMLElement | null;
+      if (targetDialog && targetDialog !== draggedEl) {
+        const rect = targetDialog.getBoundingClientRect();
+        const isAfter = e.clientY - rect.top > rect.height / 2;
+        if (isAfter) {
+          container.insertBefore(draggedEl, targetDialog.nextSibling);
+        } else {
+          container.insertBefore(draggedEl, targetDialog);
+        }
+      } else if (!targetDialog) {
+        container.appendChild(draggedEl);
+      }
+
+      this.currentDraggedStackpanelDialog = null;
+      this.updateStackpanelOrderFromDOM();
+      this.justFinishedStackpanelDrag = true;
+      setTimeout(() => {
+        this.justFinishedStackpanelDrag = false;
+      }, 200);
+    });
+  }
+
+  /**
+   * Updates CSS flex order and ToolInterface.order for each tool in the stackpanel sidebar,
+   * synchronizes the Tools dropdown menu, and persists the new order to localStorage.
+   */
+  public updateStackpanelOrderFromDOM(): void {
+    const container = this.getElement('stackpanelRightSidebar') || document.getElementById('stackpanelRightSidebar');
+    if (!container) return;
+
+    const dialogs = Array.from(container.querySelectorAll(':scope > .floating-dialog')) as HTMLElement[];
+    dialogs.forEach((dialog, index) => {
+      dialog.style.order = String(index);
+      const tool = this.getToolByDialogId(dialog.id);
+      if (tool) {
+        (tool as any).order = index + 2; // Offset 2 so Outliner remains #1
+      }
+    });
+
+    this.saveStackpanelOrder();
+    this.renderToolsMenu();
+  }
+
+  /**
+   * Persists the current stackpanel tool order to localStorage.
+   */
+  public saveStackpanelOrder(): void {
+    const container = this.getElement('stackpanelRightSidebar') || document.getElementById('stackpanelRightSidebar');
+    if (!container) return;
+
+    try {
+      const dialogs = Array.from(container.querySelectorAll(':scope > .floating-dialog')) as HTMLElement[];
+      const orderList = dialogs.map((d) => d.id).filter(Boolean);
+      localStorage.setItem('mesheditor_stackpanel_order', JSON.stringify(orderList));
+    } catch (e) {
+      console.warn('Failed to save stackpanel order to localStorage:', e);
+    }
+  }
+
+  /**
+   * Restores the persisted tool order in the stackpanel sidebar from localStorage,
+   * or sorts sidebar dialog elements by default tool.order if no order is saved.
+   */
+  public restoreStackpanelOrder(): void {
+    const container = this.getElement('stackpanelRightSidebar') || document.getElementById('stackpanelRightSidebar');
+    if (!container) return;
+
+    try {
+      const saved = localStorage.getItem('mesheditor_stackpanel_order');
+      if (saved) {
+        const orderList: string[] = JSON.parse(saved);
+        if (Array.isArray(orderList) && orderList.length > 0) {
+          const dialogs = Array.from(container.querySelectorAll(':scope > .floating-dialog')) as HTMLElement[];
+          const dialogMap = new Map<string, HTMLElement>();
+          for (const d of dialogs) {
+            if (d.id) dialogMap.set(d.id, d);
+          }
+
+          let orderIndex = 0;
+          for (const id of orderList) {
+            const dialog = dialogMap.get(id);
+            if (dialog) {
+              container.appendChild(dialog);
+              dialog.style.order = String(orderIndex);
+              const tool = this.getToolByDialogId(id);
+              if (tool) {
+                (tool as any).order = orderIndex + 2;
+              }
+              dialogMap.delete(id);
+              orderIndex++;
+            }
+          }
+
+          for (const [, dialog] of dialogMap) {
+            container.appendChild(dialog);
+            dialog.style.order = String(orderIndex);
+            const tool = this.getToolByDialogId(dialog.id);
+            if (tool) {
+              (tool as any).order = orderIndex + 2;
+            }
+            orderIndex++;
+          }
+
+          this.renderToolsMenu();
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to restore stackpanel order from localStorage:', e);
+    }
+
+    // If no order is saved in localStorage, sort container children by initial tool.order
+    const dialogs = Array.from(container.querySelectorAll(':scope > .floating-dialog')) as HTMLElement[];
+    dialogs.sort((a, b) => {
+      const toolA = this.getToolByDialogId(a.id);
+      const toolB = this.getToolByDialogId(b.id);
+      const orderA = toolA?.order ?? 999;
+      const orderB = toolB?.order ?? 999;
+      return orderA - orderB;
+    });
+    dialogs.forEach((dialog, index) => {
+      container.appendChild(dialog);
+      dialog.style.order = String(index);
+    });
   }
 
   /**
@@ -3142,6 +3436,20 @@ export class MeshEditorApp {
     const dropZone = document.getElementById('dropOverlay') || document.getElementById('drop-zone');
 
     window.addEventListener('dragover', (e) => {
+      // Do not activate file drop overlay if an internal tool is being reordered
+      if (this.currentDraggedStackpanelDialog) {
+        if (dropZone) dropZone.classList.remove('active');
+        return;
+      }
+
+      // Check whether files are actively being dragged into the window from the OS
+      const types = e.dataTransfer?.types;
+      const isFileDrag = types ? Array.from(types).includes('Files') : false;
+      if (!isFileDrag) {
+        if (dropZone) dropZone.classList.remove('active');
+        return;
+      }
+
       e.preventDefault();
       if (dropZone) dropZone.classList.add('active');
     });
@@ -3191,8 +3499,13 @@ export class MeshEditorApp {
     };
 
     window.addEventListener('drop', async (e) => {
-      e.preventDefault();
       if (dropZone) dropZone.classList.remove('active');
+      if (this.currentDraggedStackpanelDialog) return;
+      const types = e.dataTransfer?.types;
+      const isFileDrag = types ? Array.from(types).includes('Files') : false;
+      if (!isFileDrag) return;
+
+      e.preventDefault();
 
       // CRITICAL: Extract all FileSystemEntries synchronously BEFORE any 'await' calls!
       // Otherwise Chromium/WebKit clears e.dataTransfer.items on the next event loop tick.

@@ -687,6 +687,99 @@ body.layout-stackpanel .stackpanel-sidebar .floating-dialog .dialog-header,
   cursor: pointer !important;
 }
 
+body.layout-stackpanel .stackpanel-sidebar .floating-dialog .dialog-header[draggable="true"],
+#app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog .dialog-header[draggable="true"] {
+  cursor: grab !important;
+}
+
+body.layout-stackpanel .stackpanel-sidebar .floating-dialog .dialog-header[draggable="true"]:active,
+#app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog .dialog-header[draggable="true"]:active {
+  cursor: grabbing !important;
+}
+
+/* Stackpanel Tool Drag & Drop Reordering Styles */
+.dialog-drag-handle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: var(--text-secondary);
+  opacity: 0.55;
+  margin-right: 4px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.dialog-drag-handle:hover {
+  opacity: 1;
+  color: var(--accent-color);
+  background: var(--bg-hover);
+}
+
+.dialog-drag-handle:active {
+  cursor: grabbing;
+}
+
+.dialog-drag-handle .app-icon {
+  width: 14px;
+  height: 14px;
+}
+
+body.layout-stackpanel .stackpanel-sidebar .dialog-drag-handle,
+#app-container.layout-stackpanel .stackpanel-sidebar .dialog-drag-handle {
+  display: inline-flex;
+}
+
+body.layout-stackpanel .stackpanel-sidebar .floating-dialog.is-dragging,
+#app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog.is-dragging {
+  opacity: 0.42 !important;
+  border: 1px dashed var(--accent-color) !important;
+  filter: grayscale(20%);
+}
+
+body.layout-stackpanel .stackpanel-sidebar .floating-dialog.drag-target-above,
+#app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog.drag-target-above {
+  position: relative !important;
+}
+
+body.layout-stackpanel .stackpanel-sidebar .floating-dialog.drag-target-above::before,
+#app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog.drag-target-above::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--accent-color);
+  border-radius: 2px;
+  box-shadow: 0 0 10px var(--accent-color);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+body.layout-stackpanel .stackpanel-sidebar .floating-dialog.drag-target-below,
+#app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog.drag-target-below {
+  position: relative !important;
+}
+
+body.layout-stackpanel .stackpanel-sidebar .floating-dialog.drag-target-below::after,
+#app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog.drag-target-below::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--accent-color);
+  border-radius: 2px;
+  box-shadow: 0 0 10px var(--accent-color);
+  z-index: 1000;
+  pointer-events: none;
+}
+
 body.layout-stackpanel .stackpanel-sidebar .floating-dialog.minimized .dialog-header,
 #app-container.layout-stackpanel .stackpanel-sidebar .floating-dialog.minimized .dialog-header {
   border-radius: var(--radius-md) !important;

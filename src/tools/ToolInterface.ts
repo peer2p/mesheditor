@@ -50,17 +50,6 @@ export interface ToolInterface {
   readonly viewTemplate?: string;
 
   /**
-   * Returns the HTML/EJS view template markup for this tool.
-   */
-  getViewTemplate?(): string;
-
-  /**
-   * Mounts or retrieves the tool's dialog DOM element.
-   * If the dialog element is not already present in the DOM, mounts it from `viewTemplate`.
-   */
-  renderView?(container?: HTMLElement): HTMLElement | null;
-
-  /**
    * If true, this tool takes exclusive control of 3D scene pointer clicks (e.g. voxel painting or path curve editing).
    * Multiple exclusive tool dialogs can remain open simultaneously, but only the active tool edits 3D viewport state.
    * Activating one exclusive tool automatically deactivates 3D editing on other exclusive tools without closing their dialogs.
@@ -70,11 +59,22 @@ export interface ToolInterface {
   /** Whether this tool dialog should be open and expanded by default on initial profile load */
   readonly defaultOpen?: boolean;
 
-  /** Optional sorting order priority in dropdown menus */
-  readonly order?: number;
-
   /** JSON Schema describing the input parameters for AI function calling */
   readonly parameters?: Record<string, any>;
+
+  /** Optional sorting order priority in dropdown menus and stackpanel sidebar */
+  order?: number;
+
+  /**
+   * Returns the HTML/EJS view template markup for this tool.
+   */
+  getViewTemplate?(): string;
+
+  /**
+   * Mounts or retrieves the tool's dialog DOM element.
+   * If the dialog element is not already present in the DOM, mounts it from `viewTemplate`.
+   */
+  renderView?(container?: HTMLElement): HTMLElement | null;
 
   /** Formats the tool specification for OpenAI-compatible function calling */
   getDefinition?(): OpenAIToolDefinition;
