@@ -1,0 +1,169 @@
+<div id="dialog-ai-texture" class="floating-dialog" style="top: 120px; right: 365px; width: 340px; display: none">
+  <div class="dialog-header">
+    <span class="dialog-title"><i class="app-icon" data-lucide="wand-2"></i> AI Texture Generator</span>
+    <div class="dialog-actions">
+      <button class="dialog-btn btn-help" title="Help &amp; Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+      <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+      <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+    </div>
+  </div>
+  <div class="dialog-body sculpt-tool-body">
+    <!-- 1. Prompt & Quick Presets -->
+    <div class="tool-control-group">
+      <div class="sculpt-slider-header">
+        <div class="sculpt-section-title"><i class="app-icon" data-lucide="sparkles"></i> Prompt &amp; Preset</div>
+        <button type="button" id="btnUploadAITextureImage" class="sculpt-btn" style="height: 24px; padding: 0 8px; font-size: 10px;" title="Import any external or AI-generated texture image">
+          <i class="app-icon" data-lucide="upload"></i> Import Image
+        </button>
+        <input type="file" id="aiTextureImageFileInput" accept="image/png,image/jpeg,image/webp" style="display: none" />
+      </div>
+      <div class="tool-row" style="margin-top: 4px;">
+        <label class="tool-label" for="aiTexturePresetSelect" style="min-width: 78px;">Preset</label>
+        <select id="aiTexturePresetSelect" class="tool-select" style="flex: 1;" aria-label="Quick Texture Presets">
+          <option value="">Choose Quick Preset...</option>
+          <option value="Weathered dark dungeon cobblestone floor with mossy crevices|cobblestone">Dungeon Cobblestone</option>
+          <option value="Aged red clay brick wall with warm mortar joints|brick">Ancient Red Brick</option>
+          <option value="Warm medieval oak wood planks with natural grain|wood">Oak Wood Planks</option>
+          <option value="Futuristic dark titanium sci-fi hull plating with glowing cyan seams|scifi">Sci-Fi Hull Panels</option>
+          <option value="Corroded industrial iron sheet metal with orange rust patches|rust">Rusted Metal</option>
+          <option value="Cracked black basalt volcanic rock with glowing orange lava veins|lava">Volcanic Magma Rock</option>
+          <option value="Polished white Carrara marble with subtle grey and gold mineral veins|marble">Royal White Marble</option>
+          <option value="Ancient obsidian stone tablet engraved with glowing arcane violet runes|runes">Arcane Glowing Runes</option>
+          <option value="Overlapping emerald green dragon scales with metallic gold highlights|scales">Dragon Scales</option>
+          <option value="Lush organic forest moss and lichen ground cover|moss">Forest Moss Ground</option>
+          <option value="Cracked stone emblem decal with transparent edges|decal">Stone Emblem Decal</option>
+        </select>
+      </div>
+      <label class="tool-label" for="aiTexturePrompt" style="margin-top: 4px;">Description</label>
+      <textarea
+        id="aiTexturePrompt"
+        class="tool-input"
+        rows="2"
+        style="width: 100%; height: 52px; resize: vertical; min-height: 44px; font-family: inherit; line-height: 1.35; padding: 6px 8px;"
+        placeholder="Describe texture (e.g. Weathered dungeon cobblestone with mossy cracks)..."
+      >Weathered dark dungeon cobblestone floor with mossy crevices</textarea>
+    </div>
+
+    <!-- 2. Pattern & Synthesis Settings -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="sliders"></i> Synthesis Settings</div>
+      <div class="tool-row" style="margin-top: 4px;">
+        <label class="tool-label" for="aiTextureStyleSelect" style="min-width: 78px;">Style</label>
+        <select id="aiTextureStyleSelect" class="tool-select" style="flex: 1;">
+          <option value="auto" selected>Auto (From Prompt)</option>
+          <option value="cobblestone">Cobblestone</option>
+          <option value="stone">Natural Stone</option>
+          <option value="brick">Brick Wall</option>
+          <option value="wood">Wood Planks</option>
+          <option value="metal">Brushed Metal</option>
+          <option value="rust">Rusted Metal</option>
+          <option value="scifi">Sci-Fi Panels</option>
+          <option value="marble">Polished Marble</option>
+          <option value="lava">Volcanic Lava</option>
+          <option value="moss">Moss &amp; Foliage</option>
+          <option value="scales">Scales / Armor</option>
+          <option value="fabric">Woven Fabric</option>
+          <option value="runes">Arcane Runes</option>
+          <option value="decal">Alpha Decal</option>
+        </select>
+      </div>
+
+      <div class="tool-row" style="margin-top: 4px;">
+        <label class="tool-label" for="aiTextureSizeSelect" style="min-width: 78px;">Resolution</label>
+        <select id="aiTextureSizeSelect" class="tool-select" style="flex: 1;">
+          <option value="256">256 × 256 (Fast)</option>
+          <option value="512" selected>512 × 512 (Standard)</option>
+          <option value="1024">1024 × 1024 (1K HD)</option>
+        </select>
+      </div>
+
+      <div class="sculpt-options-row" style="margin-top: 6px;">
+        <label class="sculpt-checkbox-label">
+          <input type="checkbox" id="aiTextureSeamlessCheck" checked />
+          <span>Seamless Tileable</span>
+        </label>
+        <label class="sculpt-checkbox-label">
+          <input type="checkbox" id="aiTextureNormalCheck" checked />
+          <span>Normal Map</span>
+        </label>
+      </div>
+
+      <div class="sculpt-options-row" style="margin-top: 4px;">
+        <label class="sculpt-checkbox-label">
+          <input type="checkbox" id="aiTextureCustomColorsCheck" />
+          <span>Custom Palette</span>
+        </label>
+        <div id="aiTextureColorPickersRow" style="display: none; align-items: center; gap: 6px;">
+          <input type="color" id="aiTexturePrimaryColor" value="#5e6368" title="Primary Color" aria-label="Primary Color" class="path-extrusion-color-input" />
+          <input type="color" id="aiTextureSecondaryColor" value="#25282c" title="Secondary Color" aria-label="Secondary Color" class="path-extrusion-color-input" />
+          <input type="color" id="aiTextureAccentColor" value="#4b6043" title="Accent Color" aria-label="Accent Color" class="path-extrusion-color-input" />
+        </div>
+      </div>
+
+      <div class="sculpt-slider-row" style="margin-top: 6px;">
+        <div class="sculpt-slider-header">
+          <label class="sculpt-slider-label" for="aiTextureNormalStrength">Normal Relief Depth</label>
+          <span id="aiTextureNormalStrengthVal" class="sculpt-slider-val">2.2</span>
+        </div>
+        <input type="range" id="aiTextureNormalStrength" min="0.5" max="5.0" step="0.1" value="2.2" class="tool-range" />
+      </div>
+
+      <button type="button" id="btnGenerateAITexture" class="tool-btn tool-btn-primary btn-block" style="width: 100%; height: 32px; margin-top: 8px;">
+        <i class="app-icon" data-lucide="wand-2"></i> Generate Texture
+      </button>
+    </div>
+
+    <!-- 3. Preview, Apply & Download -->
+    <div id="aiTexturePreviewContainer" class="tool-control-group" style="display: none; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-slider-header" style="margin-bottom: 4px;">
+        <span id="aiTextureMetaLabel" class="sculpt-slider-label" style="color: #f0f6fc; font-weight: 600;">Preview</span>
+      </div>
+
+      <div class="sculpt-grid-3" style="margin-bottom: 6px;">
+        <button type="button" id="btnPreviewAlbedo" class="sculpt-btn active">Albedo</button>
+        <button type="button" id="btnPreviewNormal" class="sculpt-btn">Normal</button>
+        <button type="button" id="btnPreviewTiled" class="sculpt-btn">2×2 Tile</button>
+      </div>
+
+      <div
+        id="aiTexturePreviewBox"
+        style="width: 100%; height: 170px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.14); background-color: #0d1117; background-position: center; background-size: contain; background-repeat: no-repeat; margin-bottom: 8px;"
+      ></div>
+
+      <div class="tool-row" style="margin-bottom: 6px; justify-content: space-between;">
+        <label class="tool-label" for="aiTextureUVScaleInput">UV Tile Scale</label>
+        <input type="number" id="aiTextureUVScaleInput" class="tool-input" value="1" min="0.1" max="32" step="0.5" style="width: 84px;" />
+      </div>
+
+      <div class="sculpt-grid-2" style="margin-bottom: 6px;">
+        <button type="button" id="btnApplyAITextureToMesh" class="tool-btn tool-btn-primary" title="Apply generated texture and normal map to selected mesh">
+          <i class="app-icon" data-lucide="paintbrush"></i> Apply to Mesh
+        </button>
+        <button type="button" id="btnUseAITextureAsDecal" class="sculpt-btn" title="Send this texture to the Decal Painter tool">
+          <i class="app-icon" data-lucide="stamp"></i> Use as Decal
+        </button>
+      </div>
+
+      <div class="sculpt-grid-2">
+        <button type="button" id="btnDownloadAITextureAlbedo" class="sculpt-btn" title="Download Albedo PNG">
+          <i class="app-icon" data-lucide="download"></i> Albedo PNG
+        </button>
+        <button type="button" id="btnDownloadAITextureNormal" class="sculpt-btn" title="Download Normal Map PNG">
+          <i class="app-icon" data-lucide="download"></i> Normal PNG
+        </button>
+      </div>
+    </div>
+
+    <!-- 4. Generated Texture Library -->
+    <div class="sculpt-stats-card">
+      <div class="sculpt-stats-row">
+        <span style="color: #8b949e;">Generated Library:</span>
+        <span id="aiTextureCountBadge" style="color: #58a6ff; font-weight: 600; font-family: monospace;">0 textures</span>
+      </div>
+      <div
+        id="aiTextureHistoryList"
+        style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; max-height: 116px; overflow-y: auto; padding-top: 4px;"
+      ></div>
+    </div>
+  </div>
+</div>

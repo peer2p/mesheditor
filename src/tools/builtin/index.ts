@@ -39,3 +39,7 @@ export * from './GenerateNeuralMeshTool';
 export * from './UVUnwrapTool';
 export * from './BakeTexturesTool';
 export * from './RigWeightTool';
+export * from './GenerateTextureTool';
+export * from './CreateTextMeshTool';
+export * from './DecalTool';
+

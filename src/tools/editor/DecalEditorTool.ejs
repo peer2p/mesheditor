@@ -1,0 +1,141 @@
+<div id="dialog-decal" class="floating-dialog" style="top: 180px; right: 365px; width: 340px; display: none">
+  <div class="dialog-header">
+    <span class="dialog-title"><i class="app-icon" data-lucide="stamp"></i> Decal Painter</span>
+    <div class="dialog-actions">
+      <button class="dialog-btn btn-help" title="Help &amp; Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+      <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+      <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+    </div>
+  </div>
+  <div class="dialog-body sculpt-tool-body">
+    <!-- 1. Interactive 3D Viewport Paint Mode -->
+    <div class="tool-control-group">
+      <button
+        type="button"
+        id="btnToggleDecalPaintMode"
+        class="tool-btn tool-btn-primary btn-block"
+        style="width: 100%; height: 32px;"
+      >
+        <i class="app-icon" data-lucide="mouse-pointer"></i> <span id="decalPaintModeLabel">Paint Mode: Active (Click Mesh)</span>
+      </button>
+      <div class="tool-sublabel" style="text-align: center; margin-top: 2px;">
+        Left-Click mesh to stamp &bull; Right-Click decal to remove &bull; Q/E rotate
+      </div>
+    </div>
+
+    <!-- 2. Decal Texture & Gallery -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-slider-header">
+        <div class="sculpt-section-title"><i class="app-icon" data-lucide="image"></i> Decal Texture</div>
+        <button type="button" id="btnUploadDecalImage" class="sculpt-btn" style="height: 24px; padding: 0 8px; font-size: 10px;" title="Upload custom PNG/WebP decal image">
+          <i class="app-icon" data-lucide="upload"></i> Upload PNG
+        </button>
+        <input type="file" id="decalImageFileInput" accept="image/png,image/webp,image/jpeg" style="display: none" />
+      </div>
+
+      <select id="decalTextureSelect" class="tool-select" style="width: 100%; margin-top: 4px;" aria-label="Decal Texture"></select>
+
+      <div
+        id="decalTextureGallery"
+        style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; max-height: 116px; overflow-y: auto; padding: 5px; margin-top: 4px; background: #0d1117; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.12);"
+      ></div>
+    </div>
+
+    <!-- 3. Decal Transform & Material -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="sliders"></i> Brush &amp; Projection</div>
+
+      <div class="sculpt-slider-row" style="margin-top: 4px;">
+        <div class="sculpt-slider-header">
+          <label class="sculpt-slider-label" for="decalSizeRange">Decal Size</label>
+          <input type="number" id="decalSizeNum" class="tool-number" min="0.05" max="20" step="0.05" value="0.6" style="width: 58px; text-align: right;" aria-label="Decal Size Value" />
+        </div>
+        <input type="range" id="decalSizeRange" min="0.1" max="5" step="0.05" value="0.6" class="tool-range" />
+      </div>
+
+      <div class="sculpt-slider-row" style="margin-top: 6px;">
+        <div class="sculpt-slider-header">
+          <label class="sculpt-slider-label" for="decalAngleRange">Rotation (&deg;)</label>
+          <input type="number" id="decalAngleNum" class="tool-number" min="0" max="360" step="15" value="0" style="width: 58px; text-align: right;" aria-label="Decal Rotation Degrees" />
+        </div>
+        <input type="range" id="decalAngleRange" min="0" max="360" step="5" value="0" class="tool-range" />
+      </div>
+
+      <div class="sculpt-slider-row" style="margin-top: 6px;">
+        <div class="sculpt-slider-header">
+          <label class="sculpt-slider-label" for="decalOpacityRange">Opacity</label>
+          <span id="decalOpacityVal" class="sculpt-slider-val">100%</span>
+        </div>
+        <input type="range" id="decalOpacityRange" min="0.1" max="1" step="0.05" value="1.0" class="tool-range" />
+      </div>
+
+      <div class="sculpt-options-row" style="margin-top: 6px;">
+        <div class="path-extrusion-color-row">
+          <label class="sculpt-slider-label" for="decalTintColorPicker">Tint</label>
+          <input
+            type="color"
+            id="decalTintColorPicker"
+            value="#ffffff"
+            class="path-extrusion-color-input"
+          />
+        </div>
+        <label class="sculpt-checkbox-label">
+          <input type="checkbox" id="decalCullBackFacesCheck" checked />
+          <span>Cull Backfaces</span>
+        </label>
+      </div>
+
+      <div class="tool-row" style="margin-top: 6px;">
+        <label class="tool-label" for="decalFaceSelect" style="min-width: 78px;">Quick Face</label>
+        <select id="decalFaceSelect" class="tool-select" style="flex: 1;">
+          <option value="front" selected>Front (-Z)</option>
+          <option value="back">Back (+Z)</option>
+          <option value="top">Top (+Y)</option>
+          <option value="bottom">Bottom (-Y)</option>
+          <option value="left">Left (-X)</option>
+          <option value="right">Right (+X)</option>
+        </select>
+        <button type="button" id="btnPlaceDecalOnSelected" class="sculpt-btn" title="Project a decal onto the chosen face of the selected mesh">
+          <i class="app-icon" data-lucide="stamp"></i> Stamp
+        </button>
+      </div>
+    </div>
+
+    <!-- 4. Mesh Fusion & Export -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="combine"></i> Mesh Fusion &amp; Export</div>
+
+      <div class="tool-row" style="margin-top: 4px;">
+        <button
+          type="button"
+          id="btnMergeDecalsIntoMesh"
+          class="tool-btn tool-btn-primary"
+          style="flex: 1; height: 32px;"
+          title="Fuse all placed decals directly into their target meshes"
+        >
+          <i class="app-icon" data-lucide="combine"></i> Merge Decals into Mesh
+        </button>
+        <button
+          type="button"
+          id="btnClearUnmergedDecals"
+          class="tool-action-btn btn-danger"
+          style="height: 32px; width: 32px;"
+          title="Remove all unmerged decals"
+          aria-label="Clear Unmerged Decals"
+        >
+          <i class="app-icon" data-lucide="trash-2"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="sculpt-stats-card">
+      <div class="sculpt-stats-row">
+        <span style="color: #8b949e;">Scene Decals:</span>
+        <span id="decalUnmergedCountBadge" style="color: #58a6ff; font-weight: 600; font-family: monospace;">0 unmerged decals</span>
+      </div>
+      <div class="tool-sublabel" style="line-height: 1.35;">
+        Decals are also automatically fused into their target mesh when exporting (GLB, glTF, OBJ, STL).
+      </div>
+    </div>
+  </div>
+</div>

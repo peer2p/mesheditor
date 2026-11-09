@@ -17,6 +17,9 @@ import { CompressModelEditorTool } from './CompressModelEditorTool';
 import { UVUnwrapEditorTool } from './UVUnwrapEditorTool';
 import { VoxelPainterEditorTool } from './VoxelPainterEditorTool';
 import { SculptEditorTool } from './SculptEditorTool';
+import { AITextureEditorTool } from './AITextureEditorTool';
+import { TextMeshEditorTool } from './TextMeshEditorTool';
+import { DecalEditorTool } from './DecalEditorTool';
 import { TOOL_VIEWS, getToolViewTemplate } from './toolViews';
 
 export {
@@ -38,6 +41,9 @@ export {
   UVUnwrapEditorTool,
   VoxelPainterEditorTool,
   SculptEditorTool,
+  AITextureEditorTool,
+  TextMeshEditorTool,
+  DecalEditorTool,
   TOOL_VIEWS,
   getToolViewTemplate,
 };
@@ -64,6 +70,9 @@ export function createBuiltinEditorTools(): ToolInterface[] {
     new SceneEnvironmentEditorTool(),
     new AnimationPlayerEditorTool(),
     new RiggingEditorTool(),
+    new AITextureEditorTool(),
+    new TextMeshEditorTool(),
+    new DecalEditorTool(),
   ];
 }
 

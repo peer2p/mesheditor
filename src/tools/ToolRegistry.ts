@@ -42,6 +42,9 @@ import {
   UVUnwrapTool,
   BakeTexturesTool,
   RigWeightTool,
+  GenerateTextureTool,
+  CreateTextMeshTool,
+  DecalTool,
 } from './builtin';
 
 /**
@@ -167,5 +170,8 @@ export function createDefaultToolRegistry(): ToolRegistry {
     new UVUnwrapTool(),
     new BakeTexturesTool(),
     new RigWeightTool(),
+    new GenerateTextureTool(),
+    new CreateTextMeshTool(),
+    new DecalTool(),
   ]);
 }

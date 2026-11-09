@@ -26,6 +26,9 @@ const TOOLS = [
   { className: 'SceneEnvironmentEditorTool', file: 'SceneEnvironmentEditorTool.ejs', id: 'dialog-scene' },
   { className: 'AnimationPlayerEditorTool', file: 'AnimationPlayerEditorTool.ejs', id: 'dialog-anim' },
   { className: 'RiggingEditorTool', file: 'RiggingEditorTool.ejs', id: 'dialog-rigging' },
+  { className: 'AITextureEditorTool', file: 'AITextureEditorTool.ejs', id: 'dialog-ai-texture' },
+  { className: 'TextMeshEditorTool', file: 'TextMeshEditorTool.ejs', id: 'dialog-text-mesh' },
+  { className: 'DecalEditorTool', file: 'DecalEditorTool.ejs', id: 'dialog-decal' },
 ];
 
 function syncTemplates() {

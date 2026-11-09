@@ -161,11 +161,13 @@ import {
   Sparkles,
   Square,
   SquareDashed,
+  Stamp,
   Sun,
   SunMedium,
   Target,
   Trash2,
   Triangle,
+  Type,
   Undo2,
   Upload,
   UploadCloud,
@@ -270,11 +272,13 @@ export const editorIcons = {
   Sparkles,
   Square,
   SquareDashed,
+  Stamp,
   Sun,
   SunMedium,
   Target,
   Trash2,
   Triangle,
+  Type,
   Undo2,
   Upload,
   UploadCloud,
@@ -643,6 +647,9 @@ export class MeshEditorApp {
         this.updateUVUnwrapUI();
         this.updateBakingUI();
         this.updateRiggingUI();
+        this.updateAITextureUI();
+        this.updateTextMeshUI();
+        this.updateDecalUI();
         const statsSelection = this.getElement<HTMLElement>('statsSelection');
         if (statsSelection) {
           statsSelection.textContent = activeMesh
@@ -661,6 +668,9 @@ export class MeshEditorApp {
         this.updateUVUnwrapUI();
         this.updateBakingUI();
         this.updateRiggingUI();
+        this.updateAITextureUI();
+        this.updateTextMeshUI();
+        this.updateDecalUI();
         options.events?.onSceneModified?.();
       },
       onHistoryChanged: (canUndo, canRedo) => {
@@ -1148,6 +1158,9 @@ export class MeshEditorApp {
     this.initUVUnwrapUI();
     this.initBakingUI();
     this.initRiggingUI();
+    this.initAITextureUI();
+    this.initTextMeshUI();
+    this.initDecalUI();
 
     // Restore saved window layout and active tools from localStorage
     this.restoreDialogLayout();
@@ -1832,12 +1845,16 @@ export class MeshEditorApp {
           this.setupFloatingDialog(dialog);
           if (id === 'dialog-compress-model') {
             this.initCompressModelUI();
-    this.initSculptUI();
-    this.initCSGBevelUI();
-    this.initUVUnwrapUI();
-    this.initBakingUI();
-    this.initRiggingUI();
           }
+          this.initSculptUI();
+          this.initCSGBevelUI();
+          this.initUVUnwrapUI();
+          this.initBakingUI();
+          this.initRiggingUI();
+          this.initAITextureUI();
+          this.initTextMeshUI();
+          this.initDecalUI();
+          this.refreshIcons();
         }
       }
     }
@@ -7709,6 +7726,620 @@ export class MeshEditorApp {
     }
     if (influencedEl) {
       influencedEl.textContent = `${stats.influencedVertexCount} verts (avg ${stats.averageActiveWeight.toFixed(2)})`;
+    }
+  }
+
+  /* =========================================================================
+     AI TEXTURE GENERATOR UI
+     ========================================================================= */
+  private activeAITextureId: string | null = null;
+  private activeAITexturePreviewMode: 'albedo' | 'normal' | 'tiled' = 'albedo';
+
+  public initAITextureUI(): void {
+    const dialog = this.getElement('dialog-ai-texture');
+    if (!dialog || (dialog as any)._aiTextureInitialized) return;
+    (dialog as any)._aiTextureInitialized = true;
+
+    const promptInput = this.getElement<HTMLTextAreaElement>('aiTexturePrompt');
+    const presetSelect = this.getElement<HTMLSelectElement>('aiTexturePresetSelect');
+    const styleSelect = this.getElement<HTMLSelectElement>('aiTextureStyleSelect');
+    const sizeSelect = this.getElement<HTMLSelectElement>('aiTextureSizeSelect');
+    const seamlessCheck = this.getElement<HTMLInputElement>('aiTextureSeamlessCheck');
+    const normalCheck = this.getElement<HTMLInputElement>('aiTextureNormalCheck');
+    const customColorsCheck = this.getElement<HTMLInputElement>('aiTextureCustomColorsCheck');
+    const colorPickersRow = this.getElement<HTMLElement>('aiTextureColorPickersRow');
+    const primaryColorInput = this.getElement<HTMLInputElement>('aiTexturePrimaryColor');
+    const secondaryColorInput = this.getElement<HTMLInputElement>('aiTextureSecondaryColor');
+    const accentColorInput = this.getElement<HTMLInputElement>('aiTextureAccentColor');
+    const normalStrengthInput = this.getElement<HTMLInputElement>('aiTextureNormalStrength');
+    const normalStrengthVal = this.getElement<HTMLElement>('aiTextureNormalStrengthVal');
+    const uvScaleInput = this.getElement<HTMLInputElement>('aiTextureUVScaleInput');
+
+    presetSelect?.addEventListener('change', () => {
+      if (!presetSelect.value) return;
+      const [presetPrompt, presetStyle] = presetSelect.value.split('|');
+      if (promptInput && presetPrompt) promptInput.value = presetPrompt;
+      if (styleSelect && presetStyle) styleSelect.value = presetStyle;
+      presetSelect.value = '';
+    });
+
+    customColorsCheck?.addEventListener('change', () => {
+      if (colorPickersRow) {
+        colorPickersRow.style.display = customColorsCheck.checked ? 'flex' : 'none';
+      }
+    });
+
+    normalStrengthInput?.addEventListener('input', () => {
+      if (normalStrengthVal) normalStrengthVal.textContent = Number(normalStrengthInput.value).toFixed(1);
+    });
+
+    const setPreviewMode = (mode: 'albedo' | 'normal' | 'tiled') => {
+      this.activeAITexturePreviewMode = mode;
+      this.updateAITextureUI();
+    };
+
+    this.getElement('btnPreviewAlbedo')?.addEventListener('click', () => setPreviewMode('albedo'));
+    this.getElement('btnPreviewNormal')?.addEventListener('click', () => setPreviewMode('normal'));
+    this.getElement('btnPreviewTiled')?.addEventListener('click', () => setPreviewMode('tiled'));
+
+    this.getElement('btnGenerateAITexture')?.addEventListener('click', async () => {
+      const prompt = promptInput?.value.trim() || 'Seamless stone texture';
+      const style = (styleSelect?.value || 'auto') as any;
+      const size = parseInt(sizeSelect?.value || '512', 10) || 512;
+      const seamless = seamlessCheck ? seamlessCheck.checked : true;
+      const generateNormalMap = normalCheck ? normalCheck.checked : true;
+      const normalStrength = parseFloat(normalStrengthInput?.value || '2.2') || 2.2;
+      const useCustomColors = Boolean(customColorsCheck?.checked);
+
+      const item = await this.service.aiTextureGenerator.generateTexture({
+        prompt,
+        style,
+        size,
+        seamless,
+        generateNormalMap,
+        normalStrength,
+        primaryColor: useCustomColors ? primaryColorInput?.value : undefined,
+        secondaryColor: useCustomColors ? secondaryColorInput?.value : undefined,
+        accentColor: useCustomColors ? accentColorInput?.value : undefined,
+        embedInScene: true,
+      });
+
+      this.activeAITextureId = item.id;
+      this.showToast(`Generated "${item.name}" (${item.size}x${item.size})`, 'success');
+      this.updateAITextureUI();
+      this.updateDecalUI();
+    });
+
+    const btnUploadTex = this.getElement<HTMLButtonElement>('btnUploadAITextureImage');
+    const fileInputTex = this.getElement<HTMLInputElement>('aiTextureImageFileInput');
+    btnUploadTex?.addEventListener('click', () => fileInputTex?.click());
+    fileInputTex?.addEventListener('change', async () => {
+      const file = fileInputTex.files?.[0];
+      if (!file) return;
+      try {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const dataUrl = reader.result as string;
+          const normalStrength = parseFloat(normalStrengthInput?.value || '2.2') || 2.2;
+          const item = await this.service.aiTextureGenerator.addExternalTexture(
+            file.name.replace(/\.[^/.]+$/, ''),
+            dataUrl,
+            promptInput?.value.trim() || file.name,
+            normalStrength,
+          );
+          this.activeAITextureId = item.id;
+          this.showToast(`Imported texture "${item.name}" with normal map!`, 'success');
+          this.updateAITextureUI();
+          this.updateDecalUI();
+        };
+        reader.readAsDataURL(file);
+      } catch (err: any) {
+        this.showToast(err?.message || 'Failed to import texture image.', 'error');
+      }
+      fileInputTex.value = '';
+    });
+
+    this.getElement('btnApplyAITextureToMesh')?.addEventListener('click', () => {
+      const item = this.activeAITextureId
+        ? this.service.aiTextureGenerator.getTextureById(this.activeAITextureId)
+        : this.service.aiTextureGenerator.getLatestTexture();
+      if (!item) {
+        this.showToast('Generate a texture first.', 'warning');
+        return;
+      }
+      const uvScale = parseFloat(uvScaleInput?.value || '1') || 1;
+      try {
+        const res = this.service.aiTextureGenerator.applyTextureToMesh(item.id, 'selected', uvScale);
+        this.showToast(`Applied "${item.name}" to ${res.appliedTo.join(', ')}`, 'success');
+      } catch (err: any) {
+        this.showToast(err?.message || 'Select a mesh first to apply texture.', 'warning');
+      }
+    });
+
+    this.getElement('btnUseAITextureAsDecal')?.addEventListener('click', () => {
+      const item = this.activeAITextureId
+        ? this.service.aiTextureGenerator.getTextureById(this.activeAITextureId)
+        : this.service.aiTextureGenerator.getLatestTexture();
+      if (!item) {
+        this.showToast('Generate a texture first.', 'warning');
+        return;
+      }
+      this.service.decalController.setTexture(item.albedoDataUrl, item.name);
+      this.toggleDialog('dialog-decal', true);
+      this.service.decalController.setActive(true);
+      this.updateDecalUI();
+      this.showToast(`Loaded "${item.name}" into Decal Painter! Click on a mesh to paint.`, 'info');
+    });
+
+    this.getElement('btnDownloadAITextureAlbedo')?.addEventListener('click', () => {
+      const item = this.activeAITextureId
+        ? this.service.aiTextureGenerator.getTextureById(this.activeAITextureId)
+        : this.service.aiTextureGenerator.getLatestTexture();
+      if (item) {
+        this.service.aiTextureGenerator.downloadTexture(item.id, 'albedo');
+      }
+    });
+
+    this.getElement('btnDownloadAITextureNormal')?.addEventListener('click', () => {
+      const item = this.activeAITextureId
+        ? this.service.aiTextureGenerator.getTextureById(this.activeAITextureId)
+        : this.service.aiTextureGenerator.getLatestTexture();
+      if (item && item.normalDataUrl) {
+        this.service.aiTextureGenerator.downloadTexture(item.id, 'normal');
+      } else {
+        this.showToast('No normal map available for this texture.', 'warning');
+      }
+    });
+
+    this.service.aiTextureGenerator.onHistoryChanged = () => {
+      this.updateAITextureUI();
+    };
+
+    this.updateAITextureUI();
+  }
+
+  public updateAITextureUI(): void {
+    const dialog = this.getElement('dialog-ai-texture');
+    if (!dialog) return;
+
+    const history = this.service.aiTextureGenerator.getHistory();
+    const countBadge = this.getElement('aiTextureCountBadge');
+    if (countBadge) {
+      countBadge.textContent = `${history.length} texture${history.length === 1 ? '' : 's'}`;
+    }
+
+    if (!this.activeAITextureId && history.length > 0) {
+      this.activeAITextureId = history[0].id;
+    }
+
+    const activeItem = this.activeAITextureId
+      ? this.service.aiTextureGenerator.getTextureById(this.activeAITextureId) || history[0]
+      : history[0];
+
+    const previewContainer = this.getElement<HTMLElement>('aiTexturePreviewContainer');
+    const previewBox = this.getElement<HTMLElement>('aiTexturePreviewBox');
+    const metaLabel = this.getElement<HTMLElement>('aiTextureMetaLabel');
+
+    if (previewContainer && previewBox) {
+      if (activeItem) {
+        previewContainer.style.display = 'block';
+        if (metaLabel) {
+          metaLabel.textContent = `${activeItem.name} (${activeItem.size}px • ${activeItem.style})`;
+        }
+        const url =
+          this.activeAITexturePreviewMode === 'normal' && activeItem.normalDataUrl
+            ? activeItem.normalDataUrl
+            : activeItem.albedoDataUrl;
+        previewBox.style.backgroundImage = `url("${url}")`;
+        if (this.activeAITexturePreviewMode === 'tiled') {
+          previewBox.style.backgroundSize = '50% 50%';
+          previewBox.style.backgroundRepeat = 'repeat';
+        } else {
+          previewBox.style.backgroundSize = 'contain';
+          previewBox.style.backgroundRepeat = 'no-repeat';
+        }
+      } else {
+        previewContainer.style.display = 'none';
+      }
+    }
+
+    const modes: Array<{ id: string; mode: 'albedo' | 'normal' | 'tiled' }> = [
+      { id: 'btnPreviewAlbedo', mode: 'albedo' },
+      { id: 'btnPreviewNormal', mode: 'normal' },
+      { id: 'btnPreviewTiled', mode: 'tiled' },
+    ];
+    for (const m of modes) {
+      const btn = this.getElement<HTMLButtonElement>(m.id);
+      if (btn) {
+        const isCurrent = this.activeAITexturePreviewMode === m.mode;
+        btn.classList.toggle('active', isCurrent);
+      }
+    }
+
+    const historyList = this.getElement<HTMLElement>('aiTextureHistoryList');
+    if (historyList) {
+      historyList.innerHTML = '';
+      for (const item of history) {
+        const thumb = document.createElement('button');
+        thumb.type = 'button';
+        thumb.title = `${item.name}: ${item.prompt}`;
+        const isSelected = activeItem && activeItem.id === item.id;
+        thumb.style.cssText = `
+          height: 52px;
+          border-radius: 5px;
+          border: 2px solid ${isSelected ? '#3b82f6' : 'rgba(255,255,255,0.12)'};
+          background-color: #161b22;
+          background-image: url("${item.albedoDataUrl}");
+          background-size: cover;
+          background-position: center;
+          cursor: pointer;
+          padding: 0;
+        `;
+        thumb.addEventListener('click', () => {
+          this.activeAITextureId = item.id;
+          this.updateAITextureUI();
+        });
+        historyList.appendChild(thumb);
+      }
+    }
+  }
+
+  /* =========================================================================
+     3D TEXT MESH TOOL UI
+     ========================================================================= */
+  public initTextMeshUI(): void {
+    const dialog = this.getElement('dialog-text-mesh');
+    if (!dialog || (dialog as any)._textMeshInitialized) return;
+    (dialog as any)._textMeshInitialized = true;
+
+    const textInput = this.getElement<HTMLInputElement>('textMeshInput');
+    const fontSelect = this.getElement<HTMLSelectElement>('textMeshFontSelect');
+    const sizeRange = this.getElement<HTMLInputElement>('textMeshSizeRange');
+    const sizeNum = this.getElement<HTMLInputElement>('textMeshSizeNum');
+    const depthRange = this.getElement<HTMLInputElement>('textMeshDepthRange');
+    const depthNum = this.getElement<HTMLInputElement>('textMeshDepthNum');
+    const resRange = this.getElement<HTMLInputElement>('textMeshResolutionRange');
+    const resNum = this.getElement<HTMLInputElement>('textMeshResolutionNum');
+    const colorPicker = this.getElement<HTMLInputElement>('textMeshColorPicker');
+    const colorHex = this.getElement<HTMLElement>('textMeshColorHex');
+    const roughnessRange = this.getElement<HTMLInputElement>('textMeshRoughnessRange');
+    const roughnessVal = this.getElement<HTMLElement>('textMeshRoughnessVal');
+    const metallicRange = this.getElement<HTMLInputElement>('textMeshMetallicRange');
+    const metallicVal = this.getElement<HTMLElement>('textMeshMetallicVal');
+    const emissivePicker = this.getElement<HTMLInputElement>('textMeshEmissivePicker');
+    const emissiveIntensityRange = this.getElement<HTMLInputElement>('textMeshEmissiveIntensityRange');
+    const surfacePlaceCheck = this.getElement<HTMLInputElement>('textMeshSurfacePlaceCheck');
+
+    const syncPair = (range: HTMLInputElement | null, num: HTMLInputElement | null) => {
+      range?.addEventListener('input', () => {
+        if (num) num.value = range.value;
+      });
+      num?.addEventListener('change', () => {
+        if (range) range.value = num.value;
+      });
+    };
+    syncPair(sizeRange, sizeNum);
+    syncPair(depthRange, depthNum);
+    syncPair(resRange, resNum);
+
+    colorPicker?.addEventListener('input', () => {
+      if (colorHex) colorHex.textContent = colorPicker.value;
+    });
+    roughnessRange?.addEventListener('input', () => {
+      if (roughnessVal) roughnessVal.textContent = Number(roughnessRange.value).toFixed(2);
+    });
+    metallicRange?.addEventListener('input', () => {
+      if (metallicVal) metallicVal.textContent = Number(metallicRange.value).toFixed(2);
+    });
+    surfacePlaceCheck?.addEventListener('change', () => {
+      this.service.textMeshController.setSurfacePlacementActive(Boolean(surfacePlaceCheck.checked));
+    });
+
+    const readFormConfig = () => ({
+      text: textInput?.value.trim() || 'Hello 3D',
+      fontUrl: fontSelect?.value || 'assets/fonts/Kenney_Future_Regular.json',
+      size: parseFloat(sizeNum?.value || sizeRange?.value || '1.0') || 1.0,
+      depth: parseFloat(depthNum?.value || depthRange?.value || '0.25') || 0.25,
+      resolution: parseInt(resNum?.value || resRange?.value || '8', 10) || 8,
+      color: colorPicker?.value || '#3b82f6',
+      roughness: parseFloat(roughnessRange?.value || '0.35') ?? 0.35,
+      metallic: parseFloat(metallicRange?.value || '0.2') ?? 0.2,
+      emissiveColor: emissivePicker?.value || '#000000',
+      emissiveIntensity: parseFloat(emissiveIntensityRange?.value || '0') || 0,
+    });
+
+    this.getElement('btnCreateTextMesh')?.addEventListener('click', async () => {
+      const cfg = readFormConfig();
+      const mesh = await this.service.textMeshController.createTextMesh(cfg);
+      this.showToast(`Created 3D Text "${cfg.text}" (${mesh.name})`, 'success');
+      this.updateTextMeshUI();
+    });
+
+    this.getElement('btnUpdateTextMesh')?.addEventListener('click', async () => {
+      const sel = this.service.selectedMesh;
+      if (!sel || !this.service.textMeshController.isTextMesh(sel)) {
+        this.showToast('Select a 3D Text mesh first to update it.', 'warning');
+        return;
+      }
+      const cfg = readFormConfig();
+      const updated = await this.service.textMeshController.updateTextMesh(sel, cfg);
+      this.showToast(`Updated 3D Text "${updated.name}"`, 'success');
+      this.updateTextMeshUI();
+    });
+
+    this.getElement('btnDuplicateTextMesh')?.addEventListener('click', async () => {
+      const sel = this.service.selectedMesh;
+      if (!sel || !this.service.textMeshController.isTextMesh(sel)) {
+        this.showToast('Select a 3D Text mesh first to duplicate it.', 'warning');
+        return;
+      }
+      const dup = await this.service.textMeshController.duplicateTextMesh(sel);
+      this.showToast(`Duplicated 3D Text as "${dup.name}"`, 'success');
+      this.updateTextMeshUI();
+    });
+
+    this.updateTextMeshUI();
+  }
+
+  public updateTextMeshUI(): void {
+    const dialog = this.getElement('dialog-text-mesh');
+    if (!dialog) return;
+
+    const sel = this.service.selectedMesh;
+    const isText = Boolean(sel && this.service.textMeshController.isTextMesh(sel));
+    const badge = this.getElement<HTMLElement>('textMeshSelectedBadge');
+    const btnUpdate = this.getElement<HTMLButtonElement>('btnUpdateTextMesh');
+    const btnDuplicate = this.getElement<HTMLButtonElement>('btnDuplicateTextMesh');
+
+    if (btnUpdate) btnUpdate.disabled = !isText;
+    if (btnDuplicate) btnDuplicate.disabled = !isText;
+
+    if (isText && sel) {
+      const cfg = this.service.textMeshController.getTextConfig(sel);
+      if (badge) {
+        badge.innerHTML = `Editing 3D Text: <strong>${sel.name}</strong>`;
+      }
+      if (cfg) {
+        const textInput = this.getElement<HTMLInputElement>('textMeshInput');
+        const fontSelect = this.getElement<HTMLSelectElement>('textMeshFontSelect');
+        const sizeRange = this.getElement<HTMLInputElement>('textMeshSizeRange');
+        const sizeNum = this.getElement<HTMLInputElement>('textMeshSizeNum');
+        const depthRange = this.getElement<HTMLInputElement>('textMeshDepthRange');
+        const depthNum = this.getElement<HTMLInputElement>('textMeshDepthNum');
+        const resRange = this.getElement<HTMLInputElement>('textMeshResolutionRange');
+        const resNum = this.getElement<HTMLInputElement>('textMeshResolutionNum');
+        const colorPicker = this.getElement<HTMLInputElement>('textMeshColorPicker');
+        const colorHex = this.getElement<HTMLElement>('textMeshColorHex');
+
+        if (textInput && document.activeElement !== textInput) textInput.value = cfg.text;
+        if (fontSelect) fontSelect.value = cfg.fontUrl;
+        if (sizeRange) sizeRange.value = String(cfg.size);
+        if (sizeNum && document.activeElement !== sizeNum) sizeNum.value = String(cfg.size);
+        if (depthRange) depthRange.value = String(cfg.depth);
+        if (depthNum && document.activeElement !== depthNum) depthNum.value = String(cfg.depth);
+        if (resRange) resRange.value = String(cfg.resolution);
+        if (resNum && document.activeElement !== resNum) resNum.value = String(cfg.resolution);
+        if (colorPicker) colorPicker.value = cfg.color;
+        if (colorHex) colorHex.textContent = cfg.color;
+      }
+    } else if (badge) {
+      badge.innerHTML =
+        'Enter text and click <strong>Create 3D Text</strong>, or select an existing 3D text mesh to edit it.';
+    }
+  }
+
+  /* =========================================================================
+     DECAL PAINTER TOOL UI
+     ========================================================================= */
+  public initDecalUI(): void {
+    const dialog = this.getElement('dialog-decal');
+    if (!dialog || (dialog as any)._decalInitialized) return;
+    (dialog as any)._decalInitialized = true;
+
+    const btnToggleMode = this.getElement<HTMLButtonElement>('btnToggleDecalPaintMode');
+    const texSelect = this.getElement<HTMLSelectElement>('decalTextureSelect');
+    const btnUpload = this.getElement<HTMLButtonElement>('btnUploadDecalImage');
+    const fileInput = this.getElement<HTMLInputElement>('decalImageFileInput');
+    const sizeRange = this.getElement<HTMLInputElement>('decalSizeRange');
+    const sizeNum = this.getElement<HTMLInputElement>('decalSizeNum');
+    const angleRange = this.getElement<HTMLInputElement>('decalAngleRange');
+    const angleNum = this.getElement<HTMLInputElement>('decalAngleNum');
+    const opacityRange = this.getElement<HTMLInputElement>('decalOpacityRange');
+    const opacityVal = this.getElement<HTMLElement>('decalOpacityVal');
+    const tintPicker = this.getElement<HTMLInputElement>('decalTintColorPicker');
+    const cullCheck = this.getElement<HTMLInputElement>('decalCullBackFacesCheck');
+    const faceSelect = this.getElement<HTMLSelectElement>('decalFaceSelect');
+
+    btnToggleMode?.addEventListener('click', () => {
+      const next = !this.service.decalController.isActive;
+      this.service.decalController.setActive(next);
+      this.updateDecalUI();
+      this.updatePanelButtonStates();
+    });
+
+    texSelect?.addEventListener('change', () => {
+      const opt = this.service.decalController
+        .getAvailableTextures()
+        .find((t) => t.url === texSelect.value || t.id === texSelect.value);
+      if (opt) {
+        this.service.decalController.setTexture(opt.url, opt.name);
+        this.updateDecalUI();
+      }
+    });
+
+    btnUpload?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      try {
+        const tex = await this.service.addTextureFromFile(file);
+        if (tex.url) {
+          this.service.decalController.setTexture(tex.url, file.name);
+          this.updateDecalUI();
+        }
+      } catch (err: any) {
+        this.showToast(err?.message || 'Failed to load decal image.', 'error');
+      }
+      fileInput.value = '';
+    });
+
+    sizeRange?.addEventListener('input', () => {
+      const v = parseFloat(sizeRange.value) || 0.6;
+      if (sizeNum) sizeNum.value = String(v);
+      this.service.decalController.setUniformSize(v);
+    });
+    sizeNum?.addEventListener('change', () => {
+      const v = parseFloat(sizeNum.value) || 0.6;
+      if (sizeRange) sizeRange.value = String(v);
+      this.service.decalController.setUniformSize(v);
+    });
+
+    angleRange?.addEventListener('input', () => {
+      const deg = parseFloat(angleRange.value) || 0;
+      if (angleNum) angleNum.value = String(deg);
+      this.service.decalController.setAngleDegrees(deg);
+    });
+    angleNum?.addEventListener('change', () => {
+      const deg = parseFloat(angleNum.value) || 0;
+      if (angleRange) angleRange.value = String(deg);
+      this.service.decalController.setAngleDegrees(deg);
+    });
+
+    opacityRange?.addEventListener('input', () => {
+      const v = parseFloat(opacityRange.value) || 1.0;
+      this.service.decalController.config.opacity = v;
+      if (opacityVal) opacityVal.textContent = `${Math.round(v * 100)}%`;
+    });
+
+    tintPicker?.addEventListener('input', () => {
+      this.service.decalController.config.tintColor = tintPicker.value;
+    });
+
+    cullCheck?.addEventListener('change', () => {
+      this.service.decalController.config.cullBackFaces = cullCheck.checked;
+    });
+
+    this.getElement('btnPlaceDecalOnSelected')?.addEventListener('click', () => {
+      try {
+        const face = (faceSelect?.value || 'front') as any;
+        const decal = this.service.decalController.placeDecal({ face });
+        this.showToast(`Stamped decal "${this.service.decalController.config.textureName}" (${decal.name})`, 'success');
+        this.updateDecalUI();
+      } catch (err: any) {
+        this.showToast(err?.message || 'Select a target mesh first.', 'warning');
+      }
+    });
+
+    this.getElement('btnMergeDecalsIntoMesh')?.addEventListener('click', () => {
+      const unmerged = this.service.decalController.getUnmergedDecals();
+      if (unmerged.length === 0) {
+        this.showToast('No unmerged decals in scene to merge.', 'info');
+        return;
+      }
+      const res = this.service.decalController.mergeAllDecalsIntoMeshes();
+      this.showToast(
+        `Merged ${res.mergedDecalCount} decal(s) into ${res.affectedMeshes.join(', ')}!`,
+        'success',
+      );
+      this.updateDecalUI();
+    });
+
+    this.getElement('btnClearUnmergedDecals')?.addEventListener('click', () => {
+      const removed = this.service.decalController.clearUnmergedDecals();
+      if (removed > 0) {
+        this.showToast(`Removed ${removed} unmerged decal(s).`, 'info');
+      } else {
+        this.showToast('No unmerged decals to remove.', 'info');
+      }
+      this.updateDecalUI();
+    });
+
+    this.service.decalController.onDecalsChanged = () => {
+      this.updateDecalUI();
+    };
+    this.service.decalController.onConfigChanged = () => {
+      this.updateDecalUI();
+    };
+
+    this.updateDecalUI();
+  }
+
+  public updateDecalUI(): void {
+    const dialog = this.getElement('dialog-decal');
+    if (!dialog) return;
+
+    const ctrl = this.service.decalController;
+    const btnToggleMode = this.getElement<HTMLButtonElement>('btnToggleDecalPaintMode');
+    const modeLabel = this.getElement<HTMLElement>('decalPaintModeLabel');
+    if (btnToggleMode && modeLabel) {
+      if (ctrl.isActive) {
+        btnToggleMode.classList.add('tool-btn-primary');
+        btnToggleMode.classList.remove('sculpt-btn');
+        modeLabel.textContent = 'Paint Mode: Active (Click Mesh)';
+      } else {
+        btnToggleMode.classList.remove('tool-btn-primary');
+        btnToggleMode.classList.add('sculpt-btn');
+        modeLabel.textContent = 'Activate Decal Paint Mode';
+      }
+    }
+
+    const available = ctrl.getAvailableTextures();
+    const texSelect = this.getElement<HTMLSelectElement>('decalTextureSelect');
+    if (texSelect) {
+      texSelect.innerHTML = '';
+      for (const opt of available) {
+        const el = document.createElement('option');
+        el.value = opt.url;
+        el.textContent = opt.name;
+        if (opt.url === ctrl.config.textureUrl) {
+          el.selected = true;
+        }
+        texSelect.appendChild(el);
+      }
+    }
+
+    const gallery = this.getElement<HTMLElement>('decalTextureGallery');
+    if (gallery) {
+      gallery.innerHTML = '';
+      for (const opt of available) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.title = opt.name;
+        const isSelected = opt.url === ctrl.config.textureUrl;
+        btn.style.cssText = `
+          height: 46px;
+          border-radius: 5px;
+          border: 2px solid ${isSelected ? '#3b82f6' : 'rgba(255,255,255,0.12)'};
+          background-color: #161b22;
+          background-image: url("${opt.previewDataUrl || opt.url}");
+          background-size: contain;
+          background-repeat: no-repeat;
+          background-position: center;
+          cursor: pointer;
+          padding: 0;
+        `;
+        btn.addEventListener('click', () => {
+          ctrl.setTexture(opt.url, opt.name);
+        });
+        gallery.appendChild(btn);
+      }
+    }
+
+    const sizeRange = this.getElement<HTMLInputElement>('decalSizeRange');
+    const sizeNum = this.getElement<HTMLInputElement>('decalSizeNum');
+    const angleRange = this.getElement<HTMLInputElement>('decalAngleRange');
+    const angleNum = this.getElement<HTMLInputElement>('decalAngleNum');
+
+    if (sizeRange) sizeRange.value = String(ctrl.config.sizeX);
+    if (sizeNum && document.activeElement !== sizeNum) sizeNum.value = String(ctrl.config.sizeX);
+    const deg = ctrl.getAngleDegrees();
+    if (angleRange) angleRange.value = String(deg);
+    if (angleNum && document.activeElement !== angleNum) angleNum.value = String(deg);
+
+    const unmergedCount = ctrl.getUnmergedDecals().length;
+    const countBadge = this.getElement<HTMLElement>('decalUnmergedCountBadge');
+    if (countBadge) {
+      countBadge.textContent = `${unmergedCount} unmerged decal${unmergedCount === 1 ? '' : 's'}`;
     }
   }
 }

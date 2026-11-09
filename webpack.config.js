@@ -42,6 +42,10 @@ module.exports = (env, argv) => {
           directory: path.resolve(__dirname, 'docs/screenshots'),
           publicPath: '/screenshots',
         },
+        {
+          directory: path.resolve(__dirname, 'src/assets'),
+          publicPath: '/assets',
+        },
       ],
       client: {
         overlay: {
@@ -113,6 +117,7 @@ module.exports = (env, argv) => {
           { from: 'src/promptImages', to: 'promptImages', noErrorOnMissing: true },
           { from: 'src/promptImages', to: 'src/promptImages', noErrorOnMissing: true },
           { from: 'docs/screenshots', to: 'screenshots', noErrorOnMissing: true },
+          { from: 'src/assets', to: 'assets', noErrorOnMissing: true },
         ],
       }),
     ],

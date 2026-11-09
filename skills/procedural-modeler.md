@@ -70,43 +70,52 @@ Use this skill whenever requested to create or extend 3D models, assets, or geom
 
 High quality 3D materials require clean textures without baked lighting artifacts.
 
-### A. When using AI Image Generators (e.g. `generate_image`, DALL-E, Imagen)
+### A. When the AI Model has Built-in Image Generation (`generate_image` / `image-generator`)
 
-In Babylon.js (and all modern PBR renderers), shadows, highlights, and ambient occlusion are computed dynamically at runtime based on scene lights and camera position. If an AI image contains directional shadows, angled perspectives, or baked lighting, tiling it produces jarring light-grid artifacts and conflicting shadows.
+If a specific texture is missing for a 3D model, surface, or decal (e.g., "gray sand", "ancient dungeon cobblestone", "scifi hull panels"), you as an AI can generate these textures seamlessly yourself using your built-in image tools!
+
+**Step 1: Generate Texture Image**
+Use your `generate_image` tool (or `image-generator` subagent) with a prompt that explicitly requests a seamless tileable texture:
+`Prompt: "A high quality top-down seamless texture of [description]. Uniform lighting, no shadows. Perfect for 3D tiling."`
+The tool saves the image as an artifact or file in your workspace. Note the absolute path or data URI.
 
 **Mandatory Prompt Rules for 3D Tiling Textures**:
-
 1. **View / Projection**: Always specify `"top-down orthogonal view"`, `"flat 90-degree overhead projection"`, `"no perspective angle"`.
 2. **Lighting / Shading**: Always specify `"completely unshaded diffuse albedo map"`, `"uniform flat lighting"`, `"zero directional shadows"`, `"no specular highlights"`, `"no vignette"`.
 3. **Tiling**: Always include `"seamless texture"`, `"seamless tileable repeating pattern"`, `"perfect for 3D tiling"`.
 4. **Subject**: Focus purely on the surface macro/micro texture without scene objects, horizons, or tilted elements.
 
-**Prompt Examples**:
-
-- **Sand**: `"A high quality top-down seamless texture of fine gray sand with subtle wind ripples. Completely unshaded diffuse albedo map, flat orthogonal 90-degree projection, uniform lighting, zero shadows, no highlights, seamless repeating pattern, perfect for 3D tiling."`
-- **Cobblestone**: `"A high quality top-down seamless texture of medieval cobblestone street pavement. Flat orthogonal top-down view, unshaded diffuse albedo map, uniform ambient lighting, no cast shadows, clean repeating tileable pattern."`
-- **Roof Tiles**: `"A high quality top-down seamless texture of weathered terracotta clay roof tiles. Flat orthogonal 90-degree view, unshaded diffuse map, uniform lighting, no shadows, perfectly tileable."`
-- **Bark / Wood**: `"A high quality top-down seamless texture of vertical oak wood grain planks. Flat overhead unshaded diffuse albedo map, uniform lighting, no shadows, seamless tileable."`
-
-**Applying Generated Textures**:
-Pass the resulting image URL or base64 data URI directly to `modeler_create_material`:
+**Step 2: Register & Apply to Mesh**
+Pass the generated image path or data URL directly to `modeler_generate_texture` with `imageUrl`, or to `modeler_create_material`:
 
 ```json
 {
-  "materialName": "SandPBRMat",
-  "textureUrl": "https://... or data:image/png;base64,...",
-  "uScale": 4,
-  "vScale": 4,
-  "roughness": 0.9,
-  "metallic": 0.0
+  "tool": "modeler_generate_texture",
+  "prompt": "Gray lunar sand",
+  "imageUrl": "/Users/dpeer/.../generated_image.png",
+  "applyToMesh": "MoonSurface",
+  "uvScale": 4
 }
 ```
+`modeler_generate_texture` automatically computes a matching tangent-space normal map, embeds the textures in the scene, and binds them to the mesh.
 
-### B. When the LLM does NOT have an Image Generator (3 Powerful Offline Alternatives)
+### B. Fallback: When the Model does NOT have an Image Generator (Built-in Procedural)
 
-Models without image generation tools can achieve stunning, seamless textures using these three approaches:
+When working without external or built-in image generators, ALWAYS fall back to the built-in procedural synthesizer:
 
-1. **Built-in Procedural Textures (`proceduralTexture` in `modeler_create_material`)**:
+1. **`modeler_generate_texture` (Built-in Synthesizer)**:
+   Runs instantly and offline, creating tileable PBR diffuse and normal maps:
+   ```json
+   {
+     "tool": "modeler_generate_texture",
+     "prompt": "Weathered dark dungeon cobblestone floor with mossy crevices",
+     "style": "cobblestone",
+     "size": 512,
+     "applyToMesh": "DungeonWall"
+   }
+   ```
+
+2. **Built-in Procedural Textures (`proceduralTexture` in `modeler_create_material`)**:
    Mesh Editor contains a built-in mathematical procedural texture generator that runs instantly and offline.
    - **Supported Types**: `sand`, `tiles`, `grass`, `fabric`, `wood`, `stone`, `marble`, `brick`, `metal`, `checker`, `grid`, `noise`, `gradient`.
    - **Parameters**: `primaryColor`, `secondaryColor`, `scale`, `uScale`, `vScale`.
@@ -127,7 +136,7 @@ Models without image generation tools can achieve stunning, seamless textures us
      }
      ```
 
-2. **Custom Procedural 2D Canvas in `modeler_execute_babylon_code` (`DynamicTexture`)**:
+3. **Custom Procedural 2D Canvas in `modeler_execute_babylon_code` (`DynamicTexture`)**:
    LLMs can generate any mathematical pattern using standard HTML5 Canvas 2D methods directly in code:
 
    ```javascript
@@ -233,3 +242,10 @@ To avoid crude, wooden, or blocky results, prefer these high-level parametric to
    - Marks Smart Seams (`seamMode: "sharp_edges" | "cylindrical" | "box"`), unfolds UV islands (`method: "seam_unwrap"`), normalizes uniform **Texel Density** (`targetTexelDensity: 256` px/m at `textureSize: 1024`), and packs islands into `[0, 1]` UV space without overlaps (`packIslands: true`, `paddingPixels: 4`).
 12. **High-to-Low-Poly Normal Map & AO Baking (`modeler_bake_textures`)**:
    - Projects micro-details (grooves, bevels, pores, bolts) from a high-poly sculpt onto a low-poly game mesh using an automatic smooth-normal **Projection Cage** (`cageOffset: 0.05`, `bakeNormals: true`, `bakeAO: true`, `dilationPixels: 4`, `applyToMaterial: true`).
+13. **AI Texture Synthesis (`modeler_generate_texture`)**:
+   - Generates seamless tileable 2D PBR Albedo and Tangent-Space Normal Map textures from a natural language `prompt` (styles: `"cobblestone"`, `"stone"`, `"brick"`, `"wood"`, `"metal"`, `"rust"`, `"scifi"`, `"marble"`, `"lava"`, `"moss"`, `"scales"`, `"fabric"`, `"runes"`, `"decal"`), embeds them in the scene, registers a `PBRMaterial`, and optionally applies them directly via `applyToMesh`.
+14. **3D Extruded Typography (`modeler_create_text_mesh`)**:
+   - Builds or updates 3D extruded text meshes (`text`, `font: "kenney_future" | "droid_sans_bold" | "droid_sans_regular"`, `size`, `depth`, `resolution`, `color`, `emissiveColor`).
+15. **Surface Decal Painting & Mesh Fusion (`modeler_decal`)**:
+   - Stamps 2D decals (`decalType`: `"bullet_hole"`, `"cracks"`, `"rust_stain"`, `"splatter"`, `"glowing_rune"`, `"hazard_stripes"`, `"rivets_plate"`, `"star_emblem"`, `"ivy_leaves"`, `"vines"`, `"bush"`, `"flowers_colorful_lg"`, `"old_stones"`, `"water_puddle"`, or a custom `prompt`) onto a target mesh (`face: "front" | "back" | "top" | "bottom" | "left" | "right"` or explicit `position`/`normal`). Pass `mergeIntoMesh: true` or `action: "merge"` to fuse decals into the target mesh (also performed automatically on export).
+

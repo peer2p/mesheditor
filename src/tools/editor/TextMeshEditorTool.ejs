@@ -1,0 +1,137 @@
+<div id="dialog-text-mesh" class="floating-dialog" style="top: 150px; right: 365px; width: 340px; display: none">
+  <div class="dialog-header">
+    <span class="dialog-title"><i class="app-icon" data-lucide="type"></i> 3D Text</span>
+    <div class="dialog-actions">
+      <button class="dialog-btn btn-help" title="Help &amp; Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
+      <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
+      <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
+    </div>
+  </div>
+  <div class="dialog-body sculpt-tool-body">
+    <div id="textMeshSelectedBadge" class="tool-help-box">
+      Enter text and click <strong>Create 3D Text</strong>, or select an existing 3D text mesh to edit it.
+    </div>
+
+    <!-- 1. Typography & Font -->
+    <div class="tool-control-group">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="type"></i> Typography &amp; Font</div>
+      <div class="tool-row" style="margin-top: 4px;">
+        <label class="tool-label" for="textMeshInput" style="min-width: 78px;">Text</label>
+        <input
+          type="text"
+          id="textMeshInput"
+          class="tool-input"
+          style="flex: 1;"
+          value="Hello 3D"
+          placeholder="Enter 3D text..."
+        />
+      </div>
+
+      <div class="tool-row" style="margin-top: 4px;">
+        <label class="tool-label" for="textMeshFontSelect" style="min-width: 78px;">Font</label>
+        <select id="textMeshFontSelect" class="tool-select" style="flex: 1;">
+          <option value="assets/fonts/Kenney_Future_Regular.json" selected>Kenney Future</option>
+          <option value="assets/fonts/Droid_Sans_Bold.json">Droid Sans Bold</option>
+          <option value="assets/fonts/Droid_Sans_Regular.json">Droid Sans Regular</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 2. 3D Extrusion Geometry -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="box"></i> 3D Extrusion Geometry</div>
+
+      <div class="sculpt-slider-row" style="margin-top: 4px;">
+        <div class="sculpt-slider-header">
+          <label class="sculpt-slider-label" for="textMeshSizeRange">Character Size</label>
+          <input type="number" id="textMeshSizeNum" class="tool-number" min="0.1" max="20" step="0.1" value="1.0" style="width: 58px; text-align: right;" aria-label="Font Size Value" />
+        </div>
+        <input type="range" id="textMeshSizeRange" min="0.1" max="10" step="0.1" value="1.0" class="tool-range" />
+      </div>
+
+      <div class="sculpt-slider-row" style="margin-top: 6px;">
+        <div class="sculpt-slider-header">
+          <label class="sculpt-slider-label" for="textMeshDepthRange">Extrusion Depth</label>
+          <input type="number" id="textMeshDepthNum" class="tool-number" min="0.01" max="10" step="0.05" value="0.25" style="width: 58px; text-align: right;" aria-label="Extrusion Depth Value" />
+        </div>
+        <input type="range" id="textMeshDepthRange" min="0.02" max="5" step="0.02" value="0.25" class="tool-range" />
+      </div>
+
+      <div class="sculpt-slider-row" style="margin-top: 6px;">
+        <div class="sculpt-slider-header">
+          <label class="sculpt-slider-label" for="textMeshResolutionRange">Curve Resolution</label>
+          <input type="number" id="textMeshResolutionNum" class="tool-number" min="1" max="32" step="1" value="8" style="width: 58px; text-align: right;" aria-label="Curve Resolution Value" />
+        </div>
+        <input type="range" id="textMeshResolutionRange" min="1" max="24" step="1" value="8" class="tool-range" />
+      </div>
+    </div>
+
+    <!-- 3. Surface Material -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-section-title"><i class="app-icon" data-lucide="palette"></i> PBR Material</div>
+
+      <div class="sculpt-options-row" style="margin-top: 4px;">
+        <label class="sculpt-slider-label" for="textMeshColorPicker">Base Albedo Color</label>
+        <div class="path-extrusion-color-row">
+          <input
+            type="color"
+            id="textMeshColorPicker"
+            value="#3b82f6"
+            class="path-extrusion-color-input"
+          />
+          <span id="textMeshColorHex" class="path-extrusion-color-hex">#3b82f6</span>
+        </div>
+      </div>
+
+      <div class="sculpt-slider-row" style="margin-top: 6px;">
+        <div class="sculpt-slider-header">
+          <label class="sculpt-slider-label" for="textMeshRoughnessRange">Roughness</label>
+          <span id="textMeshRoughnessVal" class="sculpt-slider-val">0.35</span>
+        </div>
+        <input type="range" id="textMeshRoughnessRange" min="0" max="1" step="0.05" value="0.35" class="tool-range" />
+      </div>
+
+      <div class="sculpt-slider-row" style="margin-top: 4px;">
+        <div class="sculpt-slider-header">
+          <label class="sculpt-slider-label" for="textMeshMetallicRange">Metallic</label>
+          <span id="textMeshMetallicVal" class="sculpt-slider-val">0.20</span>
+        </div>
+        <input type="range" id="textMeshMetallicRange" min="0" max="1" step="0.05" value="0.20" class="tool-range" />
+      </div>
+
+      <div class="sculpt-options-row" style="margin-top: 4px; gap: 10px;">
+        <label class="sculpt-slider-label" for="textMeshEmissivePicker">Emissive Glow</label>
+        <input
+          type="color"
+          id="textMeshEmissivePicker"
+          value="#000000"
+          class="path-extrusion-color-input"
+        />
+        <input type="range" id="textMeshEmissiveIntensityRange" min="0" max="3" step="0.1" value="0" class="tool-range" style="flex: 1;" aria-label="Emissive Glow Intensity" />
+      </div>
+    </div>
+
+    <!-- 4. Placement & Actions -->
+    <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
+      <div class="sculpt-options-row">
+        <label class="sculpt-checkbox-label">
+          <input type="checkbox" id="textMeshSurfacePlaceCheck" />
+          <span><strong>Shift + Click</strong> 3D surface to stamp</span>
+        </label>
+      </div>
+
+      <button type="button" id="btnCreateTextMesh" class="tool-btn tool-btn-primary btn-block" style="width: 100%; height: 32px; margin-top: 6px;">
+        <i class="app-icon" data-lucide="plus-circle"></i> Create 3D Text
+      </button>
+
+      <div class="sculpt-grid-2" style="margin-top: 6px;">
+        <button type="button" id="btnUpdateTextMesh" class="sculpt-btn" disabled title="Update currently selected 3D Text mesh">
+          <i class="app-icon" data-lucide="refresh-cw"></i> Update Selected
+        </button>
+        <button type="button" id="btnDuplicateTextMesh" class="sculpt-btn" disabled title="Duplicate selected 3D Text mesh">
+          <i class="app-icon" data-lucide="copy"></i> Duplicate
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

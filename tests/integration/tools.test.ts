@@ -103,11 +103,11 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
   });
 
   describe('2. ToolRegistry Management', () => {
-    it('initializes default registry with all 41 built-in modeling tools', () => {
+    it('initializes default registry with all 44 built-in modeling tools', () => {
       const registry = createDefaultToolRegistry();
       const allTools = registry.getAll();
 
-      expect(allTools.length).toBe(41);
+      expect(allTools.length).toBe(44);
       expect(registry.has('modeler_get_scene_info')).toBe(true);
       expect(registry.has('modeler_plan_model')).toBe(true);
       expect(registry.has('modeler_create_primitive')).toBe(true);
@@ -149,9 +149,12 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       expect(registry.has('modeler_uv_unwrap')).toBe(true);
       expect(registry.has('modeler_bake_textures')).toBe(true);
       expect(registry.has('modeler_rig_and_weight_paint')).toBe(true);
+      expect(registry.has('modeler_generate_texture')).toBe(true);
+      expect(registry.has('modeler_create_text_mesh')).toBe(true);
+      expect(registry.has('modeler_decal')).toBe(true);
 
       const openAiDefs = registry.getOpenAITools();
-      expect(openAiDefs.length).toBe(41);
+      expect(openAiDefs.length).toBe(44);
       expect(openAiDefs.every((d) => d.type === 'function' && typeof d.function.name === 'string')).toBe(true);
     });
 
@@ -268,9 +271,9 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
   });
 
   describe('4. Tool Abstraction, In-App Help Guides & Dialog Wiring', () => {
-    it('provides unified ToolInterface metadata and comprehensive English help text for all 17 editor tools', () => {
+    it('provides unified ToolInterface metadata and comprehensive English help text for all 20 editor tools', () => {
       const editorTools = getBuiltinEditorTools();
-      expect(editorTools.length).toBe(17);
+      expect(editorTools.length).toBe(20);
 
       const requiredTools = [
         'scene_outliner',
@@ -290,6 +293,9 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
         'scene_environment',
         'animation_player',
         'rigging_skinning',
+        'ai_texture_generator',
+        'text_mesh',
+        'decal_painter',
       ];
 
       for (const name of requiredTools) {
@@ -437,7 +443,7 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
 
     it('instantiates all decentralized editor tool classes with self-contained configurations and help guides', () => {
       const tools = createBuiltinEditorTools();
-      expect(tools.length).toBe(17);
+      expect(tools.length).toBe(20);
 
       const outliner = new OutlinerEditorTool();
       expect(outliner.name).toBe('scene_outliner');
@@ -802,6 +808,121 @@ describe('Modular Tools Architecture (ToolInterface, AbstractTool, ToolRegistry)
       const procMat = service.scene.getMaterialByName('ProcBrickMat') as any;
       expect(procMat.bumpTexture).toBeDefined();
       expect(procMat.bumpTexture.name).toContain('ProcBrickMat_brick_normal');
+    });
+  });
+
+  describe('8. AI Texture Generator, 3D Text & Decal Painter + Export Fusion', () => {
+    it('generates textures from prompts via AITextureGenerator and modeler_generate_texture tool and applies to mesh', async () => {
+      await service.aiAgent.executeToolCall('modeler_create_primitive', {
+        shape: 'box',
+        name: 'DungeonWall',
+        options: { size: 2 },
+      });
+
+      const genRes = await service.aiAgent.executeToolCall('modeler_generate_texture', {
+        prompt: 'Weathered dark dungeon cobblestone floor with mossy crevices',
+        size: 256,
+        seamless: true,
+        generateNormalMap: true,
+        applyToMesh: 'DungeonWall',
+      });
+
+      const parsed = JSON.parse(genRes);
+      expect(parsed.status).toBe('ok');
+      expect(parsed.style).toBe('cobblestone');
+      expect(parsed.appliedToMeshes).toContain('DungeonWall');
+
+      const history = service.aiTextureGenerator.getHistory();
+      expect(history.length).toBeGreaterThanOrEqual(1);
+      expect(history[0].albedoDataUrl).toMatch(/^data:image\/png;base64,/);
+      expect(history[0].normalDataUrl).toMatch(/^data:image\/png;base64,/);
+
+      const wallMesh = service.importedMeshes.find((m) => m.name === 'DungeonWall');
+      expect(wallMesh?.material).toBeDefined();
+    });
+
+    it('creates and updates 3D extruded text meshes via TextMeshController and modeler_create_text_mesh tool', async () => {
+      const createRes = await service.aiAgent.executeToolCall('modeler_create_text_mesh', {
+        text: 'HERO',
+        name: 'HeroSign',
+        font: 'kenney_future',
+        size: 1.2,
+        depth: 0.3,
+        resolution: 6,
+        color: '#f59e0b',
+        position: [0, 1, 0],
+      });
+
+      const parsed = JSON.parse(createRes);
+      expect(parsed.status).toBe('ok');
+      expect(parsed.meshName).toBe('HeroSign');
+      expect(parsed.vertices).toBeGreaterThan(0);
+
+      const signMesh = service.importedMeshes.find((m) => m.name === 'HeroSign');
+      expect(signMesh).toBeDefined();
+      expect(service.textMeshController.isTextMesh(signMesh)).toBe(true);
+
+      // Update the 3D text mesh in-place
+      const updateRes = await service.aiAgent.executeToolCall('modeler_create_text_mesh', {
+        targetMesh: 'HeroSign',
+        text: 'VICTORY',
+        size: 1.5,
+        depth: 0.4,
+        color: '#10b981',
+      });
+      const parsedUpdate = JSON.parse(updateRes);
+      expect(parsedUpdate.status).toBe('ok');
+
+      const updatedMesh = service.importedMeshes.find((m) => m.name === 'HeroSign');
+      expect(updatedMesh).toBeDefined();
+      expect(service.textMeshController.getTextConfig(updatedMesh!)?.text).toBe('VICTORY');
+    });
+
+    it('places decals on a mesh and fuses/merges them into the target mesh via DecalController and modeler_decal tool', async () => {
+      await service.aiAgent.executeToolCall('modeler_create_primitive', {
+        shape: 'box',
+        name: 'ArmorCrate',
+        options: { size: 2 },
+      });
+
+      const crateBefore = service.importedMeshes.find((m) => m.name === 'ArmorCrate')!;
+      expect(crateBefore).toBeDefined();
+      const initialVerts = crateBefore.getTotalVertices();
+
+      // Place two decals onto ArmorCrate
+      const placeRes1 = await service.aiAgent.executeToolCall('modeler_decal', {
+        action: 'place',
+        targetMesh: 'ArmorCrate',
+        decalType: 'bullet_hole',
+        face: 'front',
+        size: 0.8,
+      });
+      expect(JSON.parse(placeRes1).status).toBe('ok');
+
+      const placeRes2 = await service.aiAgent.executeToolCall('modeler_decal', {
+        action: 'place',
+        targetMesh: 'ArmorCrate',
+        prompt: 'Glowing arcane rune seal decal',
+        face: 'top',
+        size: 0.8,
+      });
+      expect(JSON.parse(placeRes2).status).toBe('ok');
+
+      expect(service.decalController.getUnmergedDecals('ArmorCrate').length).toBe(2);
+
+      // Merge decals into the mesh
+      const mergeRes = await service.aiAgent.executeToolCall('modeler_decal', {
+        action: 'merge',
+        targetMesh: 'ArmorCrate',
+      });
+      expect(JSON.parse(mergeRes).status).toBe('ok');
+
+      // Verify decals are now fused into ArmorCrate and no unmerged decals remain
+      expect(service.decalController.getUnmergedDecals('ArmorCrate').length).toBe(0);
+      const crateAfter = service.importedMeshes.find((m) => m.name === 'ArmorCrate')!;
+      expect(crateAfter).toBeDefined();
+      expect(crateAfter.getTotalVertices()).toBeGreaterThan(initialVerts);
+      expect(crateAfter.metadata?.mergedDecalCount).toBe(2);
     });
   });
 });

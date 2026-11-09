@@ -54,6 +54,9 @@ import { SculptController } from './sculpting/SculptController';
 import { UVUnwrapController } from './uv/UVUnwrapController';
 import { TextureBaker } from './baking/TextureBaker';
 import { WeightPaintController } from './rigging/WeightPaintController';
+import { AITextureGenerator } from './textures/AITextureGenerator';
+import { TextMeshController } from './textMesh/TextMeshController';
+import { DecalController } from './decals/DecalController';
 import {
   BevelModifierOptions,
   NonDestructiveCSGMetadata,
@@ -101,6 +104,9 @@ export class MeshEditorService {
   public uvUnwrapController: UVUnwrapController;
   public textureBaker: TextureBaker;
   public weightPaintController: WeightPaintController;
+  public aiTextureGenerator: AITextureGenerator;
+  public textMeshController: TextMeshController;
+  public decalController: DecalController;
   public get pathWays(): PathExtrusionController {
     return this.pathExtrusion;
   }
@@ -211,6 +217,9 @@ export class MeshEditorService {
     this.uvUnwrapController = new UVUnwrapController(this);
     this.textureBaker = new TextureBaker(this);
     this.weightPaintController = new WeightPaintController(this);
+    this.aiTextureGenerator = new AITextureGenerator(this);
+    this.textMeshController = new TextMeshController(this);
+    this.decalController = new DecalController(this);
     const defaultAtlas = this.textureAtlasManager.getAtlases()[0];
     if (defaultAtlas) {
       this.voxelPainter.useTextureAtlas(defaultAtlas.id);
@@ -395,6 +404,8 @@ export class MeshEditorService {
     this.uvUnwrapController?.dispose();
     this.textureBaker?.dispose();
     this.weightPaintController?.dispose();
+    this.decalController?.setActive(false);
+    this.textMeshController?.setSurfacePlacementActive(false);
     if (this.engine) {
       this.engine.dispose();
     }
@@ -609,6 +620,8 @@ export class MeshEditorService {
           !this.facetEditorActive &&
           !this.voxelPainter?.isActive &&
           !this.pathExtrusion?.isActive &&
+          !this.decalController?.isActive &&
+          !(this.textMeshController?.isSurfacePlacementActive && evt?.shiftKey) &&
           !this.isSculptModeActive()
         ) {
           this.isMarqueeCandidate = true;
@@ -684,8 +697,14 @@ export class MeshEditorService {
           return;
         }
 
-        // If voxel painter, path extrusion or sculpt tool is active, ignore default mesh selection
-        if (this.voxelPainter?.isActive || this.pathExtrusion?.isActive || this.isSculptModeActive()) {
+        // If voxel painter, path extrusion, decal painter, text surface placement or sculpt tool is active, ignore default mesh selection
+        if (
+          this.voxelPainter?.isActive ||
+          this.pathExtrusion?.isActive ||
+          this.decalController?.isActive ||
+          (this.textMeshController?.isSurfacePlacementActive && evt?.shiftKey) ||
+          this.isSculptModeActive()
+        ) {
           return;
         }
 
@@ -753,8 +772,20 @@ export class MeshEditorService {
     if (!mesh) return false;
     if (mesh === this.gridMesh || mesh === this.facetHighlightMesh) return true;
     const name = mesh.name || '';
-    if (name.startsWith('editor_') || name.startsWith('gizmo') || name.startsWith('Lines')) return true;
+    if (
+      name.startsWith('editor_') ||
+      name.startsWith('gizmo') ||
+      name.startsWith('Lines') ||
+      name === 'decal_projector_box' ||
+      name === 'decal_preview_mesh'
+    ) {
+      return true;
+    }
     return !!((mesh as any).metadata && (mesh as any).metadata.isEditorHelper);
+  }
+
+  public isInternalHelperMesh(mesh: AbstractMesh | TransformNode): boolean {
+    return this.isEditorHelper(mesh);
   }
 
   public isAnyGizmoDragging(): boolean {
@@ -6186,6 +6217,11 @@ export class MeshEditorService {
     const format = opts.format.toLowerCase() as ExportOptions['format'];
     this.events.onStatusChanged?.(`Exporting as ${format.toUpperCase()}...`, true);
 
+    // Fuse any unmerged decals into their target meshes prior to export
+    if (this.decalController && this.decalController.getUnmergedDecals().length > 0) {
+      this.decalController.mergeAllDecalsIntoMeshes();
+    }
+
     const shouldExport = (node: any) => this.shouldExportNode(node, opts.selectedOnly);
 
     try {
@@ -6333,6 +6369,9 @@ export class MeshEditorService {
   }
 
   public async exportToGLBBlob(filename: string = 'model'): Promise<Blob> {
+    if (this.decalController && this.decalController.getUnmergedDecals().length > 0) {
+      this.decalController.mergeAllDecalsIntoMeshes();
+    }
     const shouldExport = (node: any) => this.shouldExportNode(node, false);
     const glb = await GLTF2Export.GLBAsync(this.scene, filename, {
       shouldExportNode: shouldExport,
@@ -6435,6 +6474,9 @@ export class MeshEditorService {
     options?: Partial<ModelCompressorOptions>,
     filename?: string
   ): Promise<{ blob: Blob; filename: string; size: number }> {
+    if (this.decalController && this.decalController.getUnmergedDecals().length > 0) {
+      this.decalController.mergeAllDecalsIntoMeshes();
+    }
     const targetMeshes = this.selectedMesh
       ? [this.selectedMesh]
       : this.importedMeshes.filter((m) => !m.isDisposed() && m.isEnabled());
