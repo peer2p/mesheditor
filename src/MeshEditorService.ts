@@ -1168,13 +1168,14 @@ export class MeshEditorService {
     const list: TransformNode[] = [];
     for (const g of this.groups) {
       if (g.isDisposed()) continue;
+      if (typeof g.isEnabled === 'function' && !g.isEnabled()) continue;
       list.push(g);
       for (const m of g.getChildren()) {
-        if (m instanceof Mesh && !this.isEditorHelper(m)) list.push(m);
+        if (m instanceof Mesh && !this.isEditorHelper(m) && (!m.isEnabled || m.isEnabled())) list.push(m);
       }
     }
     for (const m of this.importedMeshes) {
-      if (!this.isEditorHelper(m) && !m.isDisposed() && (!m.parent || !this.isGroupNode(m.parent))) {
+      if (!this.isEditorHelper(m) && !m.isDisposed() && (!m.isEnabled || m.isEnabled()) && (!m.parent || !this.isGroupNode(m.parent))) {
         list.push(m);
       }
     }
@@ -1201,6 +1202,7 @@ export class MeshEditorService {
     this.events.onHistoryChanged?.(this.canUndo(), this.canRedo());
     this.events.onToast?.(`Undo: ${action.name}`, 'info');
     this.updateStats();
+    this.events.onSceneModified?.();
   }
 
   public redo(): void {
@@ -1211,6 +1213,7 @@ export class MeshEditorService {
     this.events.onHistoryChanged?.(this.canUndo(), this.canRedo());
     this.events.onToast?.(`Redo: ${action.name}`, 'info');
     this.updateStats();
+    this.events.onSceneModified?.();
   }
 
   public canUndo(): boolean {

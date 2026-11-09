@@ -227,12 +227,21 @@ describe('Scene Hierarchy Tree, Selection-Aware Operations & Loose Parts Separat
       expect(torso.isEnabled()).toBe(false);
       expect(limb.isEnabled()).toBe(false);
 
-      // Undo restores parent and all children
+      // Scene Objects Outliner tree must NOT contain deleted nodes
+      const outliner = container.querySelector('#outlinerTreeContainer');
+      expect(outliner?.textContent).not.toContain('ParentArmature');
+      expect(outliner?.textContent).not.toContain('Torso');
+      expect(outliner?.textContent).not.toContain('Limb');
+
+      // Undo restores parent and all children in both service and Outliner
       service.undo();
       expect(service.importedMeshes).toContain(torso);
       expect(service.importedMeshes).toContain(limb);
       expect(torso.isEnabled()).toBe(true);
       expect(limb.isEnabled()).toBe(true);
+      expect(outliner?.textContent).toContain('ParentArmature');
+      expect(outliner?.textContent).toContain('Torso');
+      expect(outliner?.textContent).toContain('Limb');
     });
 
     it('filters hierarchy tree with search input and auto-expands branches with matching objects', () => {

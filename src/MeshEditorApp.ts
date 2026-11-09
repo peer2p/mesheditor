@@ -3161,6 +3161,7 @@ export class MeshEditorApp {
 
     const isValidSceneNode = (n: any): boolean => {
       if (!n || n.isDisposed()) return false;
+      if (typeof n.isEnabled === 'function' && !n.isEnabled()) return false;
       if (this.service.isEditorHelper(n)) return false;
       const className = n.getClassName ? n.getClassName() : '';
       if (className.includes('Camera') || className.includes('Light')) return false;
@@ -4035,7 +4036,7 @@ export class MeshEditorApp {
 
   public updateCSGGUI(): void {
     const validMeshes = this.service.importedMeshes.filter(
-      (m) => !this.service.isEditorHelper(m) && m.name !== '__root__' && m.getTotalVertices() > 0
+      (m) => !this.service.isEditorHelper(m) && m.name !== '__root__' && m.getTotalVertices() > 0 && (!m.isEnabled || m.isEnabled())
     );
     const meshNames = validMeshes.map((m) => m.name);
     const options = ['None', ...meshNames];
@@ -7169,7 +7170,7 @@ export class MeshEditorApp {
     if (selectHighPoly) {
       const prevVal = selectHighPoly.value;
       const validMeshes = this.service.importedMeshes.filter(
-        (m) => !this.service.isEditorHelper(m) && !m.isDisposed()
+        (m) => !this.service.isEditorHelper(m) && !m.isDisposed() && (!m.isEnabled || m.isEnabled())
       );
       selectHighPoly.innerHTML = `<option value="auto">Auto / Active High-Poly</option>`;
       for (const m of validMeshes) {
@@ -7389,12 +7390,12 @@ export class MeshEditorApp {
     const resolveLowPoly = (): Mesh | null => {
       const val = selectLow?.value || 'selected';
       if (val !== 'selected') {
-        const found = this.service.importedMeshes.find((m) => m.name === val && !m.isDisposed());
+        const found = this.service.importedMeshes.find((m) => m.name === val && !m.isDisposed() && (!m.isEnabled || m.isEnabled()));
         if (found) return found;
       }
       return (
         this.service.selectedMesh ||
-        this.service.importedMeshes.find((m) => !this.service.isEditorHelper(m) && !m.isDisposed()) ||
+        this.service.importedMeshes.find((m) => !this.service.isEditorHelper(m) && !m.isDisposed() && (!m.isEnabled || m.isEnabled())) ||
         null
       );
     };
@@ -7402,7 +7403,7 @@ export class MeshEditorApp {
     const resolveHighPoly = (low: Mesh | null): Mesh | null => {
       const val = selectHigh?.value || 'self';
       if (val !== 'self') {
-        const found = this.service.importedMeshes.find((m) => m.name === val && !m.isDisposed());
+        const found = this.service.importedMeshes.find((m) => m.name === val && !m.isDisposed() && (!m.isEnabled || m.isEnabled()));
         if (found) return found;
       }
       return low;
@@ -7534,7 +7535,7 @@ export class MeshEditorApp {
     const selectLow = this.getElement<HTMLSelectElement>('selectBakeLowPoly');
     const selectHigh = this.getElement<HTMLSelectElement>('selectBakeHighPoly');
     const validMeshes = this.service.importedMeshes.filter(
-      (m) => !this.service.isEditorHelper(m) && !m.isDisposed()
+      (m) => !this.service.isEditorHelper(m) && !m.isDisposed() && (!m.isEnabled || m.isEnabled())
     );
 
     if (selectLow) {

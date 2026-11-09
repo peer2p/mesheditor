@@ -30,6 +30,13 @@ export class DeleteMeshTool extends AbstractTool {
         m.dispose();
       }
     }
+    if (deleted.length > 0) {
+      if (context.service.selectedMesh && deleted.includes(context.service.selectedMesh.name)) {
+        context.service.selectMesh(null);
+      }
+      context.service.updateStats();
+      context.service.events.onSceneModified?.();
+    }
     return JSON.stringify({
       status: 'ok',
       deleted,
