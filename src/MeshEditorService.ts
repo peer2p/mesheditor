@@ -5014,38 +5014,16 @@ export class MeshEditorService {
     const tex = new Texture(url, this.scene, false, false, Texture.NEAREST_SAMPLINGMODE);
     if (name) tex.name = name;
 
-    const lowerName = (name || url).toLowerCase();
-    const isPotentiallyTransparent =
-      lowerName.endsWith('.png') ||
-      lowerName.endsWith('.webp') ||
-      lowerName.endsWith('.gif') ||
-      lowerName.endsWith('.svg') ||
-      url.startsWith('data:image/png') ||
-      url.startsWith('data:image/webp');
-
-    if (isPotentiallyTransparent) {
-      tex.hasAlpha = true;
-    }
+    // Default texture alpha to false - the user decides whether to enable alpha and transparency
+    tex.hasAlpha = false;
 
     if (selMat instanceof PBRMaterial) {
       selMat.albedoTexture = tex;
-      if (isPotentiallyTransparent) {
-        selMat.useAlphaFromAlbedoTexture = true;
-        if (
-          selMat.transparencyMode === PBRMaterial.PBRMATERIAL_OPAQUE ||
-          selMat.transparencyMode === undefined ||
-          selMat.transparencyMode === null
-        ) {
-          selMat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATESTANDBLEND;
-        }
-        selMat.backFaceCulling = false;
-      }
+      selMat.useAlphaFromAlbedoTexture = false;
+      selMat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
     } else if (selMat instanceof StandardMaterial) {
       selMat.diffuseTexture = tex;
-      if (isPotentiallyTransparent) {
-        selMat.useAlphaFromDiffuseTexture = true;
-        selMat.backFaceCulling = false;
-      }
+      selMat.useAlphaFromDiffuseTexture = false;
     }
     this.events.onSceneModified?.();
     this.events.onToast?.(`Applied texture to material "${selMat.name}"`, 'success');
@@ -5292,8 +5270,8 @@ export class MeshEditorService {
       if (mode !== 0) mat.backFaceCulling = false;
     }
     const tex = this.getActiveMaterialTexture();
-    if (tex && mode !== 0) {
-      tex.hasAlpha = true;
+    if (tex) {
+      tex.hasAlpha = mode !== 0;
     }
     this.events.onSceneModified?.();
   }
@@ -5460,16 +5438,8 @@ export class MeshEditorService {
             .replace(/^(normal|bump)[_\-.]/i, '')
         : baseNameWithoutExt;
 
-      const isPotentiallyTransparent =
-        !isBumpMap &&
-        (lowerFileName.endsWith('.png') ||
-          lowerFileName.endsWith('.webp') ||
-          lowerFileName.endsWith('.gif') ||
-          lowerFileName.endsWith('.svg'));
-
-      if (isPotentiallyTransparent) {
-        tex.hasAlpha = true;
-      }
+      // Default texture alpha to false - the user decides whether to enable transparency
+      tex.hasAlpha = false;
 
       let fileAppliedCount = 0;
 
@@ -5530,17 +5500,8 @@ export class MeshEditorService {
             }
           } else if (mat instanceof PBRMaterial) {
             mat.albedoTexture = tex;
-            if (isPotentiallyTransparent) {
-              mat.useAlphaFromAlbedoTexture = true;
-              if (
-                mat.transparencyMode === PBRMaterial.PBRMATERIAL_OPAQUE ||
-                mat.transparencyMode === undefined ||
-                mat.transparencyMode === null
-              ) {
-                mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATESTANDBLEND;
-              }
-              mat.backFaceCulling = false;
-            }
+            mat.useAlphaFromAlbedoTexture = false;
+            mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
             if (mat.bumpTexture instanceof Texture) {
               mat.bumpTexture.uOffset = tex.uOffset;
               mat.bumpTexture.vOffset = tex.vOffset;
@@ -5553,10 +5514,7 @@ export class MeshEditorService {
             fileAppliedCount++;
           } else if (mat instanceof StandardMaterial) {
             mat.diffuseTexture = tex;
-            if (isPotentiallyTransparent) {
-              mat.useAlphaFromDiffuseTexture = true;
-              mat.backFaceCulling = false;
-            }
+            mat.useAlphaFromDiffuseTexture = false;
             if (mat.bumpTexture instanceof Texture) {
               mat.bumpTexture.uOffset = tex.uOffset;
               mat.bumpTexture.vOffset = tex.vOffset;
@@ -5592,17 +5550,8 @@ export class MeshEditorService {
           }
         } else if (selMat instanceof PBRMaterial) {
           selMat.albedoTexture = tex;
-          if (isPotentiallyTransparent) {
-            selMat.useAlphaFromAlbedoTexture = true;
-            if (
-              selMat.transparencyMode === PBRMaterial.PBRMATERIAL_OPAQUE ||
-              selMat.transparencyMode === undefined ||
-              selMat.transparencyMode === null
-            ) {
-              selMat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATESTANDBLEND;
-            }
-            selMat.backFaceCulling = false;
-          }
+          selMat.useAlphaFromAlbedoTexture = false;
+          selMat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
           if (selMat.bumpTexture instanceof Texture) {
             selMat.bumpTexture.uOffset = tex.uOffset;
             selMat.bumpTexture.vOffset = tex.vOffset;
@@ -5615,10 +5564,7 @@ export class MeshEditorService {
           fileAppliedCount++;
         } else if (selMat instanceof StandardMaterial) {
           selMat.diffuseTexture = tex;
-          if (isPotentiallyTransparent) {
-            selMat.useAlphaFromDiffuseTexture = true;
-            selMat.backFaceCulling = false;
-          }
+          selMat.useAlphaFromDiffuseTexture = false;
           if (selMat.bumpTexture instanceof Texture) {
             selMat.bumpTexture.uOffset = tex.uOffset;
             selMat.bumpTexture.vOffset = tex.vOffset;
@@ -5645,24 +5591,12 @@ export class MeshEditorService {
             }
           } else if (mat instanceof PBRMaterial) {
             mat.albedoTexture = tex;
-            if (isPotentiallyTransparent) {
-              mat.useAlphaFromAlbedoTexture = true;
-              if (
-                mat.transparencyMode === PBRMaterial.PBRMATERIAL_OPAQUE ||
-                mat.transparencyMode === undefined ||
-                mat.transparencyMode === null
-              ) {
-                mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHATESTANDBLEND;
-              }
-              mat.backFaceCulling = false;
-            }
+            mat.useAlphaFromAlbedoTexture = false;
+            mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
             fileAppliedCount++;
           } else if (mat instanceof StandardMaterial) {
             mat.diffuseTexture = tex;
-            if (isPotentiallyTransparent) {
-              mat.useAlphaFromDiffuseTexture = true;
-              mat.backFaceCulling = false;
-            }
+            mat.useAlphaFromDiffuseTexture = false;
             fileAppliedCount++;
           }
         }
@@ -6049,7 +5983,9 @@ export class MeshEditorService {
     }
 
     const webpUrl = canvas.toDataURL('image/webp', quality);
-    return new Texture(webpUrl, this.scene, false, false);
+    const newTex = new Texture(webpUrl, this.scene, false, false);
+    newTex.hasAlpha = !!texture.hasAlpha;
+    return newTex;
   }
 
   public replaceTextureInAllMaterials(oldTex: Texture, newTex: Texture): void {

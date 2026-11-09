@@ -448,8 +448,8 @@ export class MeshEditorApp {
     alpha: 1.0,
     wireframe: false,
     backFaceCulling: false,
-    textureAlpha: true,
-    transparencyMode: 'Alpha Test & Blend',
+    textureAlpha: false,
+    transparencyMode: 'Opaque',
     twoSided: true,
     alphaCutOff: 0.5,
     bumpInfo: 'None',
@@ -3118,7 +3118,7 @@ export class MeshEditorApp {
       const trans = this.service.getMaterialTransparencyInfo();
       this.materialParams.textureAlpha = trans.hasAlpha;
       const modeNames = ['Opaque', 'Alpha Test (Cutout)', 'Alpha Blend', 'Alpha Test & Blend'];
-      this.materialParams.transparencyMode = modeNames[trans.mode] ?? 'Alpha Test & Blend';
+      this.materialParams.transparencyMode = modeNames[trans.mode] ?? 'Opaque';
       this.materialParams.twoSided = trans.twoSided;
       this.materialParams.alphaCutOff = trans.alphaCutOff;
 

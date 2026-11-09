@@ -635,6 +635,35 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
       expect(info.alphaCutOff).toBe(0.4);
     });
 
+    it('defaults texture alpha to false when assigning a texture, letting the user decide', () => {
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box' }));
+      service.selectMesh(box);
+      service.createNewMaterialForSelected('TexAlphaMat');
+
+      const dummyPngUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=';
+      const applied = service.applyTextureToSelectedMaterial(dummyPngUrl, 'diffuse.png');
+      expect(applied).toBe(true);
+
+      const tex = service.getActiveMaterialTexture();
+      expect(tex).toBeDefined();
+      expect(tex?.hasAlpha).toBe(false);
+
+      const info = service.getMaterialTransparencyInfo();
+      expect(info.hasAlpha).toBe(false);
+      expect(info.mode).toBe(0); // Opaque
+
+      // User decides to enable texture alpha
+      service.setTextureAlpha(true);
+      expect(service.getActiveMaterialTexture()?.hasAlpha).toBe(true);
+      expect(service.getMaterialTransparencyInfo().hasAlpha).toBe(true);
+
+      // User decides to disable texture alpha
+      service.setTextureAlpha(false);
+      expect(service.getActiveMaterialTexture()?.hasAlpha).toBe(false);
+      expect(service.getMaterialTransparencyInfo().hasAlpha).toBe(false);
+      expect(service.getMaterialTransparencyInfo().mode).toBe(0);
+    });
+
     it('supports bump and normal mapping with intensity level and axis inversion', () => {
       const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box' }));
       service.selectMesh(box);
