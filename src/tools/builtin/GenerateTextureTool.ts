@@ -154,7 +154,7 @@ export class GenerateTextureTool extends AbstractTool {
       context.materialRegistry.set(matName, mat);
     }
 
-    mat.albedoColor = Color3.White();
+    const isDecal = item.style === 'decal';
     mat.roughness = item.roughness;
     mat.metallic = item.metallic;
 
@@ -168,21 +168,36 @@ export class GenerateTextureTool extends AbstractTool {
         false,
         false,
         Texture.TRILINEAR_SAMPLINGMODE,
-        null,
-        null,
-        item.albedoDataUrl,
-        true,
       );
       albedoTex.name = item.embeddedAlbedoName || `${item.name}_albedo.png`;
     }
     albedoTex.uScale = uvScale;
     albedoTex.vScale = uvScale;
-    if (item.style === 'decal') {
-      albedoTex.hasAlpha = true;
-      mat.useAlphaFromAlbedoTexture = true;
-      mat.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+    albedoTex.hasAlpha = isDecal;
+    if (isDecal) {
+      albedoTex.onLoadObservable.addOnce(() => {
+        albedoTex.hasAlpha = true;
+      });
     }
+
+    mat.useAlphaFromAlbedoTexture = isDecal;
+    mat.transparencyMode = isDecal ? PBRMaterial.PBRMATERIAL_ALPHABLEND : PBRMaterial.PBRMATERIAL_OPAQUE;
+    mat.backFaceCulling = !isDecal;
     mat.albedoTexture = albedoTex;
+
+    // Prevent blinding white flash while texture is decoding asynchronously
+    if (albedoTex.isReady()) {
+      mat.albedoColor = Color3.White();
+    } else {
+      try {
+        mat.albedoColor = Color3.FromHexString(item.primaryColor || '#888888');
+      } catch {
+        mat.albedoColor = new Color3(0.5, 0.5, 0.5);
+      }
+      albedoTex.onLoadObservable.addOnce(() => {
+        mat.albedoColor = Color3.White();
+      });
+    }
 
     if (item.normalDataUrl) {
       let normTex = context.scene.textures.find(
@@ -195,15 +210,12 @@ export class GenerateTextureTool extends AbstractTool {
           false,
           false,
           Texture.TRILINEAR_SAMPLINGMODE,
-          null,
-          null,
-          item.normalDataUrl,
-          true,
         );
         normTex.name = item.embeddedNormalName || `${item.name}_normal.png`;
       }
       normTex.uScale = uvScale;
       normTex.vScale = uvScale;
+      normTex.hasAlpha = false;
       normTex.level = Math.max(0.1, Math.min(3.0, item.normalStrength / 2.0));
       mat.bumpTexture = normTex;
     }

@@ -133,6 +133,9 @@ export class CreateMaterialTool extends AbstractTool {
     if ((args.textureUrl || args.albedoTextureUrl) && createTexturesEnabled) {
       const url = String(args.textureUrl || args.albedoTextureUrl);
       const tex = new Texture(url, context.scene, false, false);
+      tex.hasAlpha = false;
+      mat.useAlphaFromAlbedoTexture = false;
+      mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
       tex.uScale = typeof args.uScale === 'number' ? args.uScale : 1;
       tex.vScale = typeof args.vScale === 'number' ? args.vScale : 1;
       mat.albedoTexture = tex;
@@ -145,6 +148,7 @@ export class CreateMaterialTool extends AbstractTool {
     if (rawNormalUrl && createNormalMapsEnabled) {
       const url = String(rawNormalUrl);
       const tex = new Texture(url, context.scene, false, false);
+      tex.hasAlpha = false;
       tex.uScale = typeof args.uScale === 'number' ? args.uScale : 1;
       tex.vScale = typeof args.vScale === 'number' ? args.vScale : 1;
       mat.bumpTexture = tex;
@@ -167,6 +171,9 @@ export class CreateMaterialTool extends AbstractTool {
         });
         const tex = new Texture(dataUrl, context.scene, false, false);
         tex.name = `${matName}_${proc.type}.png`;
+        tex.hasAlpha = false;
+        mat.useAlphaFromAlbedoTexture = false;
+        mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
         tex.uScale =
           proc.uScale !== undefined
             ? Number(proc.uScale)
@@ -194,6 +201,7 @@ export class CreateMaterialTool extends AbstractTool {
           });
           const normTex = new Texture(normalDataUrl, context.scene, false, false);
           normTex.name = `${matName}_${proc.type}_normal.png`;
+          normTex.hasAlpha = false;
           normTex.uScale = tex.uScale;
           normTex.vScale = tex.vScale;
           mat.bumpTexture = normTex;

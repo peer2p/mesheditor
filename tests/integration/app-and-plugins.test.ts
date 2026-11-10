@@ -60,6 +60,33 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
     expect(sceneLoader?.classList.contains('is-hidden')).toBe(true);
   });
 
+  it('styles Create Mesh CTA buttons (Spawn at Origin and Pick & Place in 3D) with tool-btn tool-btn-primary btn-block', () => {
+    app = new MeshEditorApp({
+      container,
+      engine,
+      layoutMode: 'floating',
+    });
+
+    const createContainer = container.querySelector('#gui-create-container');
+    expect(createContainer).not.toBeNull();
+
+    const spawnBtn = Array.from(createContainer!.querySelectorAll('.cr.function')).find(
+      (el) => el.textContent?.includes('Spawn at Origin')
+    );
+    expect(spawnBtn).toBeDefined();
+    expect(spawnBtn?.classList.contains('tool-btn')).toBe(true);
+    expect(spawnBtn?.classList.contains('tool-btn-primary')).toBe(true);
+    expect(spawnBtn?.classList.contains('btn-block')).toBe(true);
+
+    const placeBtn = Array.from(createContainer!.querySelectorAll('.cr.function')).find(
+      (el) => el.textContent?.includes('Pick & Place in 3D')
+    );
+    expect(placeBtn).toBeDefined();
+    expect(placeBtn?.classList.contains('tool-btn')).toBe(true);
+    expect(placeBtn?.classList.contains('tool-btn-primary')).toBe(true);
+    expect(placeBtn?.classList.contains('btn-block')).toBe(true);
+  });
+
   it('keeps color picker palettes visible with elevated z-index across repeated interactions', () => {
     app = new MeshEditorApp({
       container,

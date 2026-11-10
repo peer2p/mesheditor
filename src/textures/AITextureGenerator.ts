@@ -485,7 +485,7 @@ export class AITextureGenerator {
       pbr = new PBRMaterial(matName, this.service.scene);
     }
 
-    pbr.albedoColor = Color3.White();
+    const isDecal = item.style === 'decal';
     pbr.roughness = item.roughness;
     pbr.metallic = item.metallic;
 
@@ -499,21 +499,36 @@ export class AITextureGenerator {
         false,
         false,
         Texture.TRILINEAR_SAMPLINGMODE,
-        null,
-        null,
-        item.albedoDataUrl,
-        true,
       );
       albedoTex.name = item.embeddedAlbedoName || `${item.name}_albedo.png`;
     }
     albedoTex.uScale = uvScale;
     albedoTex.vScale = uvScale;
-    if (item.style === 'decal') {
-      albedoTex.hasAlpha = true;
-      pbr.useAlphaFromAlbedoTexture = true;
-      pbr.transparencyMode = PBRMaterial.PBRMATERIAL_ALPHABLEND;
+    albedoTex.hasAlpha = isDecal;
+    if (isDecal) {
+      albedoTex.onLoadObservable.addOnce(() => {
+        albedoTex.hasAlpha = true;
+      });
     }
+
+    pbr.useAlphaFromAlbedoTexture = isDecal;
+    pbr.transparencyMode = isDecal ? PBRMaterial.PBRMATERIAL_ALPHABLEND : PBRMaterial.PBRMATERIAL_OPAQUE;
+    pbr.backFaceCulling = !isDecal;
     pbr.albedoTexture = albedoTex;
+
+    // Prevent blinding white flash while texture is decoding asynchronously
+    if (albedoTex.isReady()) {
+      pbr.albedoColor = Color3.White();
+    } else {
+      try {
+        pbr.albedoColor = Color3.FromHexString(item.primaryColor || '#888888');
+      } catch {
+        pbr.albedoColor = new Color3(0.5, 0.5, 0.5);
+      }
+      albedoTex.onLoadObservable.addOnce(() => {
+        pbr.albedoColor = Color3.White();
+      });
+    }
 
     if (item.normalDataUrl) {
       let normalTex = this.service.scene.textures.find(
@@ -526,15 +541,14 @@ export class AITextureGenerator {
           false,
           false,
           Texture.TRILINEAR_SAMPLINGMODE,
-          null,
-          null,
-          item.normalDataUrl,
-          true,
         );
         normalTex.name = item.embeddedNormalName || `${item.name}_normal.png`;
       }
       normalTex.uScale = uvScale;
       normalTex.vScale = uvScale;
+      if (normalTex !== albedoTex) {
+        normalTex.hasAlpha = false;
+      }
       normalTex.level = Math.max(0.1, Math.min(3.0, item.normalStrength / 2.0));
       pbr.bumpTexture = normalTex;
     }

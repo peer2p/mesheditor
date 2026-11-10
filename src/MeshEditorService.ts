@@ -5150,6 +5150,7 @@ export class MeshEditorService {
     } else if (texName) {
       tex.name = texName;
     }
+    tex.hasAlpha = false;
 
     const baseTex = this.getActiveMaterialTexture();
     if (baseTex) {
@@ -5923,6 +5924,7 @@ export class MeshEditorService {
     }
     const tex = new Texture(dataUrl, this.scene, false, false);
     tex.name = name;
+    tex.hasAlpha = false;
     this.events.onToast?.(`Embedded texture "${name}" added to scene.`, 'success');
     return tex;
   }

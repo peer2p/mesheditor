@@ -345,7 +345,7 @@ export function generateNormalMapFromCanvas(
         outData[idx] = Math.round((nx * 0.5 + 0.5) * 255);
         outData[idx + 1] = Math.round((ny * 0.5 + 0.5) * 255);
         outData[idx + 2] = Math.round((nz * 0.5 + 0.5) * 255);
-        outData[idx + 3] = Math.round(Math.min(1, Math.max(0, center)) * 255);
+        outData[idx + 3] = 255;
       }
     }
 

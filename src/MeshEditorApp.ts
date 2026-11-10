@@ -3334,8 +3334,23 @@ export class MeshEditorApp {
     fCreateMat.add(this.createParams, 'metallic', 0, 1, 0.05).name('Metallic');
     fCreateMat.open();
 
-    this.guiCreate.add(this.createParams, 'createNow').name('Spawn at Origin');
-    this.guiCreate.add(this.createParams, 'clickToPlace').name('Pick & Place in 3D');
+    const ctrlCreateNow = this.guiCreate.add(this.createParams, 'createNow').name('Spawn at Origin');
+    const ctrlClickToPlace = this.guiCreate.add(this.createParams, 'clickToPlace').name('Pick & Place in 3D');
+
+    this.createControllers['createNow'] = ctrlCreateNow;
+    this.createControllers['clickToPlace'] = ctrlClickToPlace;
+
+    const liCreateNow = ctrlCreateNow.domElement.closest('li') || (ctrlCreateNow as any).__li;
+    const liClickToPlace = ctrlClickToPlace.domElement.closest('li') || (ctrlClickToPlace as any).__li;
+
+    if (liCreateNow) {
+      liCreateNow.classList.add('tool-btn', 'tool-btn-primary', 'btn-block');
+      liCreateNow.setAttribute('title', 'Spawn current primitive at the world origin (0, 0, 0)');
+    }
+    if (liClickToPlace) {
+      liClickToPlace.classList.add('tool-btn', 'tool-btn-primary', 'btn-block');
+      liClickToPlace.setAttribute('title', 'Click directly in the 3D viewport to place the primitive on the grid or surface');
+    }
 
     this.updateCreateShapeVisibility(this.createParams.shape);
 
@@ -6754,6 +6769,37 @@ export class MeshEditorApp {
       countBadge.textContent = textures.length.toString();
     }
 
+    const currentCards = gallery.querySelectorAll<HTMLElement>('.embedded-texture-card');
+    if (currentCards.length === textures.length && currentCards.length > 0) {
+      let matches = true;
+      for (let i = 0; i < textures.length; i++) {
+        if (currentCards[i].getAttribute('data-url') !== textures[i].url) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches) {
+        const selMat = this.service.getSelectedMaterial();
+        for (let i = 0; i < textures.length; i++) {
+          const tex = textures[i];
+          const card = currentCards[i];
+          const isAlbedoActive =
+            selMat &&
+            (selMat instanceof PBRMaterial
+              ? (selMat.albedoTexture as Texture)?.url === tex.url
+              : (selMat as StandardMaterial).diffuseTexture &&
+                ((selMat as StandardMaterial).diffuseTexture as Texture).url === tex.url);
+          const isBumpActive =
+            selMat &&
+            (selMat instanceof PBRMaterial || selMat instanceof StandardMaterial) &&
+            (selMat.bumpTexture as Texture)?.url === tex.url;
+
+          card.classList.toggle('active', !!(isAlbedoActive || isBumpActive));
+        }
+        return;
+      }
+    }
+
     gallery.innerHTML = '';
     if (textures.length === 0) {
       const empty = document.createElement('div');
@@ -6767,6 +6813,7 @@ export class MeshEditorApp {
       if (!tex.url) continue;
       const card = document.createElement('div');
       card.className = 'embedded-texture-card';
+      card.setAttribute('data-url', tex.url);
       if (tex.isAtlas) {
         card.classList.add('is-atlas');
       }
@@ -8904,11 +8951,30 @@ export class MeshEditorApp {
 
     const historyList = this.getElement<HTMLElement>('aiTextureHistoryList');
     if (historyList) {
+      const currentThumbs = historyList.querySelectorAll<HTMLButtonElement>('button');
+      if (currentThumbs.length === history.length && currentThumbs.length > 0) {
+        let matches = true;
+        for (let i = 0; i < history.length; i++) {
+          if (currentThumbs[i].getAttribute('data-id') !== history[i].id) {
+            matches = false;
+            break;
+          }
+        }
+        if (matches) {
+          for (let i = 0; i < history.length; i++) {
+            const isSelected = activeItem && activeItem.id === history[i].id;
+            currentThumbs[i].style.borderColor = isSelected ? '#3b82f6' : 'rgba(255,255,255,0.12)';
+          }
+          return;
+        }
+      }
+
       historyList.innerHTML = '';
       for (const item of history) {
         const thumb = document.createElement('button');
         thumb.type = 'button';
         thumb.title = `${item.name}: ${item.prompt}`;
+        thumb.setAttribute('data-id', item.id);
         const isSelected = activeItem && activeItem.id === item.id;
         thumb.style.cssText = `
           height: 52px;
@@ -9246,28 +9312,71 @@ export class MeshEditorApp {
 
     const gallery = this.getElement<HTMLElement>('decalTextureGallery');
     if (gallery) {
-      gallery.innerHTML = '';
-      for (const opt of available) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.title = opt.name;
-        const isSelected = opt.url === ctrl.config.textureUrl;
-        btn.style.cssText = `
-          height: 46px;
-          border-radius: 5px;
-          border: 2px solid ${isSelected ? '#3b82f6' : 'rgba(255,255,255,0.12)'};
-          background-color: #161b22;
-          background-image: url("${opt.previewDataUrl || opt.url}");
-          background-size: contain;
-          background-repeat: no-repeat;
-          background-position: center;
-          cursor: pointer;
-          padding: 0;
-        `;
-        btn.addEventListener('click', () => {
-          ctrl.setTexture(opt.url, opt.name);
-        });
-        gallery.appendChild(btn);
+      const currentBtns = gallery.querySelectorAll<HTMLButtonElement>('button');
+      if (currentBtns.length === available.length && currentBtns.length > 0) {
+        let matches = true;
+        for (let i = 0; i < available.length; i++) {
+          if (currentBtns[i].getAttribute('data-url') !== available[i].url) {
+            matches = false;
+            break;
+          }
+        }
+        if (matches) {
+          for (let i = 0; i < available.length; i++) {
+            const isSelected = available[i].url === ctrl.config.textureUrl;
+            currentBtns[i].style.borderColor = isSelected ? '#3b82f6' : 'rgba(255,255,255,0.12)';
+          }
+        } else {
+          gallery.innerHTML = '';
+          for (const opt of available) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.title = opt.name;
+            btn.setAttribute('data-url', opt.url);
+            const isSelected = opt.url === ctrl.config.textureUrl;
+            btn.style.cssText = `
+              height: 46px;
+              border-radius: 5px;
+              border: 2px solid ${isSelected ? '#3b82f6' : 'rgba(255,255,255,0.12)'};
+              background-color: #161b22;
+              background-image: url("${opt.previewDataUrl || opt.url}");
+              background-size: contain;
+              background-repeat: no-repeat;
+              background-position: center;
+              cursor: pointer;
+              padding: 0;
+            `;
+            btn.addEventListener('click', () => {
+              ctrl.setTexture(opt.url, opt.name);
+            });
+            gallery.appendChild(btn);
+          }
+        }
+      } else {
+        gallery.innerHTML = '';
+        for (const opt of available) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.title = opt.name;
+          btn.setAttribute('data-url', opt.url);
+          const isSelected = opt.url === ctrl.config.textureUrl;
+          btn.style.cssText = `
+            height: 46px;
+            border-radius: 5px;
+            border: 2px solid ${isSelected ? '#3b82f6' : 'rgba(255,255,255,0.12)'};
+            background-color: #161b22;
+            background-image: url("${opt.previewDataUrl || opt.url}");
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            cursor: pointer;
+            padding: 0;
+          `;
+          btn.addEventListener('click', () => {
+            ctrl.setTexture(opt.url, opt.name);
+          });
+          gallery.appendChild(btn);
+        }
       }
     }
 

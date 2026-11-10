@@ -385,6 +385,36 @@ describe('External AI Image Generator & AI Texture Generator Integration', () =>
       expect(pbr.name).toContain(item.name);
       expect(pbr.albedoTexture).toBeDefined();
       expect((pbr.albedoTexture as any)?.uScale).toBe(2.0);
+      expect(pbr.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_OPAQUE);
+      expect(pbr.useAlphaFromAlbedoTexture).toBe(false);
+      expect((pbr.albedoTexture as any)?.hasAlpha).toBe(false);
+      if (pbr.bumpTexture) {
+        expect((pbr.bumpTexture as any)?.hasAlpha).toBe(false);
+      }
+    });
+
+    it('enables alpha transparency only when texture style is decal', async () => {
+      const box = MeshBuilder.CreateBox('decal_box', { size: 2 }, service.scene);
+      service.selectMesh(box);
+
+      const item = await service.aiTextureGenerator.generateTexture({
+        prompt: 'Cracked stone emblem decal',
+        style: 'decal',
+        size: 256,
+        backend: 'procedural',
+        applyToMesh: 'selected',
+      });
+
+
+      const pbr = box.material as PBRMaterial;
+      expect(pbr.transparencyMode).toBe(PBRMaterial.PBRMATERIAL_ALPHABLEND);
+      expect(pbr.useAlphaFromAlbedoTexture).toBe(true);
+      expect((pbr.albedoTexture as any)?.hasAlpha).toBe(true);
+    });
+
+    it('defaults embedded texture hasAlpha to false to prevent highlight and transparency flickering', () => {
+      const tex = service.addTextureFromDataUrl('test_embed.png', TINY_PNG_DATA_URL);
+      expect(tex.hasAlpha).toBe(false);
     });
   });
 

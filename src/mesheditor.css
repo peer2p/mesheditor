@@ -324,6 +324,24 @@ body.is-electron-mac #top-toolbar .toolbar-brand {
   background: #2ea043;
 }
 
+.tool-btn.tool-btn-primary {
+  background: #2563eb;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-weight: 600;
+}
+
+.tool-btn.tool-btn-primary:hover {
+  background: #1d4ed8;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.btn-block {
+  display: flex !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
 .tool-btn.btn-export {
   background: #1f6feb;
   color: #fff;
@@ -398,6 +416,7 @@ body.is-electron-mac #top-toolbar .toolbar-brand {
   outline: none;
   display: block;
   touch-action: none;
+  background-color: #0f1218;
 }
 
 /* 3D Scene Marquee Selection Box */
@@ -505,7 +524,7 @@ body.is-electron-mac #top-toolbar .toolbar-brand {
 }
 
 .dialog-title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
   display: flex;
@@ -1126,6 +1145,68 @@ body.layout-stackpanel #dialog-outliner .dialog-body,
   width: 100% !important;
   text-align: center !important;
   font-weight: 600 !important;
+}
+
+/* dat.GUI Call to Action (CTA) Button Styling (Spawn at Origin & Pick & Place in 3D) */
+.dialog-body .dg li.tool-btn-primary,
+.dialog-body .dg li.tool-btn.tool-btn-primary,
+.dialog-body .dg .cr.function.tool-btn-primary {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: calc(100% - 16px) !important;
+  height: 34px !important;
+  line-height: 34px !important;
+  margin: 6px 8px !important;
+  padding: 0 12px !important;
+  box-sizing: border-box !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+  transition: all 0.15s ease-in-out !important;
+  text-shadow: none !important;
+  user-select: none !important;
+}
+
+.dialog-body .dg li.tool-btn-primary:hover,
+.dialog-body .dg li.tool-btn.tool-btn-primary:hover,
+.dialog-body .dg .cr.function.tool-btn-primary:hover {
+  background: #1d4ed8 !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.5) !important;
+}
+
+.dialog-body .dg li.tool-btn-primary:active,
+.dialog-body .dg li.tool-btn.tool-btn-primary:active,
+.dialog-body .dg .cr.function.tool-btn-primary:active {
+  background: #1e40af !important;
+  transform: translateY(1px) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dialog-body .dg li.tool-btn-primary > div,
+.dialog-body .dg li.tool-btn-primary .property-name {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  text-align: center !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+  float: none !important;
+}
+
+.dialog-body .dg li.tool-btn-primary .c {
+  display: none !important;
 }
 
 /* Animation Player Transport Controls (Play, Pause, Stop in 1 row) */
