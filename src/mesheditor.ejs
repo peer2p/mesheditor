@@ -384,6 +384,152 @@
         </div>
       </div>
 
+      <!-- AI Prompting Guide & Modeling Tools Directory Modal Dialog -->
+      <div id="promptHelpModal">
+        <div class="prompt-help-dialog" role="dialog" aria-modal="true" aria-labelledby="promptHelpTitle">
+          <div class="prompt-help-header">
+            <div class="prompt-help-title-group">
+              <span class="prompt-help-icon" id="promptHelpIcon"><i class="app-icon" data-lucide="book-open"></i></span>
+              <div class="prompt-help-title-col">
+                <div class="prompt-help-title-row">
+                  <h3 class="prompt-help-title" id="promptHelpTitle">AI Prompting &amp; Tools Guide</h3>
+                  <span class="prompt-help-badge" id="promptHelpBadge">AI Mesh Modeler</span>
+                </div>
+                <div class="prompt-help-desc" id="promptHelpDesc">Comprehensive guide for crafting 3D prompts and full directory of available modeling tools.</div>
+              </div>
+            </div>
+            <button class="dialog-btn btn-close" id="btnClosePromptHelp" title="Close Guide"><i class="app-icon" data-lucide="x"></i></button>
+          </div>
+
+          <!-- Navigation Tabs -->
+          <div class="prompt-help-tabs" id="promptHelpTabs">
+            <button type="button" class="prompt-tab-btn active" data-tab="guide">
+              <i class="app-icon" data-lucide="wand-2"></i> Prompting Guide
+            </button>
+            <button type="button" class="prompt-tab-btn" data-tab="tools">
+              <i class="app-icon" data-lucide="wrench"></i> Available AI Tools <span class="tab-badge" id="promptHelpToolCountBadge">44</span>
+            </button>
+            <button type="button" class="prompt-tab-btn" data-tab="examples">
+              <i class="app-icon" data-lucide="sparkles"></i> Prompt Templates
+            </button>
+          </div>
+
+          <div class="prompt-help-body" id="promptHelpBody">
+            <!-- Tab 1: Prompting Guide -->
+            <div class="prompt-tab-pane active" id="tabPaneGuide">
+              <div class="prompt-guide-section">
+                <h4><i class="app-icon" data-lucide="bot"></i> How the AI Agent Uses 3D Tools</h4>
+                <p>
+                  The <strong>AI Mesh Agent</strong> is an autonomous 3D modeler with direct access to specialized Babylon.js modeling functions.
+                  Instead of generating a static black-box mesh, it constructs geometry step-by-step using parameters you describe.
+                  You can let the AI pick appropriate tools automatically, or you can <strong>explicitly instruct it which tools to execute</strong> for pinpoint precision.
+                </p>
+              </div>
+
+              <div class="prompt-guide-section">
+                <h4><i class="app-icon" data-lucide="terminal"></i> Referencing Tools in Your Prompts</h4>
+                <p>
+                  You can reference tools by their exact function identifier (such as <code>modeler_create_lathe</code>, <code>modeler_boolean_operation</code>, <code>modeler_create_wall</code>, <code>modeler_solidify_mesh</code>)
+                  or by their natural modeling names (e.g. <em>lathe, boolean subtract, solidify wall thickness, facet inset</em>).
+                </p>
+                <div class="prompt-example-card">
+                  <div class="example-label">Example 1: Rotational Lathe Body</div>
+                  <code>"Use modeler_create_lathe with 16 points to build a ceramic vase with a fluted neck, then apply a glazed porcelain material."</code>
+                </div>
+                <div class="prompt-example-card">
+                  <div class="example-label">Example 2: Parametric Architecture</div>
+                  <code>"Build a stone gateway using modeler_create_wall, cut an arched doorway with modeler_create_arch, and add a pediment roof with modeler_create_roof."</code>
+                </div>
+                <div class="prompt-example-card">
+                  <div class="example-label">Example 3: CSG Carving &amp; Inset</div>
+                  <code>"Create a rounded casing with modeler_create_rounded_box, carve a cylinder with modeler_boolean_operation (subtract), and apply bevel modifier."</code>
+                </div>
+              </div>
+
+              <div class="prompt-guide-section">
+                <h4><i class="app-icon" data-lucide="compass"></i> 5 Rules for High-Fidelity 3D Prompts</h4>
+                <ul class="prompt-rules-list">
+                  <li>
+                    <strong>1. Bottom-Alignment &amp; Grounding (Y = 0):</strong> Babylon.js uses Y-up. Mention that objects stand on ground at Y = 0 (bottom-aligned) so bases and feet stay flat on the ground plane.
+                  </li>
+                  <li>
+                    <strong>2. Part Hierarchy &amp; Polygon Budget:</strong> Deconstruct objects into Primary volumes (torso, main walls: ~50-65% budget), Secondary parts (limbs, roof: ~25-35%), and Tertiary details (eyes, rivets, bolts, trim: &lt;15%). Small parts should use <code>detailTier: "tertiary"</code>.
+                  </li>
+                  <li>
+                    <strong>3. Beveled Hard Surfaces:</strong> Real-world objects have beveled edges that catch highlights. Request rounded edges (<code>modeler_create_rounded_box</code>) or bevel radius rather than raw sharp cubes.
+                  </li>
+                  <li>
+                    <strong>4. PBR Materials &amp; Normal Maps:</strong> Specify roughness (0.1–0.2 for glossy, 0.8–0.95 for matte stone/wood), metallic values (0.85+ for steel/gold), and procedural styles (<code>cobblestone</code>, <code>wood</code>, <code>marble</code>, <code>tiles</code>, <code>metal</code>, <code>sand</code>) or normal maps for micro-surface relief.
+                  </li>
+                  <li>
+                    <strong>5. Modifying Existing Meshes:</strong> Select an existing mesh in the 3D viewport, then prompt adjustments (e.g. <em>"Scale this mesh by 1.2 on X, separate loose parts, and change material to gold"</em>).
+                  </li>
+                </ul>
+              </div>
+
+              <div class="prompt-guide-section">
+                <h4><i class="app-icon" data-lucide="camera"></i> Multimodal Prompting: Vision &amp; Screenshots</h4>
+                <p>
+                  Attach concept art, photos, or diagrams using the Image button or Drag &amp; Drop.
+                  Click the <strong>Camera button</strong> to attach an instant snapshot of your current 3D viewport so the vision model can visually inspect proportions, alignment, and silhouettes.
+                </p>
+              </div>
+            </div>
+
+            <!-- Tab 2: Available AI Tools (Searchable List / Table) -->
+            <div class="prompt-tab-pane" id="tabPaneTools" style="display: none;">
+              <div class="prompt-tools-filter-bar">
+                <div class="prompt-tools-search-wrap">
+                  <i class="app-icon" data-lucide="search"></i>
+                  <input
+                    type="text"
+                    id="promptToolSearchInput"
+                    class="tool-input prompt-tools-search-input"
+                    placeholder="Search tools by name, category or description (e.g. lathe, boolean, wall, uv, voxel)..."
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button type="button" class="prompt-tools-clear-search" id="btnClearPromptToolSearch" style="display: none;" title="Clear search">&times;</button>
+                </div>
+                <div class="prompt-category-chips" id="promptCategoryChips">
+                  <button type="button" class="prompt-category-chip active" data-category="all">All</button>
+                  <button type="button" class="prompt-category-chip" data-category="shapes">Shapes &amp; Primitives</button>
+                  <button type="button" class="prompt-category-chip" data-category="architecture">Architecture</button>
+                  <button type="button" class="prompt-category-chip" data-category="modifiers">CSG &amp; Modifiers</button>
+                  <button type="button" class="prompt-category-chip" data-category="facet">Facet Modeling</button>
+                  <button type="button" class="prompt-category-chip" data-category="materials">Materials &amp; UV</button>
+                  <button type="button" class="prompt-category-chip" data-category="voxels">Voxels</button>
+                  <button type="button" class="prompt-category-chip" data-category="transforms">Transforms &amp; Rigging</button>
+                  <button type="button" class="prompt-category-chip" data-category="workflow">Scene &amp; Workflow</button>
+                </div>
+                <div class="prompt-tools-status-row">
+                  <span id="promptToolsCount" class="prompt-tools-count">Loading tools...</span>
+                </div>
+              </div>
+
+              <div class="prompt-tools-list" id="promptToolsList">
+                <!-- Dynamically populated from ToolRegistry.getAll() -->
+              </div>
+            </div>
+
+            <!-- Tab 3: Prompt Templates & Examples -->
+            <div class="prompt-tab-pane" id="tabPaneExamples" style="display: none;">
+              <div class="prompt-templates-container" id="promptTemplatesContainer">
+                <!-- Templates rendered here -->
+              </div>
+            </div>
+          </div>
+
+          <div class="prompt-help-footer">
+            <div class="prompt-help-footer-hint">
+              <i class="app-icon" data-lucide="info"></i>
+              <span>Click <strong>Insert</strong> on any tool or template to insert it into your prompt input.</span>
+            </div>
+            <button class="tool-btn btn-primary" id="btnDonePromptHelp">Got it!</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Help Modal Dialog -->
       <div id="helpModal">
         <div class="modal-content">
@@ -507,6 +653,17 @@
                 • <strong>Pick & Place:</strong> In the Tools menu, choose "Create Mesh" and click on any surface to spawn new primitives precisely in 3D.<br />
                 • <strong>Snapping Increments:</strong> Open the "Scene & Environment" tool to adjust Move Snap distance (units) and Rotate Snap angle (degrees).
               </p>
+            </div>
+
+            <div class="help-section">
+              <h4><i class="app-icon" data-lucide="bot"></i> AI Prompting &amp; Modeling Tools Directory</h4>
+              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 10px;">
+                The AI Mesh Agent provides 40+ specialized Babylon.js modeling tools (lathes, CSG booleans, architectural walls, roofs, columns, SDF clay, UV unwrap, baking, voxel grids, and PBR textures) that you can reference directly in your prompts.
+              </p>
+              <button type="button" class="tool-btn btn-primary" id="btnOpenPromptHelpFromGeneralHelp" style="display: inline-flex; align-items: center; gap: 6px;">
+                <span class="btn-icon"><i class="app-icon" data-lucide="book-open"></i></span>
+                <span class="btn-label">Open AI Prompting &amp; Tools Directory</span>
+              </button>
             </div>
           </div>
           <div class="modal-footer">

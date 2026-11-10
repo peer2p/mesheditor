@@ -29,6 +29,15 @@ export class AIAgentEditorTool extends AbstractEditorTool {
   <li><strong>Viewport Capture:</strong> Click the camera icon to send a screenshot of your active 3D view to the AI for visual feedback and adjustments.</li>
   <li><strong>OpenAI-Compatible:</strong> Connects to Ollama (local), OpenAI (GPT-4o), OpenRouter, LM Studio, or any OpenAI-compatible API endpoint.</li>
 </ul>
+
+<h4><i class="app-icon" data-lucide="book-open"></i> Prompting Guide &amp; AI Tools Directory</h4>
+<p>Discover best practices for writing effective 3D prompts, referencing modeling tools directly by name (e.g. <code>modeler_create_lathe</code>, <code>modeler_boolean_operation</code>, <code>modeler_create_wall</code>), and browse the complete directory of all 40+ available Babylon.js modeling tools.</p>
+<div style="margin-top: 10px;">
+  <button type="button" class="tool-btn btn-primary" id="btnOpenPromptGuideFromHelp" style="width: 100%; justify-content: center; display: inline-flex; align-items: center; gap: 6px;">
+    <span class="btn-icon"><i class="app-icon" data-lucide="book-open"></i></span>
+    <span class="btn-label">Open Prompting &amp; Tools Guide</span>
+  </button>
+</div>
 `.trim();
 
   public isActive(app: any): boolean {

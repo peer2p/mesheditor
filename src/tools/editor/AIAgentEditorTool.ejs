@@ -5,6 +5,9 @@
               <button class="dialog-btn" id="btnAISettingsToggle" title="Configure OpenAI-Compatible Endpoint & Skills">
                 <i class="app-icon" data-lucide="settings"></i>
               </button>
+              <button class="dialog-btn" id="btnAIPromptHelpHeader" title="AI Prompting & Tools Guide">
+                <i class="app-icon" data-lucide="book-open"></i>
+              </button>
               <button class="dialog-btn btn-help" title="Help & Tool Guide" aria-label="Help"><i class="app-icon" data-lucide="help-circle"></i></button>
             <button class="dialog-btn btn-min" title="Minimize"><i class="app-icon" data-lucide="minus"></i></button>
               <button class="dialog-btn btn-close" title="Close"><i class="app-icon" data-lucide="x"></i></button>
@@ -301,6 +304,7 @@
             <div class="ai-endpoint-summary" id="aiEndpointSummaryBar">
               <span class="ai-endpoint-dot" id="aiEndpointStatusDot"></span>
               <span id="aiEndpointSummaryText">Model: gpt-4o</span>
+              <button type="button" class="ai-link-btn" id="btnOpenPromptHelpInline" title="Open AI Prompting & Tools Directory" style="margin-left: auto;">Prompt Guide &amp; Tools</button>
               <button type="button" class="ai-link-btn" id="btnOpenAISettingsInline">Configure</button>
             </div>
 
@@ -349,6 +353,9 @@
               ></textarea>
               <div class="ai-controls-row">
                 <div class="ai-controls-left">
+                  <button type="button" class="tool-btn" id="btnAIPromptHelp" title="Prompting Guide: Tips & Available AI Tools">
+                    <span class="btn-icon"><i class="app-icon" data-lucide="book-open"></i></span>
+                  </button>
                   <button type="button" class="tool-btn" id="btnAIRecordSpeech" title="Voice: Record prompt using Speech-to-Text">
                     <span class="btn-icon"><i class="app-icon" data-lucide="mic"></i></span>
                   </button>
