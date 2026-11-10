@@ -135,7 +135,7 @@ function buildOpeningContour2D(
   const w = Math.max(0.1, Math.min(wallW - 0.1, Number(op.width ?? 0.9)));
   const h = Math.max(0.1, Math.min(wallH - 0.05, Number(op.height ?? 1.4)));
   const cx = Math.max(-wallW * 0.5 + w * 0.5 + 0.03, Math.min(wallW * 0.5 - w * 0.5 - 0.03, Number(op.x ?? 0)));
-  const y0 = Math.max(0.0, Math.min(wallH - h - 0.03, Number(op.y ?? 0)));
+  const y0 = Math.max(0.005, Math.min(wallH - h - 0.03, Number(op.y ?? 0)));
 
   const hw = w * 0.5;
   const pts: Vector3[] = [];
@@ -245,9 +245,9 @@ export function buildWallMesh(scene: Scene, name: string, opts: WallBuildOptions
         const dy = yEnd - yStart;
         const segLen = Math.hypot(dx, dy);
         if (segLen < 1e-3) continue;
-        const bar = createRoundedBoxMesh(
+        const bar = MeshBuilder.CreateBox(
           `${name}_frame_${i}_${j}`,
-          { width: segLen + fw * 0.5, height: fw, depth: fd, radius: fw * 0.2, segments: 2 },
+          { width: segLen + fw * 0.4, height: fw, depth: fd },
           scene
         );
         bar.rotation.z = Math.atan2(dy, dx);
@@ -472,24 +472,22 @@ export function buildColumnMesh(scene: Scene, name: string, opts: ColumnBuildOpt
     parts.push(plinth);
 
     const torusBaseProfile: Vector3[] = [
-      new Vector3(0, plinthH, 0),
       new Vector3(baseRadius * 1.25, plinthH, 0),
       new Vector3(baseRadius * 1.32, plinthH + baseHeight * 0.2, 0),
-      new Vector3(baseRadius * 1.12, plinthH + baseHeight * 0.38, 0),
-      new Vector3(baseRadius * 1.18, plinthH + baseHeight * 0.5, 0),
+      new Vector3(baseRadius * 1.15, plinthH + baseHeight * 0.4, 0),
+      new Vector3(baseRadius * 1.20, plinthH + baseHeight * 0.65, 0),
       new Vector3(baseRadius, shaftY0, 0),
-      new Vector3(0, shaftY0, 0),
     ];
     const baseLathe = MeshBuilder.CreateLathe(
       `${name}_base_torus`,
-      { shape: torusBaseProfile, tessellation: Math.min(36, radialSegs), sideOrientation: Mesh.DOUBLESIDE },
+      { shape: torusBaseProfile, tessellation: Math.min(36, radialSegs), sideOrientation: Mesh.FRONTSIDE },
       scene
     );
     parts.push(baseLathe);
   }
 
   // 2. Parametric Fluted & Entasis Shaft
-  const vSegs = 16;
+  const vSegs = 24;
   const shaftPos: number[] = [];
   const shaftNorm: number[] = [];
   const shaftUV: number[] = [];
@@ -501,22 +499,29 @@ export function buildColumnMesh(scene: Scene, name: string, opts: ColumnBuildOpt
     // Classical entasis peaks around 1/3 up the shaft
     const entasisBulge = Math.sin(v * Math.PI) * entasis * baseRadius;
     const ringR = baseRadius * (1 - (1 - taper) * v) + entasisBulge;
-    // Fade flutes out smoothly at the very bottom/top 4% so they terminate cleanly in semi-circular hollows
-    const fluteEnvelope =
-      flutes > 0 ? Math.min(1, Math.min(v / 0.04, (1 - v) / 0.04)) : 0;
+    // Fade flutes out smoothly at bottom and top 8% with smoothstep
+    const fade = 0.08;
+    let fluteEnvelope = 1.0;
+    if (v < fade) {
+      const t = v / fade;
+      fluteEnvelope = t * t * (3 - 2 * t);
+    } else if (v > 1 - fade) {
+      const t = (1 - v) / fade;
+      fluteEnvelope = t * t * (3 - 2 * t);
+    }
+    if (flutes === 0) fluteEnvelope = 0;
 
     for (let iu = 0; iu <= radialSegs; iu++) {
       const u = iu / radialSegs;
       const theta = u * Math.PI * 2;
       let r = ringR;
       if (flutes > 0) {
-        const fluteWave = Math.max(0, Math.sin(theta * flutes));
+        const fluteWave = Math.pow(Math.max(0, Math.sin(theta * flutes)), 0.65);
         r -= fluteDepth * fluteEnvelope * fluteWave;
       }
       const x = Math.cos(theta) * r;
       const z = Math.sin(theta) * r;
       shaftPos.push(x, y, z);
-      shaftNorm.push(Math.cos(theta), 0, Math.sin(theta));
       shaftUV.push(u, v);
     }
   }
@@ -528,7 +533,8 @@ export function buildColumnMesh(scene: Scene, name: string, opts: ColumnBuildOpt
       const i10 = iv * stride + (iu + 1);
       const i01 = (iv + 1) * stride + iu;
       const i11 = (iv + 1) * stride + (iu + 1);
-      shaftIdx.push(i00, i11, i10, i00, i01, i11);
+      // Correct outward normal winding:
+      shaftIdx.push(i00, i10, i11, i00, i11, i01);
     }
   }
 
@@ -550,16 +556,14 @@ export function buildColumnMesh(scene: Scene, name: string, opts: ColumnBuildOpt
     const echinusTopY = totalHeight - abacusH;
 
     const capProfile: Vector3[] = [
-      new Vector3(0, shaftY1 - capHeight * 0.08, 0),
-      new Vector3(topR * 1.08, shaftY1, 0),
+      new Vector3(topR * 1.05, shaftY1, 0),
       new Vector3(topR * 1.02, shaftY1 + capHeight * 0.15, 0),
-      new Vector3(topR * 1.28, shaftY1 + capHeight * 0.45, 0),
-      new Vector3(topR * (order === 'corinthian' ? 1.48 : 1.38), echinusTopY, 0),
-      new Vector3(0, echinusTopY, 0),
+      new Vector3(topR * 1.25, shaftY1 + capHeight * 0.45, 0),
+      new Vector3(topR * (order === 'corinthian' ? 1.45 : 1.35), echinusTopY, 0),
     ];
     const echinus = MeshBuilder.CreateLathe(
       `${name}_echinus`,
-      { shape: capProfile, tessellation: Math.min(36, radialSegs), sideOrientation: Mesh.DOUBLESIDE },
+      { shape: capProfile, tessellation: Math.min(36, radialSegs), sideOrientation: Mesh.FRONTSIDE },
       scene
     );
     parts.push(echinus);
@@ -575,19 +579,21 @@ export function buildColumnMesh(scene: Scene, name: string, opts: ColumnBuildOpt
     parts.push(abacus);
 
     if (order === 'ionic') {
-      // Ionic volute scrolls on left/right of capital
+      // Proportional Ionic volute scroll discs under the abacus
+      const voluteR = capHeight * 0.32;
+      const voluteThick = topR * 0.45;
       for (const sx of [-1, 1]) {
         const volute = MeshBuilder.CreateCylinder(
           `${name}_volute_${sx}`,
           {
-            height: abacusW * 1.04,
-            diameter: capHeight * 0.72,
-            tessellation: 18,
+            height: voluteThick,
+            diameter: voluteR * 2,
+            tessellation: 24,
           },
           scene
         );
         volute.rotation.x = Math.PI / 2;
-        volute.position.set(sx * topR * 1.18, echinusTopY - capHeight * 0.12, 0);
+        volute.position.set(sx * (topR * 1.05), echinusTopY - voluteR * 0.65, 0);
         volute.bakeCurrentTransformIntoVertices();
         parts.push(volute);
       }

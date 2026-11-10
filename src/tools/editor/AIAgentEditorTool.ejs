@@ -260,6 +260,41 @@
               </div>
             </div>
 
+            <!-- External Image Generator (AI Textures & Materials) -->
+            <div class="ai-settings-title-row" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+              <span class="ai-settings-title">External Image Generator (AI Textures)</span>
+            </div>
+            <div class="ai-slider-subtext" style="margin-bottom: 6px;">
+              Connect an external image generator (Pollinations, OpenAI DALL-E, Stable Diffusion WebUI, Fal.ai, Replicate) for synthesizing AI texture maps.
+            </div>
+
+            <div class="ai-neural-provider-card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px; margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                <label class="ai-checkbox-label" for="aiImageGenEnabled" style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin: 0;">
+                  <input type="checkbox" id="aiImageGenEnabled" checked />
+                  <span><strong>Enable AI Image Generator</strong></span>
+                </label>
+                <button type="button" class="ai-chip-btn" id="btnTestImageGenGlobal" title="Test Generator Endpoint Connection">Test</button>
+              </div>
+              <div class="ai-slider-subtext" style="margin-top: 2px;">When enabled, textures created by the AI Agent and the AI Texture Generator use this image model.</div>
+              <div id="aiImageGenConfigBody" style="display: none; margin-top: 6px; flex-direction: column; gap: 5px;">
+                <div class="ai-input-row" style="gap: 6px;">
+                  <select id="aiImageGenBackendSelect" class="ai-select tool-select" style="width: 140px;">
+                    <option value="pollinations">Pollinations (Free)</option>
+                    <option value="openai">OpenAI DALL-E</option>
+                    <option value="imagen">Google Imagen / Banana</option>
+                    <option value="fal">Fal.ai Flux</option>
+                    <option value="replicate">Replicate</option>
+                    <option value="sd_webui">SD WebUI / Draw Things (Local)</option>
+                    <option value="custom">Custom REST</option>
+                  </select>
+                  <input type="text" id="aiImageGenModel" class="ai-input" placeholder="Model ID" style="flex: 1; min-width: 0;" />
+                </div>
+                <input type="text" id="aiImageGenUrl" class="ai-input" placeholder="Endpoint URL" />
+                <input type="password" id="aiImageGenKey" class="ai-input" placeholder="API Key (optional for Pollinations / Local)" autocomplete="off" />
+              </div>
+            </div>
+
             <div class="ai-settings-actions" style="display: flex; gap: 8px;">
               <button type="button" class="tool-btn" id="btnCancelAISettings" style="flex: 1;">
                 <span class="btn-icon"><i class="app-icon" data-lucide="arrow-left"></i></span>

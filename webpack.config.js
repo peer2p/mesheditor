@@ -53,6 +53,18 @@ module.exports = (env, argv) => {
           warnings: false,
         },
       },
+      proxy: [
+        {
+          context: ['/sdapi', '/api/sdapi'],
+          target: 'http://127.0.0.1:7860',
+          pathRewrite: { '^/api/sdapi': '/sdapi' },
+          changeOrigin: true,
+          secure: false,
+          onProxyRes: (proxyRes) => {
+            proxyRes.headers['Access-Control-Allow-Origin'] = '*';
+          },
+        },
+      ],
       setupMiddlewares: (middlewares, devServer) => {
         if (devServer && devServer.app) {
           setupAntigravityBridgeRoutes(devServer.app);

@@ -151,6 +151,9 @@ export class MeshEditorService {
   public textureBaker: TextureBaker;
   public weightPaintController: WeightPaintController;
   public aiTextureGenerator: AITextureGenerator;
+  public get externalImageGenerator() {
+    return this.aiTextureGenerator.externalImageGenerator;
+  }
   public textMeshController: TextMeshController;
   public decalController: DecalController;
   public get pathWays(): PathExtrusionController {
@@ -5088,8 +5091,17 @@ export class MeshEditorService {
       this.events.onToast?.('Please select a mesh first', 'warning');
       return false;
     }
-    const tex = new Texture(url, this.scene, false, false, Texture.NEAREST_SAMPLINGMODE);
-    if (name) tex.name = name;
+
+    // Reuse existing Texture instance in the scene with the same URL if available
+    let tex = this.scene.textures.find(
+      (t): t is Texture => t instanceof Texture && !(t as any).isRenderTarget && t.url === url
+    );
+    if (!tex) {
+      tex = new Texture(url, this.scene, false, false, Texture.NEAREST_SAMPLINGMODE);
+      if (name) tex.name = name;
+    } else if (name) {
+      tex.name = name;
+    }
 
     // Default texture alpha to false - the user decides whether to enable alpha and transparency
     tex.hasAlpha = false;
@@ -5128,8 +5140,16 @@ export class MeshEditorService {
       url = fileOrUrl;
     }
 
-    const tex = new Texture(url, this.scene, false, false, Texture.NEAREST_SAMPLINGMODE);
-    if (texName) tex.name = texName;
+    // Reuse existing Texture instance in the scene with the same URL if available
+    let tex = this.scene.textures.find(
+      (t): t is Texture => t instanceof Texture && !(t as any).isRenderTarget && t.url === url
+    );
+    if (!tex) {
+      tex = new Texture(url, this.scene, false, false, Texture.NEAREST_SAMPLINGMODE);
+      if (texName) tex.name = texName;
+    } else if (texName) {
+      tex.name = texName;
+    }
 
     const baseTex = this.getActiveMaterialTexture();
     if (baseTex) {
@@ -5753,7 +5773,8 @@ export class MeshEditorService {
   }
 
   /**
-   * Scans and returns detailed metadata for all textures currently embedded in the scene/materials.
+   * Scans and returns detailed metadata for all distinct textures currently embedded in the scene/materials.
+   * Duplicate texture instances with identical URLs or matching names/dimensions are automatically consolidated.
    */
   public getEmbeddedTexturesInfo(): EmbeddedTextureInfo[] {
     const textures = this.scanSceneTextures();
@@ -5823,6 +5844,55 @@ export class MeshEditorService {
         }
       }
 
+      // Check if this texture is already represented in result (deduplicate distinct textures)
+      const existing = result.find((item) => {
+        // Direct match on URL / image source (data URL, blob, path)
+        if (item.url && item.url === url) {
+          return true;
+        }
+        // Match on identical non-generic name with identical dimensions
+        if (
+          item.name &&
+          tex.name &&
+          item.name === tex.name &&
+          item.name !== 'embedded_texture' &&
+          !item.name.startsWith('data:') &&
+          size.width > 0 &&
+          item.width === size.width &&
+          item.height === size.height
+        ) {
+          return true;
+        }
+        return false;
+      });
+
+      if (existing) {
+        // Merge material associations without duplicates
+        for (const mName of matNames) {
+          if (!existing.materialNames.includes(mName)) {
+            existing.materialNames.push(mName);
+          }
+        }
+        existing.materialsCount = existing.materialNames.length;
+
+        // Upgrade name if current is generic and this instance has a descriptive name
+        if (
+          (!existing.name || existing.name === 'embedded_texture' || existing.name.startsWith('data:')) &&
+          tex.name &&
+          tex.name !== 'embedded_texture' &&
+          !tex.name.startsWith('data:')
+        ) {
+          existing.name = tex.name;
+        }
+
+        // Update dimensions if previously not loaded
+        if ((!existing.width || existing.width <= 0) && size.width > 0) {
+          existing.width = size.width;
+          existing.height = size.height;
+        }
+        continue;
+      }
+
       result.push({
         id: tex.uniqueId ? String(tex.uniqueId) : tex.name,
         name: tex.name || 'embedded_texture',
@@ -5842,6 +5912,15 @@ export class MeshEditorService {
    * Adds an embedded texture to the scene from a data URL string.
    */
   public addTextureFromDataUrl(name: string, dataUrl: string): Texture {
+    let existing = this.scene.textures.find(
+      (t): t is Texture => t instanceof Texture && !(t as any).isRenderTarget && t.url === dataUrl
+    );
+    if (existing) {
+      if (name && (!existing.name || existing.name === 'embedded_texture')) {
+        existing.name = name;
+      }
+      return existing;
+    }
     const tex = new Texture(dataUrl, this.scene, false, false);
     tex.name = name;
     this.events.onToast?.(`Embedded texture "${name}" added to scene.`, 'success');

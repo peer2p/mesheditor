@@ -21,7 +21,7 @@ Use this skill when meshes already exist in the scene and the user wants to adap
    - **UV Unwrap, Texel Density & Island Packing**: Use `modeler_uv_unwrap` to mark smart seams, unfold UV charts, normalize Texel Density (`px/m`), and pack islands cleanly into `[0, 1]` UV space.
    - **High-to-Low-Poly Baking**: Use `modeler_bake_textures` to project high-poly surface detail onto low-poly Tangent-Space Normal and Ambient Occlusion maps using a smooth Projection Cage.
    - **Rigging, Skinning & Weight Painting**: Use `modeler_rig_and_weight` (`action: "auto_rig" | "paint_weights" | "pose_bone" | "reset_pose"`) to generate a `humanoid`, `quadruped`, or `spine` skeleton, bind normalized 4-bone skin weights, paint influence zones, and test joint bending.
-   - **Change Material & Texture**: Use `modeler_create_material` (including procedural textures: `wood`, `stone`, `brick`, `marble`, `metal`, etc.) and `modeler_apply_material`.
+   - **Change Material & Texture**: Use `modeler_generate_texture` (`prompt`, `useAI: true`, `applyToMesh`, `uvScale`) to synthesize AI Albedo and Normal maps via external AI image engines or procedural synthesis, or `modeler_create_material` / `modeler_apply_material`.
    - **Patterns & Repetition**: Use `modeler_clone_array` (`linear` or `radial`) to repeat parts along an axis or in a circle (pillars, gear teeth, fence posts, stairs).
    - **Separate / Merge**: Use `modeler_separate_mesh` to break loose parts into separate meshes or `modeler_merge_meshes` to fuse parts.
 

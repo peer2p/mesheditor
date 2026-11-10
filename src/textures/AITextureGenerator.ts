@@ -6,6 +6,8 @@ import {
 } from '@babylonjs/core';
 import type { MeshEditorService } from '../MeshEditorService';
 import { generateNormalMapFromCanvas } from '../tools/textureUtils';
+import { ImageGeneratorBackendId } from '../types';
+import { ExternalImageGeneratorService } from './ExternalImageGeneratorService';
 
 export type TextureStylePreset =
   | 'auto'
@@ -42,6 +44,9 @@ export interface AITextureGenerationOptions {
   embedInScene?: boolean;
   applyToMesh?: string;
   useAI?: boolean;
+  backend?: ImageGeneratorBackendId | 'procedural' | 'auto';
+  enhancePrompt?: boolean;
+  fallbackToProcedural?: boolean;
 }
 
 export interface GeneratedTextureItem {
@@ -63,6 +68,8 @@ export interface GeneratedTextureItem {
   createdAt: number;
   embeddedAlbedoName?: string;
   embeddedNormalName?: string;
+  generatorBackend?: string;
+  isAI?: boolean;
 }
 
 interface ResolvedTextureRecipe {
@@ -153,10 +160,12 @@ export class AITextureGenerator {
   private service: MeshEditorService;
   private history: GeneratedTextureItem[] = [];
   private counter = 1;
+  public externalImageGenerator: ExternalImageGeneratorService;
   public onHistoryChanged?: (history: GeneratedTextureItem[]) => void;
 
   constructor(service: MeshEditorService) {
     this.service = service;
+    this.externalImageGenerator = new ExternalImageGeneratorService();
   }
 
   public getHistory(): GeneratedTextureItem[] {
@@ -186,13 +195,128 @@ export class AITextureGenerator {
 
   /**
    * Generates a new texture from a natural language prompt, embeds it in the scene,
-   * and optionally applies it to a mesh.
+   * and optionally applies it to a mesh. Uses an external AI image generator if configured,
+   * or falls back to the built-in procedural synthesizer.
    */
   public async generateTexture(options: AITextureGenerationOptions): Promise<GeneratedTextureItem> {
     const prompt = (options.prompt || 'Seamless stone texture').trim();
     const size = this.clampSize(options.size ?? 512);
     const seamless = options.seamless !== false;
     const generateNormal = options.generateNormalMap !== false;
+
+    // Check whether an external AI Image Generator should be used
+    const configuredBackend = this.externalImageGenerator.getActiveBackend();
+    const explicitBackend = options.backend;
+    const shouldUseAI =
+      (explicitBackend !== undefined && explicitBackend !== 'procedural') ||
+      (options.useAI !== false && (configuredBackend !== 'procedural' || explicitBackend === 'auto' || options.useAI === true));
+
+    if (shouldUseAI) {
+      try {
+        const targetBackend =
+          explicitBackend && explicitBackend !== 'auto' && explicitBackend !== 'procedural'
+            ? explicitBackend
+            : configuredBackend !== 'procedural'
+              ? configuredBackend
+              : 'pollinations';
+
+        const genResult = await this.externalImageGenerator.generateImage({
+          backend: targetBackend as any,
+          prompt,
+          size,
+          seamless,
+          seed: options.seed,
+          enhancePrompt: options.enhancePrompt,
+        });
+
+        const normalStrength = typeof options.normalStrength === 'number' ? options.normalStrength : 2.2;
+        const cleanBaseName = this.sanitizeName(options.name || this.deriveNameFromPrompt(prompt, 'stone'));
+        const uniqueName = `${cleanBaseName}_${this.counter++}`;
+
+        // Compute normal map from the generated AI image canvas
+        let normalDataUrl: string | undefined;
+        let actualWidth = size;
+        let actualHeight = size;
+
+        if (generateNormal && typeof document !== 'undefined') {
+          try {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            await new Promise<void>((resolve) => {
+              const timer = setTimeout(() => resolve(), 200);
+              img.onload = () => {
+                clearTimeout(timer);
+                resolve();
+              };
+              img.onerror = () => {
+                clearTimeout(timer);
+                resolve();
+              };
+              img.src = genResult.dataUrl;
+            });
+            actualWidth = img.naturalWidth || size;
+            actualHeight = img.naturalHeight || size;
+            const canvas = document.createElement('canvas');
+            canvas.width = actualWidth;
+            canvas.height = actualHeight;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0);
+              normalDataUrl = this.renderNormalMap(canvas, normalStrength);
+            }
+          } catch {
+            normalDataUrl = undefined;
+          }
+        }
+
+        const item: GeneratedTextureItem = {
+          id: `ai_tex_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+          name: uniqueName,
+          prompt,
+          style: (options.style && options.style !== 'auto' ? options.style : 'stone') as any,
+          size: Math.max(actualWidth, actualHeight),
+          seed: options.seed ?? 0,
+          seamless,
+          albedoDataUrl: genResult.dataUrl,
+          normalDataUrl,
+          roughness: options.roughness ?? 0.7,
+          metallic: options.metallic ?? 0.1,
+          normalStrength,
+          primaryColor: options.primaryColor || '#888888',
+          secondaryColor: options.secondaryColor || '#444444',
+          accentColor: options.accentColor || '#222222',
+          createdAt: Date.now(),
+          generatorBackend: genResult.providerId,
+          isAI: true,
+        };
+
+        if (options.embedInScene !== false) {
+          const albedoEmbedName = `${uniqueName}_albedo.png`;
+          this.service.addTextureFromDataUrl(albedoEmbedName, genResult.dataUrl);
+          item.embeddedAlbedoName = albedoEmbedName;
+
+          if (normalDataUrl) {
+            const normalEmbedName = `${uniqueName}_normal.png`;
+            this.service.addTextureFromDataUrl(normalEmbedName, normalDataUrl);
+            item.embeddedNormalName = normalEmbedName;
+          }
+        }
+
+        this.history.unshift(item);
+        this.onHistoryChanged?.(this.getHistory());
+
+        if (options.applyToMesh) {
+          this.applyTextureToMesh(item.id, options.applyToMesh, options.uvScale ?? 1);
+        }
+
+        return item;
+      } catch (err: any) {
+        if (options.fallbackToProcedural === false) {
+          throw err;
+        }
+        console.warn(`External AI generation failed (${err?.message}), falling back to procedural synthesizer.`);
+      }
+    }
 
     const recipe = this.analyzePrompt(prompt, options);
     const cleanBaseName = this.sanitizeName(options.name || this.deriveNameFromPrompt(prompt, recipe.style));
@@ -224,6 +348,8 @@ export class AITextureGenerator {
       secondaryColor: recipe.secondaryHex,
       accentColor: recipe.accentHex,
       createdAt: Date.now(),
+      generatorBackend: 'procedural',
+      isAI: false,
     };
 
     // Embed in scene texture registry by default so Materials and Decals can use it immediately
@@ -270,9 +396,16 @@ export class AITextureGenerator {
       try {
         const img = new Image();
         img.crossOrigin = 'anonymous';
-        await new Promise<void>((resolve, reject) => {
-          img.onload = () => resolve();
-          img.onerror = reject;
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(() => resolve(), 200);
+          img.onload = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+          img.onerror = () => {
+            clearTimeout(timer);
+            resolve();
+          };
           img.src = albedoDataUrl;
         });
 
@@ -356,18 +489,23 @@ export class AITextureGenerator {
     pbr.roughness = item.roughness;
     pbr.metallic = item.metallic;
 
-    const albedoTex = new Texture(
-      item.albedoDataUrl,
-      this.service.scene,
-      false,
-      false,
-      Texture.TRILINEAR_SAMPLINGMODE,
-      null,
-      null,
-      item.albedoDataUrl,
-      true,
+    let albedoTex = this.service.scene.textures.find(
+      (t): t is Texture => t instanceof Texture && !(t as any).isRenderTarget && t.url === item.albedoDataUrl
     );
-    albedoTex.name = item.embeddedAlbedoName || `${item.name}_albedo.png`;
+    if (!albedoTex) {
+      albedoTex = new Texture(
+        item.albedoDataUrl,
+        this.service.scene,
+        false,
+        false,
+        Texture.TRILINEAR_SAMPLINGMODE,
+        null,
+        null,
+        item.albedoDataUrl,
+        true,
+      );
+      albedoTex.name = item.embeddedAlbedoName || `${item.name}_albedo.png`;
+    }
     albedoTex.uScale = uvScale;
     albedoTex.vScale = uvScale;
     if (item.style === 'decal') {
@@ -378,18 +516,23 @@ export class AITextureGenerator {
     pbr.albedoTexture = albedoTex;
 
     if (item.normalDataUrl) {
-      const normalTex = new Texture(
-        item.normalDataUrl,
-        this.service.scene,
-        false,
-        false,
-        Texture.TRILINEAR_SAMPLINGMODE,
-        null,
-        null,
-        item.normalDataUrl,
-        true,
+      let normalTex = this.service.scene.textures.find(
+        (t): t is Texture => t instanceof Texture && !(t as any).isRenderTarget && t.url === item.normalDataUrl
       );
-      normalTex.name = item.embeddedNormalName || `${item.name}_normal.png`;
+      if (!normalTex) {
+        normalTex = new Texture(
+          item.normalDataUrl,
+          this.service.scene,
+          false,
+          false,
+          Texture.TRILINEAR_SAMPLINGMODE,
+          null,
+          null,
+          item.normalDataUrl,
+          true,
+        );
+        normalTex.name = item.embeddedNormalName || `${item.name}_normal.png`;
+      }
       normalTex.uScale = uvScale;
       normalTex.vScale = uvScale;
       normalTex.level = Math.max(0.1, Math.min(3.0, item.normalStrength / 2.0));

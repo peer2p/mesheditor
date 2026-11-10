@@ -541,9 +541,80 @@ async function runAgyChatCompletion(body) {
 }
 
 /**
+ * Proxies HTTP requests to local Stable Diffusion WebUI / Draw Things running on 127.0.0.1:7860.
+ * Eliminates browser CORS issues by injecting Access-Control-Allow-Origin headers.
+ */
+function proxyToLocalSdWebUI(req, res, targetPath) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
+
+  const cleanPath = targetPath.startsWith('/') ? targetPath : `/${targetPath}`;
+  const options = {
+    hostname: '127.0.0.1',
+    port: 7860,
+    path: cleanPath,
+    method: req.method,
+    headers: {
+      ...req.headers,
+      host: '127.0.0.1:7860',
+    },
+  };
+
+  const proxyReq = http.request(options, (proxyRes) => {
+    res.statusCode = proxyRes.statusCode;
+    for (const [key, value] of Object.entries(proxyRes.headers)) {
+      if (key.toLowerCase() !== 'access-control-allow-origin') {
+        res.setHeader(key, value);
+      }
+    }
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    proxyRes.pipe(res);
+  });
+
+  proxyReq.on('error', (err) => {
+    res.statusCode = 502;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(
+      JSON.stringify({
+        error: {
+          message: `Cannot connect to local Draw Things / SD WebUI on port 7860: ${err.message}`,
+          code: 'SD_WEBUI_UNREACHABLE',
+        },
+      })
+    );
+  });
+
+  if (req.body) {
+    const bodyData = Buffer.isBuffer(req.body)
+      ? req.body
+      : typeof req.body === 'object'
+      ? JSON.stringify(req.body)
+      : String(req.body);
+    proxyReq.end(bodyData);
+  } else {
+    req.pipe(proxyReq);
+  }
+}
+
+/**
  * Express / webpack-dev-server middleware registration helper.
  */
 function setupAntigravityBridgeRoutes(app) {
+  // Transparent proxy for local Stable Diffusion WebUI & Draw Things API
+  app.use('/sdapi', (req, res) => {
+    proxyToLocalSdWebUI(req, res, `/sdapi${req.url || ''}`);
+  });
+  app.use('/api/sdapi', (req, res) => {
+    proxyToLocalSdWebUI(req, res, `/sdapi${req.url || ''}`);
+  });
+
   app.use('/api/antigravity/v1', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -629,6 +700,16 @@ function startStandaloneBridgeServer(port = Number(process.env.AGY_BRIDGE_PORT) 
     }
 
     const urlPath = (req.url || '').split('?')[0];
+
+    if (urlPath.startsWith('/sdapi/') || urlPath === '/sdapi') {
+      proxyToLocalSdWebUI(req, res, req.url || '/sdapi');
+      return;
+    }
+    if (urlPath.startsWith('/api/sdapi/') || urlPath === '/api/sdapi') {
+      const rewrittenUrl = (req.url || '').replace(/^\/api\/sdapi/, '/sdapi');
+      proxyToLocalSdWebUI(req, res, rewrittenUrl);
+      return;
+    }
 
     if (req.method === 'GET' && (urlPath === '/v1/models' || urlPath === '/api/antigravity/v1/models' || urlPath === '/models')) {
       try {

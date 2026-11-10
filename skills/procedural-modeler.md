@@ -68,48 +68,64 @@ Use this skill whenever requested to create or extend 3D models, assets, or geom
 
 ## 3D Texture Generation & PBR Material Mastery
 
-High quality 3D materials require clean textures without baked lighting artifacts.
+High quality 3D materials require clean textures without baked lighting artifacts. Mesh Editor provides a unified texture generation architecture supporting external AI image generators, subagent image generation, and offline procedural synthesis.
 
-### A. When the AI Model has Built-in Image Generation (`generate_image` / `image-generator`)
+### A. Primary: Direct AI Texture Synthesis (`modeler_generate_texture` with `useAI: true`)
 
-If a specific texture is missing for a 3D model, surface, or decal (e.g., "gray sand", "ancient dungeon cobblestone", "scifi hull panels"), you as an AI can generate these textures seamlessly yourself using your built-in image tools!
+Mesh Editor integrates with external AI image generators configured by the user:
+- **Local Mac (Metal / Apple Silicon)**: Draw Things or Automatic1111 on `http://127.0.0.1:7860` (proxied via MeshEditor devServer/bridge to eliminate CORS).
+- **Google Cloud**: Google Imagen 3 / Banana Pro (`gemini-3-pro-image-preview` / `imagen-3.0`).
+- **Free Cloud AI**: Pollinations.ai (works out of the box without an API key).
+- **Cloud APIs**: OpenAI (DALL-E 3 / 2), Fal.ai (Flux Schnell / Dev), Replicate (Flux / SDXL), and custom REST endpoints.
 
-**Step 1: Generate Texture Image**
-Use your `generate_image` tool (or `image-generator` subagent) with a prompt that explicitly requests a seamless tileable texture:
-`Prompt: "A high quality top-down seamless texture of [description]. Uniform lighting, no shadows. Perfect for 3D tiling."`
-The tool saves the image as an artifact or file in your workspace. Note the absolute path or data URI.
-
-**Mandatory Prompt Rules for 3D Tiling Textures**:
-1. **View / Projection**: Always specify `"top-down orthogonal view"`, `"flat 90-degree overhead projection"`, `"no perspective angle"`.
-2. **Lighting / Shading**: Always specify `"completely unshaded diffuse albedo map"`, `"uniform flat lighting"`, `"zero directional shadows"`, `"no specular highlights"`, `"no vignette"`.
-3. **Tiling**: Always include `"seamless texture"`, `"seamless tileable repeating pattern"`, `"perfect for 3D tiling"`.
-4. **Subject**: Focus purely on the surface macro/micro texture without scene objects, horizons, or tilted elements.
-
-**Step 2: Register & Apply to Mesh**
-Pass the generated image path or data URL directly to `modeler_generate_texture` with `imageUrl`, or to `modeler_create_material`:
-
+When building or texturing 3D meshes, you can call `modeler_generate_texture` directly with `useAI: true` (default):
 ```json
 {
   "tool": "modeler_generate_texture",
-  "prompt": "Gray lunar sand",
-  "imageUrl": "/Users/dpeer/.../generated_image.png",
-  "applyToMesh": "MoonSurface",
-  "uvScale": 4
+  "prompt": "Weathered medieval dark dungeon cobblestone floor with green moss in crevices",
+  "useAI": true,
+  "backend": "auto",
+  "applyToMesh": "DungeonFloor",
+  "uvScale": 2.0,
+  "normalStrength": 2.2
 }
 ```
-`modeler_generate_texture` automatically computes a matching tangent-space normal map, embeds the textures in the scene, and binds them to the mesh.
+**What `modeler_generate_texture` automatically handles:**
+1. **AI Image Synthesis**: Sends the request to the user's active/configured image generator engine (or falls back seamlessly to procedural synthesis if offline or unconfigured).
+2. **Seamless Prompt Optimization**: Automatically enhances the prompt with orthogonal top-down, shadowless lighting, and tileable repeating pattern keywords.
+3. **Tangent-Space Normal Map**: Automatically evaluates the image and computes a matching tangent-space normal map for physical 3D micro-surface relief.
+4. **Distinct Texture Embedding**: Embeds the texture cleanly into the scene's *Embedded Textures* registry without creating redundant duplicate texture instances.
+5. **PBR Material & Binding**: Creates and registers a `PBRMaterial`, configures roughness/metallic, sets the UV scale, and binds it to the specified `applyToMesh`.
 
-### B. Fallback: When the Model does NOT have an Image Generator (Built-in Procedural)
+### B. When the AI Model has Built-in Image Generation (`generate_image` / `image-generator`)
 
-When working without external or built-in image generators, ALWAYS fall back to the built-in procedural synthesizer:
+If you are running in an agentic coding environment with a dedicated `generate_image` tool or `image-generator` subagent:
+1. Generate the image using your image tool with a seamless prompt:
+   `"A high quality top-down seamless texture of [description]. Uniform lighting, flat overhead view, no shadows. Perfect for 3D tiling."`
+2. Pass the saved image path or data URL directly to `modeler_generate_texture` with `imageUrl`:
+   ```json
+   {
+     "tool": "modeler_generate_texture",
+     "prompt": "Gray lunar sand",
+     "imageUrl": "/workspace/lunar_sand.png",
+     "applyToMesh": "MoonSurface",
+     "uvScale": 4
+   }
+   ```
+   `modeler_generate_texture` automatically computes the matching normal map, embeds the textures in the scene, and binds them to the mesh.
 
-1. **`modeler_generate_texture` (Built-in Synthesizer)**:
-   Runs instantly and offline, creating tileable PBR diffuse and normal maps:
+### C. Offline & Procedural Texturing (`useAI: false` or Procedural Synthesizer)
+
+When working offline or when mathematical procedural textures are preferred:
+
+1. **`modeler_generate_texture` (Procedural Mode)**:
+   Runs instantly and offline with mathematical synthesis:
    ```json
    {
      "tool": "modeler_generate_texture",
      "prompt": "Weathered dark dungeon cobblestone floor with mossy crevices",
      "style": "cobblestone",
+     "useAI": false,
      "size": 512,
      "applyToMesh": "DungeonWall"
    }
@@ -243,7 +259,7 @@ To avoid crude, wooden, or blocky results, prefer these high-level parametric to
 12. **High-to-Low-Poly Normal Map & AO Baking (`modeler_bake_textures`)**:
    - Projects micro-details (grooves, bevels, pores, bolts) from a high-poly sculpt onto a low-poly game mesh using an automatic smooth-normal **Projection Cage** (`cageOffset: 0.05`, `bakeNormals: true`, `bakeAO: true`, `dilationPixels: 4`, `applyToMaterial: true`).
 13. **AI Texture Synthesis (`modeler_generate_texture`)**:
-   - Generates seamless tileable 2D PBR Albedo and Tangent-Space Normal Map textures from a natural language `prompt` (styles: `"cobblestone"`, `"stone"`, `"brick"`, `"wood"`, `"metal"`, `"rust"`, `"scifi"`, `"marble"`, `"lava"`, `"moss"`, `"scales"`, `"fabric"`, `"runes"`, `"decal"`), embeds them in the scene, registers a `PBRMaterial`, and optionally applies them directly via `applyToMesh`.
+   - Synthesizes seamless tileable 2D PBR Albedo and Tangent-Space Normal Map textures from a natural language `prompt` using configured external AI image generators (`useAI: true`, `backend: "auto" | "sd_webui" | "imagen" | "pollinations" | "openai" | "fal" | "replicate"`) or offline procedural noise (styles: `"cobblestone"`, `"stone"`, `"brick"`, `"wood"`, `"metal"`, `"rust"`, `"scifi"`, `"marble"`, `"lava"`, `"moss"`, `"scales"`, `"fabric"`, `"runes"`, `"decal"`), embeds distinct textures in the scene, registers a `PBRMaterial`, and applies them directly to `applyToMesh` with `uvScale`.
 14. **3D Extruded Typography (`modeler_create_text_mesh`)**:
    - Builds or updates 3D extruded text meshes (`text`, `font: "kenney_future" | "droid_sans_bold" | "droid_sans_regular"`, `size`, `depth`, `resolution`, `color`, `emissiveColor`).
 15. **Surface Decal Painting & Mesh Fusion (`modeler_decal`)**:

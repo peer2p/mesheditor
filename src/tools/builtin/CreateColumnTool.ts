@@ -39,6 +39,15 @@ export class CreateColumnTool extends AbstractTool {
       roughness: { type: 'number', description: 'PBR roughness (default: 0.55).' },
       metallic: { type: 'number', description: 'PBR metallic (default: 0.02).' },
       materialName: { type: 'string', description: 'Optional existing material name.' },
+      texturePrompt: {
+        type: 'string',
+        description:
+          'Optional natural language prompt to generate and apply an AI PBR texture (e.g. "White fluted Carrara marble", "Weathered Roman limestone").',
+      },
+      uvScale: {
+        type: 'number',
+        description: 'Texture UV tiling scale factor (default: 2.0).',
+      },
     },
   };
 
@@ -68,6 +77,20 @@ export class CreateColumnTool extends AbstractTool {
     );
     context.applyTransformArgs(mesh, args);
     context.registerCreatedMesh(mesh);
+
+    if (args.texturePrompt && context.service.aiTextureGenerator) {
+      context.service.aiTextureGenerator
+        .generateTexture({
+          prompt: args.texturePrompt,
+          applyToMesh: mesh.name,
+          uvScale: typeof args.uvScale === 'number' ? args.uvScale : 2.0,
+          useAI: true,
+          fallbackToProcedural: true,
+        })
+        .catch((err: any) => {
+          console.warn(`Texture generation for ${mesh.name} failed:`, err);
+        });
+    }
 
     const bb = mesh.getBoundingInfo().boundingBox;
     return JSON.stringify({

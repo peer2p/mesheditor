@@ -44,9 +44,59 @@
       >Weathered dark dungeon cobblestone floor with mossy crevices</textarea>
     </div>
 
-    <!-- 2. Pattern & Synthesis Settings -->
+    <!-- 2. Generator Engine & Synthesis Settings -->
     <div class="tool-control-group" style="border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 10px;">
-      <div class="sculpt-section-title"><i class="app-icon" data-lucide="sliders"></i> Synthesis Settings</div>
+      <div class="sculpt-slider-header">
+        <div class="sculpt-section-title"><i class="app-icon" data-lucide="wand-2"></i> Generator Engine</div>
+        <button type="button" id="btnToggleAITextureSettings" class="sculpt-btn" style="height: 22px; padding: 0 6px; font-size: 10px;" title="Configure External AI Generator Endpoints">
+          <i class="app-icon" data-lucide="settings"></i> Config
+        </button>
+      </div>
+      <div class="tool-row" style="margin-top: 4px;">
+        <select id="aiTextureBackendSelect" class="tool-select" style="flex: 1;" aria-label="Texture Generation Engine">
+          <option value="pollinations" selected>Pollinations.ai (Free Cloud AI)</option>
+          <option value="procedural">Procedural Synthesizer (Built-in)</option>
+          <option value="openai">OpenAI DALL-E (Cloud API)</option>
+          <option value="imagen">Google Imagen 3 / Banana Pro (Cloud API)</option>
+          <option value="fal">Fal.ai Flux / SDXL (Cloud API)</option>
+          <option value="replicate">Replicate Flux / SDXL (Cloud API)</option>
+          <option value="sd_webui">Stable Diffusion / Draw Things (Local)</option>
+          <option value="custom">Custom OpenAI / REST Endpoint</option>
+        </select>
+      </div>
+
+      <!-- External Generator Configuration Drawer -->
+      <div id="aiTextureExternalConfigDrawer" style="display: none; margin-top: 8px; padding: 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span id="aiTextureConfigTitle" style="font-size: 11px; font-weight: 600; color: #f0f6fc;">External Generator Settings</span>
+          <button type="button" class="ai-chip-btn" id="btnTestAITextureConnection" title="Test Generator Endpoint Connection">Test</button>
+        </div>
+        <div class="tool-row" style="margin-top: 2px;">
+          <label class="tool-label" for="aiTextureEndpointUrl" style="min-width: 60px;">URL</label>
+          <input type="text" id="aiTextureEndpointUrl" class="tool-input" placeholder="Endpoint URL" style="flex: 1; font-size: 11px;" />
+        </div>
+        <div id="aiTextureApiKeyRow" class="tool-row" style="margin-top: 2px;">
+          <label class="tool-label" for="aiTextureApiKey" style="min-width: 60px;">API Key</label>
+          <div style="flex: 1; display: flex; gap: 4px; align-items: center;">
+            <input type="password" id="aiTextureApiKey" class="tool-input" placeholder="API Key (optional for Local / Free)" style="flex: 1; min-width: 0; font-size: 11px;" autocomplete="off" />
+            <button type="button" class="ai-icon-btn" id="btnToggleTextureApiKeyVis" title="Show/Hide API Key" style="width: 24px; height: 24px; padding: 0;">
+              <i class="app-icon" data-lucide="eye"></i>
+            </button>
+          </div>
+        </div>
+        <div class="tool-row" style="margin-top: 2px;">
+          <label class="tool-label" for="aiTextureModelId" style="min-width: 60px;">Model</label>
+          <input type="text" id="aiTextureModelId" class="tool-input" placeholder="Model ID (e.g. dall-e-3, flux)" style="flex: 1; font-size: 11px;" />
+        </div>
+        <div class="sculpt-options-row" style="margin-top: 4px;">
+          <label class="sculpt-checkbox-label">
+            <input type="checkbox" id="aiTexturePromptEnhanceCheck" checked />
+            <span style="font-size: 10px;">Enhance Prompt for Seamless Tiling</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="sculpt-section-title" style="margin-top: 10px;"><i class="app-icon" data-lucide="sliders"></i> Synthesis Settings</div>
       <div class="tool-row" style="margin-top: 4px;">
         <label class="tool-label" for="aiTextureStyleSelect" style="min-width: 78px;">Style</label>
         <select id="aiTextureStyleSelect" class="tool-select" style="flex: 1;">

@@ -97,6 +97,56 @@ export interface Neural3DProviderConfig {
 
 export type Neural3DProvidersMap = Record<Neural3DBackendId, Neural3DProviderConfig>;
 
+export type ImageGeneratorBackendId =
+  | 'pollinations'
+  | 'openai'
+  | 'imagen'
+  | 'fal'
+  | 'replicate'
+  | 'sd_webui'
+  | 'comfyui'
+  | 'custom';
+
+export type ImageGeneratorProtocol =
+  | 'pollinations'
+  | 'openai'
+  | 'imagen'
+  | 'fal'
+  | 'replicate'
+  | 'sd_webui'
+  | 'comfyui'
+  | 'custom_rest';
+
+export interface ImageGeneratorProviderConfig {
+  id: ImageGeneratorBackendId;
+  name: string;
+  enabled: boolean;
+  protocol: ImageGeneratorProtocol;
+  endpointUrl: string;
+  apiKey?: string;
+  modelId?: string;
+}
+
+export type ImageGeneratorProvidersMap = Record<ImageGeneratorBackendId, ImageGeneratorProviderConfig>;
+
+export interface ImageGenerationRequest {
+  backend?: ImageGeneratorBackendId | 'auto';
+  prompt: string;
+  size?: number;
+  seamless?: boolean;
+  seed?: number;
+  enhancePrompt?: boolean;
+  signal?: AbortSignal;
+}
+
+export interface ImageGenerationResult {
+  providerId: ImageGeneratorBackendId;
+  providerName: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
 export interface AIAgentEndpointConfig {
   baseUrl: string;
   apiKey: string;
@@ -109,6 +159,9 @@ export interface AIAgentEndpointConfig {
   createNormalMaps?: boolean;
   visualCritique?: boolean;
   neural3DProviders?: Neural3DProvidersMap;
+  imageGeneratorEnabled?: boolean;
+  imageGeneratorActiveBackend?: ImageGeneratorBackendId | 'procedural';
+  imageGeneratorProviders?: ImageGeneratorProvidersMap;
 }
 
 export interface AIAgentSkillDefinition {

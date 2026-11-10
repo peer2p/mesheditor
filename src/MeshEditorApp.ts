@@ -5382,6 +5382,74 @@ export class MeshEditorApp {
 
     syncNeuralProvidersUI();
 
+    // External Image Generator bindings (AI Textures)
+    const imgGenEnableEl = this.getElement<HTMLInputElement>('aiImageGenEnabled');
+    const imgGenBodyEl = this.getElement<HTMLElement>('aiImageGenConfigBody');
+    const imgGenBackendEl = this.getElement<HTMLSelectElement>('aiImageGenBackendSelect');
+    const imgGenModelEl = this.getElement<HTMLInputElement>('aiImageGenModel');
+    const imgGenUrlEl = this.getElement<HTMLInputElement>('aiImageGenUrl');
+    const imgGenKeyEl = this.getElement<HTMLInputElement>('aiImageGenKey');
+    const testImgGenBtn = this.getElement<HTMLButtonElement>('btnTestImageGenGlobal');
+
+    const syncImageGenUI = () => {
+      const imgGenService = this.service.externalImageGenerator;
+      const isEnabled = this.service.aiAgent.config.imageGeneratorEnabled ?? true;
+      const currentActive = imgGenService.getActiveBackend();
+      const targetBackend = (imgGenBackendEl?.value || (currentActive !== 'procedural' ? currentActive : 'pollinations')) as any;
+      const provider = imgGenService.getProvider(targetBackend);
+
+      if (imgGenEnableEl) imgGenEnableEl.checked = isEnabled;
+      if (imgGenBodyEl) imgGenBodyEl.style.display = isEnabled ? 'flex' : 'none';
+      if (imgGenBackendEl) imgGenBackendEl.value = targetBackend;
+      if (imgGenModelEl) imgGenModelEl.value = provider.modelId || '';
+      if (imgGenUrlEl) imgGenUrlEl.value = provider.endpointUrl || '';
+      if (imgGenKeyEl) imgGenKeyEl.value = provider.apiKey || '';
+    };
+
+    const saveImageGenFromDOM = () => {
+      const isEnabled = !!imgGenEnableEl?.checked;
+      const backend = (imgGenBackendEl?.value || 'pollinations') as any;
+      this.service.externalImageGenerator.updateProvider(backend, {
+        modelId: imgGenModelEl?.value.trim(),
+        endpointUrl: imgGenUrlEl?.value.trim(),
+        apiKey: imgGenKeyEl?.value.trim(),
+      });
+      this.service.externalImageGenerator.setActiveBackend(isEnabled ? backend : 'procedural');
+      this.service.aiAgent.saveConfig({
+        imageGeneratorEnabled: isEnabled,
+        imageGeneratorActiveBackend: backend,
+        imageGeneratorProviders: this.service.externalImageGenerator.getProviders(),
+      });
+    };
+
+    imgGenEnableEl?.addEventListener('change', () => {
+      const isEnabled = !!imgGenEnableEl.checked;
+      if (imgGenBodyEl) imgGenBodyEl.style.display = isEnabled ? 'flex' : 'none';
+      saveImageGenFromDOM();
+    });
+
+    imgGenBackendEl?.addEventListener('change', () => {
+      const backend = (imgGenBackendEl.value || 'pollinations') as any;
+      const provider = this.service.externalImageGenerator.getProvider(backend);
+      if (imgGenModelEl) imgGenModelEl.value = provider.modelId || '';
+      if (imgGenUrlEl) imgGenUrlEl.value = provider.endpointUrl || '';
+      if (imgGenKeyEl) imgGenKeyEl.value = provider.apiKey || '';
+      saveImageGenFromDOM();
+    });
+
+    imgGenModelEl?.addEventListener('change', saveImageGenFromDOM);
+    imgGenUrlEl?.addEventListener('change', saveImageGenFromDOM);
+    imgGenKeyEl?.addEventListener('change', saveImageGenFromDOM);
+
+    testImgGenBtn?.addEventListener('click', async () => {
+      saveImageGenFromDOM();
+      const backend = (imgGenBackendEl?.value || 'pollinations') as any;
+      const res = await this.service.externalImageGenerator.testProvider(backend);
+      this.showToast(res.message, res.ok ? 'success' : 'warning');
+    });
+
+    syncImageGenUI();
+
     updateEndpointBadge();
     this.renderAISkills();
 
@@ -5478,6 +5546,8 @@ export class MeshEditorApp {
       if (visualCritiqueCheckQuick && visualCritiqueCheck) {
         visualCritiqueCheckQuick.checked = visualCritiqueCheck.checked;
       }
+
+      saveImageGenFromDOM();
 
       this.service.aiAgent.saveConfig({
         baseUrl: endpointInput?.value.trim() || 'https://api.openai.com/v1',
@@ -6701,6 +6771,23 @@ export class MeshEditorApp {
         card.classList.add('is-atlas');
       }
 
+      const selMat = this.service.getSelectedMaterial();
+      const isAlbedoActive =
+        selMat &&
+        (selMat instanceof PBRMaterial
+          ? (selMat.albedoTexture as Texture)?.url === tex.url
+          : (selMat as StandardMaterial).diffuseTexture &&
+            ((selMat as StandardMaterial).diffuseTexture as Texture).url === tex.url);
+
+      const isBumpActive =
+        selMat &&
+        (selMat instanceof PBRMaterial || selMat instanceof StandardMaterial) &&
+        (selMat.bumpTexture as Texture)?.url === tex.url;
+
+      if (isAlbedoActive || isBumpActive) {
+        card.classList.add('active');
+      }
+
       const thumbWrapper = document.createElement('div');
       thumbWrapper.className = 'embedded-texture-thumb';
 
@@ -6729,6 +6816,24 @@ export class MeshEditorApp {
         const badge = document.createElement('span');
         badge.className = 'embedded-texture-badge';
         badge.textContent = `Atlas (${tex.framesCount || 16})`;
+        metaRow.appendChild(badge);
+      } else if (tex.materialsCount > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'embedded-texture-badge';
+        if (isAlbedoActive) {
+          badge.style.background = 'rgba(35, 134, 54, 0.25)';
+          badge.style.color = '#3fb950';
+          badge.textContent = 'Active Albedo';
+        } else if (isBumpActive) {
+          badge.style.background = 'rgba(163, 113, 247, 0.25)';
+          badge.style.color = '#d2a8ff';
+          badge.textContent = 'Active Normal';
+        } else {
+          badge.style.background = 'rgba(56, 139, 253, 0.15)';
+          badge.style.color = '#58a6ff';
+          badge.textContent = `${tex.materialsCount} ${tex.materialsCount === 1 ? 'material' : 'materials'}`;
+        }
+        badge.title = `In use by: ${tex.materialNames.join(', ')}`;
         metaRow.appendChild(badge);
       }
 
@@ -6768,9 +6873,13 @@ export class MeshEditorApp {
         });
       } else {
         const btnApply = document.createElement('button');
-        btnApply.className = 'tool-btn-xs tool-btn-primary';
-        btnApply.title = 'Apply texture to selected mesh material';
-        btnApply.innerHTML = '<i class="app-icon" data-lucide="check"></i> Apply';
+        btnApply.className = isAlbedoActive ? 'tool-btn-xs tool-btn-primary active' : 'tool-btn-xs tool-btn-primary';
+        btnApply.title = isAlbedoActive
+          ? 'Currently applied to selected material (click to re-apply)'
+          : 'Apply texture to selected mesh material';
+        btnApply.innerHTML = isAlbedoActive
+          ? '<i class="app-icon" data-lucide="check"></i> Applied'
+          : '<i class="app-icon" data-lucide="check"></i> Apply';
         btnApply.addEventListener('click', (e) => {
           e.stopPropagation();
           this.service.applyTextureToSelectedMaterial(tex.url, tex.name);
@@ -6780,8 +6889,12 @@ export class MeshEditorApp {
 
         const btnBump = document.createElement('button');
         btnBump.className = 'tool-btn-xs';
-        btnBump.title = 'Apply as Normal / Bump Map to selected mesh material';
-        btnBump.innerHTML = '<i class="app-icon" data-lucide="layers"></i> Normal';
+        btnBump.title = isBumpActive
+          ? 'Active as Normal / Bump Map'
+          : 'Apply as Normal / Bump Map to selected mesh material';
+        btnBump.innerHTML = isBumpActive
+          ? '<i class="app-icon" data-lucide="layers"></i> Active'
+          : '<i class="app-icon" data-lucide="layers"></i> Normal';
         btnBump.addEventListener('click', (e) => {
           e.stopPropagation();
           this.service.applyBumpTextureToSelectedMaterial(tex.url, tex.name);
@@ -8474,6 +8587,15 @@ export class MeshEditorApp {
 
     const promptInput = this.getElement<HTMLTextAreaElement>('aiTexturePrompt');
     const presetSelect = this.getElement<HTMLSelectElement>('aiTexturePresetSelect');
+    const backendSelect = this.getElement<HTMLSelectElement>('aiTextureBackendSelect');
+    const btnToggleConfig = this.getElement<HTMLButtonElement>('btnToggleAITextureSettings');
+    const configDrawer = this.getElement<HTMLElement>('aiTextureExternalConfigDrawer');
+    const endpointUrlInput = this.getElement<HTMLInputElement>('aiTextureEndpointUrl');
+    const apiKeyInput = this.getElement<HTMLInputElement>('aiTextureApiKey');
+    const btnToggleApiKeyVis = this.getElement<HTMLButtonElement>('btnToggleTextureApiKeyVis');
+    const modelIdInput = this.getElement<HTMLInputElement>('aiTextureModelId');
+    const promptEnhanceCheck = this.getElement<HTMLInputElement>('aiTexturePromptEnhanceCheck');
+    const btnTestConnection = this.getElement<HTMLButtonElement>('btnTestAITextureConnection');
     const styleSelect = this.getElement<HTMLSelectElement>('aiTextureStyleSelect');
     const sizeSelect = this.getElement<HTMLSelectElement>('aiTextureSizeSelect');
     const seamlessCheck = this.getElement<HTMLInputElement>('aiTextureSeamlessCheck');
@@ -8486,6 +8608,80 @@ export class MeshEditorApp {
     const normalStrengthInput = this.getElement<HTMLInputElement>('aiTextureNormalStrength');
     const normalStrengthVal = this.getElement<HTMLElement>('aiTextureNormalStrengthVal');
     const uvScaleInput = this.getElement<HTMLInputElement>('aiTextureUVScaleInput');
+    const btnGenerate = this.getElement<HTMLButtonElement>('btnGenerateAITexture');
+
+    const imgGenService = this.service.externalImageGenerator;
+
+    const syncTextureBackendUI = () => {
+      const active = imgGenService.getActiveBackend();
+      if (backendSelect) backendSelect.value = active;
+      const isExternal = active !== 'procedural';
+
+      if (btnToggleConfig) btnToggleConfig.style.display = isExternal ? 'inline-flex' : 'none';
+      if (!isExternal && configDrawer) configDrawer.style.display = 'none';
+
+      const provider = imgGenService.getProvider(isExternal ? (active as any) : 'pollinations');
+      if (endpointUrlInput) endpointUrlInput.value = provider.endpointUrl || '';
+      if (apiKeyInput) apiKeyInput.value = provider.apiKey || '';
+      if (modelIdInput) modelIdInput.value = provider.modelId || '';
+      if (promptEnhanceCheck) promptEnhanceCheck.checked = imgGenService.isPromptEnhanceEnabled();
+
+      if (btnGenerate) {
+        btnGenerate.innerHTML = `<i class="app-icon" data-lucide="wand-2"></i> Generate Texture`;
+      }
+    };
+
+    backendSelect?.addEventListener('change', () => {
+      const selected = (backendSelect.value || 'procedural') as any;
+      imgGenService.setActiveBackend(selected);
+      syncTextureBackendUI();
+    });
+
+    btnToggleConfig?.addEventListener('click', () => {
+      if (!configDrawer) return;
+      const isVisible = configDrawer.style.display === 'flex' || configDrawer.style.display === 'block';
+      configDrawer.style.display = isVisible ? 'none' : 'flex';
+    });
+
+    btnToggleApiKeyVis?.addEventListener('click', () => {
+      if (!apiKeyInput) return;
+      const isPassword = apiKeyInput.type === 'password';
+      apiKeyInput.type = isPassword ? 'text' : 'password';
+      btnToggleApiKeyVis.innerHTML = `<i class="app-icon" data-lucide="${isPassword ? 'eye-off' : 'eye'}"></i>`;
+    });
+
+    const saveBackendConfigFromDOM = () => {
+      const active = backendSelect?.value;
+      if (!active || active === 'procedural') return;
+      imgGenService.updateProvider(active as any, {
+        endpointUrl: endpointUrlInput?.value.trim(),
+        apiKey: apiKeyInput?.value.trim(),
+        modelId: modelIdInput?.value.trim(),
+      });
+      if (promptEnhanceCheck) {
+        imgGenService.setPromptEnhance(promptEnhanceCheck.checked);
+      }
+    };
+
+    endpointUrlInput?.addEventListener('change', saveBackendConfigFromDOM);
+    apiKeyInput?.addEventListener('change', saveBackendConfigFromDOM);
+    modelIdInput?.addEventListener('change', saveBackendConfigFromDOM);
+    promptEnhanceCheck?.addEventListener('change', () => {
+      if (promptEnhanceCheck) imgGenService.setPromptEnhance(promptEnhanceCheck.checked);
+    });
+
+    btnTestConnection?.addEventListener('click', async () => {
+      saveBackendConfigFromDOM();
+      const active = (backendSelect?.value || 'pollinations') as any;
+      if (active === 'procedural') {
+        this.showToast('Procedural Synthesizer is built-in and always available.', 'info');
+        return;
+      }
+      const res = await imgGenService.testProvider(active);
+      this.showToast(res.message, res.ok ? 'success' : 'warning');
+    });
+
+    syncTextureBackendUI();
 
     presetSelect?.addEventListener('change', () => {
       if (!presetSelect.value) return;
@@ -8514,7 +8710,7 @@ export class MeshEditorApp {
     this.getElement('btnPreviewNormal')?.addEventListener('click', () => setPreviewMode('normal'));
     this.getElement('btnPreviewTiled')?.addEventListener('click', () => setPreviewMode('tiled'));
 
-    this.getElement('btnGenerateAITexture')?.addEventListener('click', async () => {
+    btnGenerate?.addEventListener('click', async () => {
       const prompt = promptInput?.value.trim() || 'Seamless stone texture';
       const style = (styleSelect?.value || 'auto') as any;
       const size = parseInt(sizeSelect?.value || '512', 10) || 512;
@@ -8522,24 +8718,41 @@ export class MeshEditorApp {
       const generateNormalMap = normalCheck ? normalCheck.checked : true;
       const normalStrength = parseFloat(normalStrengthInput?.value || '2.2') || 2.2;
       const useCustomColors = Boolean(customColorsCheck?.checked);
+      const backend = (backendSelect?.value || 'procedural') as any;
+      const enhancePrompt = promptEnhanceCheck ? promptEnhanceCheck.checked : true;
 
-      const item = await this.service.aiTextureGenerator.generateTexture({
-        prompt,
-        style,
-        size,
-        seamless,
-        generateNormalMap,
-        normalStrength,
-        primaryColor: useCustomColors ? primaryColorInput?.value : undefined,
-        secondaryColor: useCustomColors ? secondaryColorInput?.value : undefined,
-        accentColor: useCustomColors ? accentColorInput?.value : undefined,
-        embedInScene: true,
-      });
+      const originalHtml = btnGenerate.innerHTML;
+      btnGenerate.disabled = true;
+      btnGenerate.innerHTML = '<i class="app-icon spin" data-lucide="loader-2"></i> Generating...';
 
-      this.activeAITextureId = item.id;
-      this.showToast(`Generated "${item.name}" (${item.size}x${item.size})`, 'success');
-      this.updateAITextureUI();
-      this.updateDecalUI();
+      try {
+        const item = await this.service.aiTextureGenerator.generateTexture({
+          prompt,
+          style,
+          size,
+          seamless,
+          generateNormalMap,
+          normalStrength,
+          primaryColor: useCustomColors ? primaryColorInput?.value : undefined,
+          secondaryColor: useCustomColors ? secondaryColorInput?.value : undefined,
+          accentColor: useCustomColors ? accentColorInput?.value : undefined,
+          backend,
+          enhancePrompt,
+          fallbackToProcedural: false,
+          embedInScene: true,
+        });
+
+        this.activeAITextureId = item.id;
+        const backendLabel = item.isAI ? ` via ${item.generatorBackend || 'AI'}` : '';
+        this.showToast(`Generated "${item.name}" (${item.size}x${item.size}${backendLabel})`, 'success');
+        this.updateAITextureUI();
+        this.updateDecalUI();
+      } catch (err: any) {
+        this.showToast(err?.message || 'Failed to generate texture.', 'error');
+      } finally {
+        btnGenerate.disabled = false;
+        btnGenerate.innerHTML = originalHtml;
+      }
     });
 
     const btnUploadTex = this.getElement<HTMLButtonElement>('btnUploadAITextureImage');
@@ -8656,7 +8869,8 @@ export class MeshEditorApp {
       if (activeItem) {
         previewContainer.style.display = 'block';
         if (metaLabel) {
-          metaLabel.textContent = `${activeItem.name} (${activeItem.size}px • ${activeItem.style})`;
+          const aiTag = activeItem.isAI ? ` • ${activeItem.generatorBackend || 'AI'}` : '';
+          metaLabel.textContent = `${activeItem.name} (${activeItem.size}px • ${activeItem.style}${aiTag})`;
         }
         const url =
           this.activeAITexturePreviewMode === 'normal' && activeItem.normalDataUrl

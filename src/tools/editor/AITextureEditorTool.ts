@@ -11,15 +11,15 @@ export class AITextureEditorTool extends AbstractEditorTool {
   public readonly isExclusive3DTool = false;
 
   public readonly description =
-    'Generate seamless 2D PBR textures and normal maps from natural language prompts, download them as PNG, or apply them to meshes and decals.';
+    'Generate seamless 2D PBR textures and normal maps using the built-in procedural synthesizer or external AI image generators (Pollinations, OpenAI DALL-E, SD WebUI, Fal.ai, Replicate).';
 
   public readonly helpText = `
     <h4>AI Texture Generator</h4>
-    <p>Synthesize seamless tileable Albedo and Tangent-Space Normal Map textures from text prompts.</p>
+    <p>Synthesize seamless tileable Albedo and Tangent-Space Normal Map textures from natural language prompts using either the offline Procedural Synthesizer or external AI Image Generators.</p>
     <ul>
+      <li><strong>Generator Engines:</strong> Choose between the built-in <em>Procedural Synthesizer</em> (fast offline mathematical noise) or external <em>AI Image Generators</em> (Free Pollinations.ai, OpenAI DALL-E 3/2, Stable Diffusion WebUI / Automatic1111, Fal.ai Flux, Replicate, or Custom REST endpoints).</li>
+      <li><strong>Seamless Tiling & Normal Maps:</strong> Automatically generates matching tangent-space normal maps for realistic 3D depth and enhances prompts with orthogonal seamless tiling modifiers.</li>
       <li><strong>Prompt & Presets:</strong> Describe the surface material (e.g., <em>"Weathered dungeon cobblestone floor with mossy crevices"</em>) or pick a quick preset.</li>
-      <li><strong>Pattern Styles:</strong> Automatically inferred from your prompt, or manually select Cobblestone, Brick, Wood Planks, Sci-Fi Panels, Rusted Metal, Volcanic Lava, Marble, Arcane Runes, Scales, Moss, or Alpha Decal.</li>
-      <li><strong>Seamless & Normal Maps:</strong> Generated textures use periodic toroidal noise for seamless UV tiling and include a matching normal map.</li>
       <li><strong>Apply, Decal & Download:</strong> Click <strong>Apply to Mesh</strong> to assign the PBR texture to the selected mesh, <strong>Use as Decal</strong> to paint with it in the Decal Painter, or <strong>Download PNG</strong> to save it locally.</li>
     </ul>
   `;

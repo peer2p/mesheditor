@@ -203,6 +203,36 @@ describe('Voxel Painter & Texture Atlas Integration Tests', () => {
       expect(currentTex?.name).toBe('my_embedded_wood.png');
     });
 
+    it('returns only distinct embedded textures and deduplicates when texture is applied multiple times', () => {
+      const meshA = service.createPrimitive(createBoxConfig('CubeA'));
+      service.selectMesh(meshA);
+
+      const mockDataUrl =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAADklEQVR42mNk+M/wHwAE/wH+j5e92QAAAABJRU5ErkJggg==';
+      const tex = service.addTextureFromDataUrl('distinct_stone.png', mockDataUrl);
+
+      // Initial count of distinct textures
+      const initialCount = service.getEmbeddedTexturesInfo().filter((t) => t.name === 'distinct_stone.png').length;
+      expect(initialCount).toBe(1);
+
+      // Apply to first mesh material
+      service.applyTextureToSelectedMaterial(tex.url, tex.name);
+      const countAfterFirstApply = service.getEmbeddedTexturesInfo().filter((t) => t.name === 'distinct_stone.png').length;
+      expect(countAfterFirstApply).toBe(1);
+
+      // Apply to second mesh material
+      const meshB = service.createPrimitive(createBoxConfig('CubeB'));
+      service.selectMesh(meshB);
+      service.applyTextureToSelectedMaterial(tex.url, tex.name);
+      const countAfterSecondApply = service.getEmbeddedTexturesInfo().filter((t) => t.name === 'distinct_stone.png').length;
+      expect(countAfterSecondApply).toBe(1);
+
+      // Verify material associations are merged
+      const distinctEntry = service.getEmbeddedTexturesInfo().find((t) => t.name === 'distinct_stone.png');
+      expect(distinctEntry).toBeDefined();
+      expect(distinctEntry?.materialsCount).toBeGreaterThanOrEqual(1);
+    });
+
     it('filters out internal Babylon RenderTargetTextures (RTT, EffectLayer, HighlightLayer)', () => {
       // Simulate Babylon's internal RTT textures
       const rtt1 = new Texture('EffectLayerMainRTT', service.scene);

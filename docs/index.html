@@ -29,6 +29,7 @@
           <li><a href="#overview" class="nav-link">Overview</a></li>
           <li><a href="#ai-copilot" class="nav-link">Human + AI</a></li>
           <li><a href="#neural-3d" class="nav-link">Neural 3D</a></li>
+          <li><a href="#ai-textures" class="nav-link">AI Textures</a></li>
           <li><a href="#game-pipeline" class="nav-link">Game Pipeline</a></li>
           <li><a href="#adapters" class="nav-link">Adapters</a></li>
           <li><a href="#plugin-system" class="nav-link">Plugin System</a></li>
@@ -367,16 +368,17 @@
           <!-- Card 5 -->
           <div class="feature-card">
             <div class="card-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="m4.93 4.93 4.24 4.24"></path><path d="m14.83 9.17 4.24-4.24"></path><path d="m14.83 14.83 4.24 4.24"></path><path d="m9.17 14.83-4.24 4.24"></path></svg>
             </div>
-            <h3 class="card-title">Procedural Textures &amp; Normal Maps</h3>
+            <h3 class="card-title">AI Texture Generator (Local &amp; Cloud)</h3>
             <p class="card-desc">
-              The AI automatically textures created meshes with seamless PBR materials, calculates UV coordinates, and computes normal/bump depth maps for micro-surface relief without inflating polygon counts.
+              Synthesize seamless 2D PBR Albedo and Tangent-Space Normal Maps directly from natural language prompts. Connect to <strong>Draw Things</strong> (local Apple Silicon / Metal), <strong>Google Imagen 3 / Banana Pro</strong>, <strong>Pollinations.ai</strong> (free), <strong>OpenAI DALL-E</strong>, or <strong>Fal.ai</strong>, or use built-in procedural synthesis.
             </p>
             <div class="card-tags">
-              <span class="card-tag">PBR Materials</span>
-              <span class="card-tag">Normal Maps</span>
-              <span class="card-tag">UV Generation</span>
+              <span class="card-tag">Draw Things / SD WebUI</span>
+              <span class="card-tag">Google Imagen 3 / Banana</span>
+              <span class="card-tag">Tangent Normal Maps</span>
+              <span class="card-tag">Seamless Tiling</span>
             </div>
           </div>
 
@@ -616,6 +618,127 @@
   position: [<span class="code-num">0</span>, <span class="code-num">1.5</span>, <span class="code-num">0</span>],
   resolutionMode: <span class="code-str">'high'</span>,
   targetTriangles: <span class="code-num">12000</span>
+});</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================================
+         AI TEXTURE GENERATOR & PBR ENGINE (DRAW THINGS, IMAGEN, POLLINATIONS)
+         ========================================================================= -->
+    <section id="ai-textures" class="section">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag">AI Texture Generator &amp; PBR Engine</span>
+          <h2 class="section-title">Local &amp; Cloud AI Texture Generation for 3D Meshes.</h2>
+          <p class="section-desc">
+            Synthesize photorealistic, stylized, or hand-painted diffuse and normal map textures directly onto meshes.
+            MeshEditor connects seamlessly to local generators like <strong>Draw Things</strong> (Metal / Apple Silicon) and <strong>SD WebUI / ComfyUI</strong>,
+            as well as zero-config cloud backends like <strong>Pollinations.ai</strong>, <strong>Google Imagen 3 (Banana Pro)</strong>, <strong>OpenAI DALL-E 3</strong>, and <strong>Fal.ai</strong>.
+          </p>
+        </div>
+
+        <div class="ai-feature-card-grid" style="margin-bottom: 36px;">
+          <!-- Card 1: Multi-Engine Local & Cloud -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            </div>
+            <h3 class="card-title">Local &amp; Cloud Multi-Engine</h3>
+            <p class="card-desc">
+              Execute entirely private on Apple Silicon via <strong>Draw Things API</strong> (Metal/ANE) or SD WebUI / ComfyUI. Or tap into cloud AI with zero-configuration <strong>Pollinations.ai</strong>, Google Imagen 3, OpenAI, or Fal.ai.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Draw Things (Metal)</span>
+              <span class="card-tag">Pollinations.ai (Free)</span>
+              <span class="card-tag">Google Imagen 3</span>
+              <span class="card-tag">SD WebUI / ComfyUI</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Tangent Normal Maps & UV Tiling -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+            </div>
+            <h3 class="card-title">Tangent Normal Maps &amp; UV Tiling</h3>
+            <p class="card-desc">
+              High-frequency surface detail is automatically derived via Sobel gradient filtering to produce tangent-space normal maps directly from generated albedos. Adjust UV scaling, roughness, and metalness per mesh or submesh.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Tangent Normal Maps</span>
+              <span class="card-tag">Sobel Height-to-Normal</span>
+              <span class="card-tag">UV Scale &amp; Tiling</span>
+              <span class="card-tag">PBR Metallic-Roughness</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Distinct Embedded Textures & GPU Reuse -->
+          <div class="feature-card">
+            <div class="card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+            </div>
+            <h3 class="card-title">Distinct Embedded Textures</h3>
+            <p class="card-desc">
+              All project textures are tracked with deduplication and live usage badges (<code>Active Albedo</code>, <code>Active Normal</code>, material counts). Reapplying textures reuses WebGL/WebGPU samplers without memory leaks.
+            </p>
+            <div class="card-tags">
+              <span class="card-tag">Distinct Texture List</span>
+              <span class="card-tag">Live Usage Badges</span>
+              <span class="card-tag">GPU Sampler Reuse</span>
+              <span class="card-tag">One-Click Re-apply</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="plugin-section-grid">
+          <div>
+            <span class="section-tag">Autonomous AI Texture Synthesis</span>
+            <h3 class="section-title" style="font-size: 28px;">AI Copilot Textures Meshes with Natural Language.</h3>
+            <p class="section-desc" style="margin-bottom: 18px;">
+              The AI Agent is fully equipped with texture generation capabilities. When you prompt the agent to build or update textured meshes, it autonomously triggers the <code>modeler_generate_texture</code> tool.
+            </p>
+            <ul class="adapter-list" style="margin-bottom: 20px;">
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Intelligent Backend Routing (<code>auto</code>):</strong> The agent automatically selects the active local server (Draw Things or SD WebUI), configured cloud provider (Google Imagen 3, OpenAI, Fal), or instant free Pollinations.ai.</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Automated Tangent Normal Generation:</strong> The agent generates matching normal maps in one step, ensuring realistic PBR depth and micro-detail under dynamic lighting.</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Mathematical Procedural Fallback:</strong> Even in offline air-gapped environments without any AI backend configured, the generator falls back seamlessly to procedural canvas pattern generation (checker, wood, marble, noise).</span>
+              </li>
+              <li>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span><strong>Persistent Embedded Project Textures:</strong> Textures are embedded directly inside saved <code>.json</code> scene files and exported <code>.glb</code> assets with optimized resolution and deduplication.</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="code-window">
+            <div class="code-header">
+              <div class="code-dots">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+              </div>
+              <span class="code-title">AI Texture Generation &bull; Copilot Tool</span>
+              <span style="font-size: 11px; color: var(--accent-hover);">Tool Execution</span>
+            </div>
+            <pre class="code-body"><code><span class="code-cm">// AI Agent generates seamless weathered stone texture with normal map</span>
+<span class="code-fn">modeler_generate_texture</span>({
+  prompt: <span class="code-str">'ancient weathered cobblestone wall, moss in crevices, seamless game texture, photorealistic'</span>,
+  applyToMesh: <span class="code-str">'Dungeon_Pillar_Base'</span>,
+  backend: <span class="code-str">'auto'</span>, <span class="code-cm">// Draw Things local | Imagen 3 | Pollinations</span>
+  useAI: <span class="code-kwd">true</span>,
+  generateNormalMap: <span class="code-kwd">true</span>,
+  normalStrength: <span class="code-num">1.5</span>,
+  uvScale: [<span class="code-num">2.0</span>, <span class="code-num">2.0</span>],
+  materialType: <span class="code-str">'pbr'</span>
 });</code></pre>
           </div>
         </div>
@@ -1076,9 +1199,9 @@
             <div class="feature-box-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="m4.93 4.93 4.24 4.24"></path><path d="m14.83 9.17 4.24-4.24"></path><path d="m14.83 14.83 4.24 4.24"></path><path d="m9.17 14.83-4.24 4.24"></path></svg>
             </div>
-            <h4 class="feature-box-title">PBR Materials &amp; Textures</h4>
+            <h4 class="feature-box-title">AI Texture Generator &amp; PBR Materials</h4>
             <p class="feature-box-desc">
-              Configure Roughness, Metallic, Albedo, Normal mapping, Emissive glow, Alpha blending, and UV coordinate tiling with Poly Haven support.
+              Generate AI textures locally (Draw Things, SD WebUI) or via cloud (Google Imagen 3, Pollinations.ai). Full PBR metallic-roughness, tangent normal maps, distinct embedded textures, and Poly Haven library.
             </p>
           </div>
 

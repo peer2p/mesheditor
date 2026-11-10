@@ -96,6 +96,17 @@ export class GenerateTextureTool extends AbstractTool {
         description:
           'Optional image URL, workspace file path, or base64 data URI (e.g. from an AI image generator tool or artifact). When provided, uses this AI image and automatically computes a tangent-space normal map; otherwise falls back to the built-in procedural synthesizer.',
       },
+      useAI: {
+        type: 'boolean',
+        description:
+          'Whether to synthesize the texture using the configured external AI Image Generator (e.g. Draw Things, Stable Diffusion WebUI, Google Imagen 3 / Banana Pro, Pollinations.ai, OpenAI DALL-E, Fal.ai) instead of the procedural synthesizer. Defaults to true.',
+      },
+      backend: {
+        type: 'string',
+        enum: ['auto', 'procedural', 'pollinations', 'openai', 'imagen', 'fal', 'replicate', 'sd_webui', 'comfyui', 'custom'],
+        description:
+          'Optional image generation backend engine to use ("auto", "procedural", "pollinations", "openai", "imagen", "fal", "replicate", "sd_webui", "comfyui", "custom"). Defaults to "auto".',
+      },
     },
     required: ['prompt'],
   };
@@ -129,6 +140,9 @@ export class GenerateTextureTool extends AbstractTool {
         metallic: typeof args.metallic === 'number' ? args.metallic : undefined,
         uvScale,
         embedInScene: true,
+        useAI: typeof args.useAI === 'boolean' ? args.useAI : true,
+        backend: args.backend,
+        fallbackToProcedural: true,
       });
     }
 
@@ -144,18 +158,23 @@ export class GenerateTextureTool extends AbstractTool {
     mat.roughness = item.roughness;
     mat.metallic = item.metallic;
 
-    const albedoTex = new Texture(
-      item.albedoDataUrl,
-      context.scene,
-      false,
-      false,
-      Texture.TRILINEAR_SAMPLINGMODE,
-      null,
-      null,
-      item.albedoDataUrl,
-      true,
+    let albedoTex = context.scene.textures.find(
+      (t): t is Texture => t instanceof Texture && !(t as any).isRenderTarget && t.url === item.albedoDataUrl
     );
-    albedoTex.name = item.embeddedAlbedoName || `${item.name}_albedo.png`;
+    if (!albedoTex) {
+      albedoTex = new Texture(
+        item.albedoDataUrl,
+        context.scene,
+        false,
+        false,
+        Texture.TRILINEAR_SAMPLINGMODE,
+        null,
+        null,
+        item.albedoDataUrl,
+        true,
+      );
+      albedoTex.name = item.embeddedAlbedoName || `${item.name}_albedo.png`;
+    }
     albedoTex.uScale = uvScale;
     albedoTex.vScale = uvScale;
     if (item.style === 'decal') {
@@ -166,18 +185,23 @@ export class GenerateTextureTool extends AbstractTool {
     mat.albedoTexture = albedoTex;
 
     if (item.normalDataUrl) {
-      const normTex = new Texture(
-        item.normalDataUrl,
-        context.scene,
-        false,
-        false,
-        Texture.TRILINEAR_SAMPLINGMODE,
-        null,
-        null,
-        item.normalDataUrl,
-        true,
+      let normTex = context.scene.textures.find(
+        (t): t is Texture => t instanceof Texture && !(t as any).isRenderTarget && t.url === item.normalDataUrl
       );
-      normTex.name = item.embeddedNormalName || `${item.name}_normal.png`;
+      if (!normTex) {
+        normTex = new Texture(
+          item.normalDataUrl,
+          context.scene,
+          false,
+          false,
+          Texture.TRILINEAR_SAMPLINGMODE,
+          null,
+          null,
+          item.normalDataUrl,
+          true,
+        );
+        normTex.name = item.embeddedNormalName || `${item.name}_normal.png`;
+      }
       normTex.uScale = uvScale;
       normTex.vScale = uvScale;
       normTex.level = Math.max(0.1, Math.min(3.0, item.normalStrength / 2.0));
@@ -204,6 +228,8 @@ export class GenerateTextureTool extends AbstractTool {
       status: 'ok',
       textureId: item.id,
       textureName: item.name,
+      generatorBackend: item.generatorBackend || 'procedural',
+      isAI: !!item.isAI,
       embeddedAlbedoName: item.embeddedAlbedoName,
       embeddedNormalName: item.embeddedNormalName,
       materialName: mat.name,

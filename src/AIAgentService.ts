@@ -45,6 +45,18 @@ export {
   normalizeNeural3DProviders,
 } from './Neural3DGeneratorService';
 import {
+  createDefaultImageGeneratorProviders,
+  ExternalImageGeneratorService,
+  IMAGE_GENERATOR_PROTOCOL_DEFAULTS,
+  normalizeImageGeneratorProviders,
+} from './textures/ExternalImageGeneratorService';
+export {
+  createDefaultImageGeneratorProviders,
+  ExternalImageGeneratorService,
+  IMAGE_GENERATOR_PROTOCOL_DEFAULTS,
+  normalizeImageGeneratorProviders,
+} from './textures/ExternalImageGeneratorService';
+import {
   ToolRegistry,
   ToolInterface,
   ToolExecutionContext,
@@ -78,6 +90,9 @@ export const DEFAULT_AI_AGENT_CONFIG: AIAgentEndpointConfig = {
   createNormalMaps: true,
   visualCritique: false,
   neural3DProviders: createDefaultNeural3DProviders(),
+  imageGeneratorEnabled: true,
+  imageGeneratorActiveBackend: 'pollinations',
+  imageGeneratorProviders: createDefaultImageGeneratorProviders(),
 };
 
 export interface EndpointPreset {
@@ -282,6 +297,13 @@ export class AIAgentService {
         visualCritique:
           typeof parsed.visualCritique === 'boolean' ? parsed.visualCritique : DEFAULT_AI_AGENT_CONFIG.visualCritique,
         neural3DProviders: normalizeNeural3DProviders(parsed.neural3DProviders),
+        imageGeneratorEnabled:
+          typeof parsed.imageGeneratorEnabled === 'boolean'
+            ? parsed.imageGeneratorEnabled
+            : DEFAULT_AI_AGENT_CONFIG.imageGeneratorEnabled,
+        imageGeneratorActiveBackend:
+          parsed.imageGeneratorActiveBackend || DEFAULT_AI_AGENT_CONFIG.imageGeneratorActiveBackend,
+        imageGeneratorProviders: normalizeImageGeneratorProviders(parsed.imageGeneratorProviders),
       };
     } catch {
       return {};
@@ -302,13 +324,44 @@ export class AIAgentService {
         })
       : normalizeNeural3DProviders(this.config.neural3DProviders);
 
+    const mergedImageProviders = newConfig.imageGeneratorProviders
+      ? normalizeImageGeneratorProviders({
+          ...(this.config.imageGeneratorProviders || createDefaultImageGeneratorProviders()),
+          ...newConfig.imageGeneratorProviders,
+        })
+      : normalizeImageGeneratorProviders(this.config.imageGeneratorProviders);
+
     this.config = {
       ...this.config,
       ...newConfig,
       baseUrl: mergedBaseUrl,
       model: mergedModel,
       neural3DProviders: mergedProviders,
+      imageGeneratorProviders: mergedImageProviders,
     };
+
+    // Keep externalImageGenerator service synchronized with active backend if specified
+    if (this.service?.externalImageGenerator) {
+      if (newConfig.imageGeneratorActiveBackend) {
+        this.service.externalImageGenerator.setActiveBackend(
+          this.config.imageGeneratorEnabled
+            ? (newConfig.imageGeneratorActiveBackend as any)
+            : 'procedural'
+        );
+      } else if (newConfig.imageGeneratorEnabled !== undefined) {
+        this.service.externalImageGenerator.setActiveBackend(
+          newConfig.imageGeneratorEnabled
+            ? (this.config.imageGeneratorActiveBackend as any) || 'pollinations'
+            : 'procedural'
+        );
+      }
+      if (newConfig.imageGeneratorProviders) {
+        for (const [id, prov] of Object.entries(mergedImageProviders)) {
+          this.service.externalImageGenerator.updateProvider(id as any, prov);
+        }
+      }
+    }
+
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem(AI_AGENT_STORAGE_KEY, JSON.stringify(this.config));
@@ -839,7 +892,10 @@ export class AIAgentService {
       : ` Normal maps are DISABLED by the user: do not apply bump or normal maps.`;
 
     const textureRule = createTextures
-      ? `3. **Colors & Materials**: Assign appropriate PBR colors (\`color\` / \`albedoColor\`, \`roughness\`, \`metallic\`) or procedural textures (\`proceduralTexture\` in \`modeler_create_material\`) to each created part so the model looks detailed and polished right away.${normalMapRule}`
+      ? `3. **Colors, Textures & Materials (Textures ENABLED)**:
+   - For primary visible surfaces (e.g. walls, floors, columns, stairs, roofs, armor, props), call \`modeler_generate_texture\` (with a descriptive \`prompt\` like \`"Weathered fluted white marble"\`, \`"Aged terracotta roof tiles"\`, \`"Ancient ashlar stone wall"\`, \`"Polished dark oak wood"\`, \`useAI: true\`, and \`applyToMesh\`) so high-resolution AI textures and normal maps are synthesized and bound to the meshes!
+   - You can also pass \`texturePrompt\` directly to architectural tools (\`modeler_create_column\`, \`modeler_create_wall\`, \`modeler_create_roof\`, \`modeler_create_stairs\`) or use \`proceduralTexture\` in \`modeler_create_material\`.
+   - Never leave the entire model in flat solid untextured colors when Textures is enabled!${normalMapRule}`
       : `3. **Colors & Materials (Textures DISABLED)**: Texturing is turned OFF by the user. Do NOT generate or apply procedural or image textures (\`proceduralTexture\` / \`textureUrl\`). Use ONLY solid PBR colors (\`color\` / \`albedoColor\`, \`roughness\`, \`metallic\`).`;
 
     const enabledNeural = this.getEnabledNeural3DProviders();
