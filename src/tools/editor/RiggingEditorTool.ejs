@@ -14,7 +14,8 @@
       <div class="tool-row" style="margin-top: 4px;">
         <span class="tool-label">Rig Preset</span>
         <select id="selectRigPreset" class="tool-select" style="flex: 1;">
-          <option value="humanoid" selected>Humanoid Biped (20 Bones)</option>
+          <option value="humanoid" selected>Humanoid Biped (Standard)</option>
+          <option value="chibi">Chibi / Cartoon (Big Head &amp; Low Arms)</option>
           <option value="quadruped">Quadruped Creature (11 Bones)</option>
           <option value="spine_chain">Spine / Prop Chain (5 Bones)</option>
         </select>
@@ -29,11 +30,55 @@
         </button>
       </div>
 
+      <!-- Multi-Part Character Sync Badge -->
+      <div id="rigMultiPartsBadge" style="display: none; margin-top: 6px; padding: 6px 8px; background: rgba(88, 166, 255, 0.12); border-radius: 6px; border: 1px solid rgba(88, 166, 255, 0.3);">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
+          <span style="color: #79c0ff; display: flex; align-items: center; gap: 4px;">
+            <i class="app-icon" data-lucide="layers" style="width: 12px; height: 12px;"></i>
+            <strong id="rigMultiPartsCount">11 Parts</strong> synced with skeleton
+          </span>
+          <button type="button" id="btnMergeRigParts" class="tool-btn" style="padding: 2px 6px; font-size: 10px; background: #21262d;" title="Merge all character parts into a single unified mesh">
+            Merge Parts
+          </button>
+        </div>
+      </div>
+
+      <!-- Skeleton Height & Proportion Sliders -->
+      <div id="rigProportionsBox" style="margin-top: 8px; padding: 6px 8px; background: rgba(0, 0, 0, 0.2); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.08);">
+        <div class="tool-label" style="margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+          <span><i class="app-icon" data-lucide="sliders" style="width: 12px; height: 12px;"></i> Proportions &amp; Bone Heights</span>
+        </div>
+        <div class="sculpt-slider-row" style="margin-top: 2px;">
+          <div class="sculpt-slider-header">
+            <span class="sculpt-slider-label">Shoulder &amp; Arm Height</span>
+            <span id="rigArmHeightVal" class="sculpt-slider-val">78%</span>
+          </div>
+          <input type="range" id="sliderRigArmHeight" min="0.40" max="0.88" step="0.02" value="0.78" class="tool-range" title="Adjust arm line height (lower for big head / cartoon characters like Mario)" />
+        </div>
+        <div class="sculpt-slider-row" style="margin-top: 4px;">
+          <div class="sculpt-slider-header">
+            <span class="sculpt-slider-label">Hips &amp; Leg Height</span>
+            <span id="rigHipHeightVal" class="sculpt-slider-val">48%</span>
+          </div>
+          <input type="range" id="sliderRigHipHeight" min="0.20" max="0.65" step="0.02" value="0.48" class="tool-range" title="Adjust hips and leg length" />
+        </div>
+      </div>
+
       <div class="tool-row" style="margin-top: 8px;">
         <span class="tool-label">Active Bone</span>
         <select id="selectRigActiveBone" class="tool-select" style="flex: 1;">
           <option value="0">None (Create Rig First)</option>
         </select>
+      </div>
+
+      <div class="tool-row" style="margin-top: 4px; justify-content: flex-end; gap: 4px;">
+        <span class="tool-sublabel" style="flex: 1;">Nudge Active Joint:</span>
+        <button type="button" id="btnNudgeBoneUp" class="tool-btn" style="padding: 2px 6px; font-size: 10px;" title="Nudge active joint up (+Y)">
+          <i class="app-icon" data-lucide="arrow-up" style="width: 11px; height: 11px;"></i> +Y
+        </button>
+        <button type="button" id="btnNudgeBoneDown" class="tool-btn" style="padding: 2px 6px; font-size: 10px;" title="Nudge active joint down (-Y)">
+          <i class="app-icon" data-lucide="arrow-down" style="width: 11px; height: 11px;"></i> -Y
+        </button>
       </div>
     </div>
 

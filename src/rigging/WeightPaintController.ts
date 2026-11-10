@@ -6,6 +6,7 @@ import {
   Matrix,
   Mesh,
   MeshBuilder,
+  Node,
   Nullable,
   PointerEventTypes,
   PointerInfo,
@@ -13,6 +14,7 @@ import {
   Scene,
   Skeleton,
   StandardMaterial,
+  TransformNode,
   Vector3,
   VertexBuffer,
   VertexData,
@@ -20,7 +22,7 @@ import {
 import { MeshEditorService } from '../MeshEditorService';
 
 export type WeightBrushMode = 'add' | 'subtract' | 'smooth' | 'replace';
-export type AutoRigPreset = 'humanoid' | 'quadruped' | 'spine_chain';
+export type AutoRigPreset = 'humanoid' | 'chibi' | 'quadruped' | 'spine_chain';
 
 export interface BoneNodeSpec {
   name: string;
@@ -59,15 +61,16 @@ export class WeightPaintController {
 
   private isPainting: boolean = false;
   private activeMesh: Nullable<Mesh> = null;
-  private strokePreWeights: Nullable<number[]> = null;
-  private strokePreIndices: Nullable<number[]> = null;
+  private strokePreStates: Map<Mesh, { indices: number[]; weights: number[] }> = new Map();
 
   private cursorRing: Nullable<Mesh> = null;
-  private boneOverlayMesh: Nullable<LinesMesh> = null;
-  private activeBoneMarker: Nullable<Mesh> = null;
+  public boneOverlayMesh: Nullable<LinesMesh> = null;
+  public activeBoneMarker: Nullable<Mesh> = null;
 
-  private originalColorsMap: WeakMap<Mesh, Nullable<number[]>> = new WeakMap();
-  private originalVertexColorFlag: WeakMap<Mesh, boolean> = new WeakMap();
+  private originalColorsMap: Map<Mesh, Nullable<number[]>> = new Map();
+  private originalVertexColorFlag: Map<Mesh, boolean> = new Map();
+  private originalMaterialMap: Map<Mesh, any> = new Map();
+  private heatmapMaterial: Nullable<StandardMaterial> = null;
 
   public onStateChanged?: (isActive: boolean) => void;
   public onWeightsModified?: (mesh: Mesh, stats: WeightStats) => void;
@@ -117,8 +120,11 @@ export class WeightPaintController {
     this.activeBoneIndex = Math.max(0, index);
     const mesh = this.getActiveTargetMesh();
     if (mesh) {
+      const targets = this.getTargetMeshes(mesh);
       if (this.showHeatmap && this.isActive) {
-        this.updateWeightHeatmap(mesh);
+        for (const t of targets) {
+          this.updateWeightHeatmap(t);
+        }
       }
       if (this.showBoneOverlay && this.isActive) {
         this.refreshBoneOverlay(mesh);
@@ -137,6 +143,7 @@ export class WeightPaintController {
     }
 
     const mesh = this.getActiveTargetMesh();
+    const targets = this.getTargetMeshes(mesh);
 
     if (active) {
       if (this.service.sculptController?.isActive) {
@@ -152,16 +159,24 @@ export class WeightPaintController {
         (this.service as any).uvUnwrapController.setActive(false);
       }
       this.service.gizmoManager?.attachToNode(null);
-      if (mesh) {
-        if (this.showHeatmap) this.updateWeightHeatmap(mesh);
-        if (this.showBoneOverlay) this.refreshBoneOverlay(mesh);
+      if (this.service.highlightLayer) {
+        this.service.highlightLayer.removeAllMeshes();
       }
+      for (const t of targets) {
+        if (this.showHeatmap) this.updateWeightHeatmap(t);
+      }
+      if (mesh && this.showBoneOverlay) this.refreshBoneOverlay(mesh);
     } else {
       if (this.isPainting) {
         this.endPaintStroke();
       }
-      if (mesh) {
-        this.restoreOriginalVertexColors(mesh);
+      const meshesToRestore = new Set<Mesh>([
+        ...targets,
+        ...this.originalColorsMap.keys(),
+        ...this.originalMaterialMap.keys(),
+      ]);
+      for (const m of meshesToRestore) {
+        if (!m.isDisposed()) this.restoreOriginalVertexColors(m);
       }
       this.clearBoneOverlay();
       if (this.service.selectedMesh && !this.service.isGizmoMesh(this.service.selectedMesh)) {
@@ -188,22 +203,94 @@ export class WeightPaintController {
   }
 
   /**
+   * Returns all meshes in the scene that share the same skeleton or character group as `primaryMesh`.
+   * Essential for multi-part models (e.g. Mario cap, head, body, hands, boots) so heatmaps,
+   * bone influence stats, and weight painting operate simultaneously across the entire character!
+   */
+  public getTargetMeshes(primaryMesh?: Nullable<Mesh>): Mesh[] {
+    const root = primaryMesh || this.getActiveTargetMesh();
+    if (!root || root.isDisposed()) return [];
+
+    const scene = root.getScene() || this.scene;
+    if (root.skeleton) {
+      const skel = root.skeleton;
+      const skinnedMeshes = scene.meshes.filter(
+        (m): m is Mesh =>
+          m instanceof Mesh &&
+          !m.isDisposed() &&
+          !this.service.isEditorHelper(m) &&
+          !this.service.isGizmoMesh(m) &&
+          m !== this.service.gridMesh &&
+          m.skeleton === skel &&
+          m.getTotalVertices() > 0
+      );
+      if (skinnedMeshes.length > 0) return skinnedMeshes;
+    }
+
+    if (this.service.selectedNodes.length > 1) {
+      const selected = this.service.selectedNodes.filter(
+        (m): m is Mesh =>
+          m instanceof Mesh &&
+          !m.isDisposed() &&
+          !this.service.isEditorHelper(m) &&
+          !this.service.isGizmoMesh(m) &&
+          m.getTotalVertices() > 0
+      );
+      if (selected.includes(root)) return selected;
+    }
+
+    if (root.parent) {
+      const siblings = (root.parent.getChildMeshes() || []).filter(
+        (m): m is Mesh =>
+          m instanceof Mesh &&
+          !m.isDisposed() &&
+          !this.service.isEditorHelper(m) &&
+          !this.service.isGizmoMesh(m) &&
+          m !== this.service.gridMesh &&
+          m.getTotalVertices() > 0
+      );
+      if (siblings.length > 1) return siblings;
+    }
+
+    const visibleMeshes = this.service.importedMeshes.filter(
+      (m) =>
+        m instanceof Mesh &&
+        !this.service.isEditorHelper(m) &&
+        !this.service.isGizmoMesh(m) &&
+        !m.isDisposed() &&
+        m.isVisible &&
+        m.getTotalVertices() > 0
+    );
+    if (visibleMeshes.length > 1 && visibleMeshes.includes(root)) {
+      return visibleMeshes;
+    }
+
+    return [root];
+  }
+
+  /**
    * Generates a complete hierarchical game-ready Skeleton fitted to `mesh`'s bounding box
    * and binds smooth capsule envelope weights (4 bone influences per vertex).
    */
   public createAutoRig(mesh: Mesh, preset: AutoRigPreset = 'humanoid'): Skeleton {
-    mesh.computeWorldMatrix(true);
-    mesh.refreshBoundingInfo();
-    const bbox = mesh.getBoundingInfo().boundingBox;
-    const min = bbox.minimum;
-    const max = bbox.maximum;
+    const targets = this.getTargetMeshes(mesh);
+    let minW = new Vector3(Infinity, Infinity, Infinity);
+    let maxW = new Vector3(-Infinity, -Infinity, -Infinity);
 
-    const width = Math.max(0.2, max.x - min.x);
-    const height = Math.max(0.2, max.y - min.y);
-    const depth = Math.max(0.2, max.z - min.z);
-    const cx = (min.x + max.x) * 0.5;
-    const cz = (min.z + max.z) * 0.5;
-    const bottomY = min.y;
+    for (const t of targets) {
+      t.computeWorldMatrix(true);
+      t.refreshBoundingInfo();
+      const b = t.getBoundingInfo().boundingBox;
+      minW = Vector3.Minimize(minW, b.minimumWorld);
+      maxW = Vector3.Maximize(maxW, b.maximumWorld);
+    }
+
+    const width = Math.max(0.2, maxW.x - minW.x);
+    const height = Math.max(0.2, maxW.y - minW.y);
+    const depth = Math.max(0.2, maxW.z - minW.z);
+    const cx = (minW.x + maxW.x) * 0.5;
+    const cz = (minW.z + maxW.z) * 0.5;
+    const bottomY = minW.y;
 
     const specs: BoneNodeSpec[] = [];
 
@@ -256,6 +343,37 @@ export class WeightPaintController {
       addBone('UpLeg_R', 'Hips', -0.18, 0.48, 0, -0.19, 0.26, 0);
       addBone('Leg_R', 'UpLeg_R', -0.19, 0.26, 0, -0.19, 0.05, 0);
       addBone('Foot_R', 'Leg_R', -0.19, 0.05, 0, -0.19, 0.01, 0.25);
+    } else if (preset === 'chibi') {
+      // 20-Bone Chibi / Cartoon / Stylized Biped (Large Head, Low Shoulder/Arm Axis, Short Legs)
+      // Perfectly proportioned for Mario, mascot figures, dwarfs & stylized heroes
+      addBone('Root', null, 0, 0.0, 0, 0, 0.36, 0);
+      addBone('Hips', 'Root', 0, 0.36, 0, 0, 0.44, 0);
+      addBone('Spine', 'Hips', 0, 0.44, 0, 0, 0.52, 0);
+      addBone('Chest', 'Spine', 0, 0.52, 0, 0, 0.59, 0);
+      addBone('Neck', 'Chest', 0, 0.59, 0, 0, 0.65, 0);
+      addBone('Head', 'Neck', 0, 0.65, 0, 0, 0.99, 0);
+
+      // Left Arm (horizontal line through sleeves at ~0.58-0.59)
+      addBone('Shoulder_L', 'Chest', 0.08, 0.59, 0, 0.22, 0.58, 0);
+      addBone('UpperArm_L', 'Shoulder_L', 0.22, 0.58, 0, 0.52, 0.58, 0);
+      addBone('ForeArm_L', 'UpperArm_L', 0.52, 0.58, 0, 0.78, 0.57, 0);
+      addBone('Hand_L', 'ForeArm_L', 0.78, 0.57, 0, 0.95, 0.57, 0);
+
+      // Right Arm
+      addBone('Shoulder_R', 'Chest', -0.08, 0.59, 0, -0.22, 0.58, 0);
+      addBone('UpperArm_R', 'Shoulder_R', -0.22, 0.58, 0, -0.52, 0.58, 0);
+      addBone('ForeArm_R', 'UpperArm_R', -0.52, 0.58, 0, -0.78, 0.57, 0);
+      addBone('Hand_R', 'ForeArm_R', -0.78, 0.57, 0, -0.95, 0.57, 0);
+
+      // Left Leg
+      addBone('UpLeg_L', 'Hips', 0.18, 0.36, 0, 0.19, 0.20, 0);
+      addBone('Leg_L', 'UpLeg_L', 0.19, 0.20, 0, 0.19, 0.05, 0);
+      addBone('Foot_L', 'Leg_L', 0.19, 0.05, 0, 0.19, 0.01, 0.25);
+
+      // Right Leg
+      addBone('UpLeg_R', 'Hips', -0.18, 0.36, 0, -0.19, 0.20, 0);
+      addBone('Leg_R', 'UpLeg_R', -0.19, 0.20, 0, -0.19, 0.05, 0);
+      addBone('Foot_R', 'Leg_R', -0.19, 0.05, 0, -0.19, 0.01, 0.25);
     } else if (preset === 'quadruped') {
       addBone('Root', null, 0, 0.0, 0, 0, 0.55, -0.4);
       addBone('Pelvis', 'Root', 0, 0.55, -0.4, 0, 0.58, -0.1);
@@ -281,21 +399,42 @@ export class WeightPaintController {
 
     const skeleton = new Skeleton(`${mesh.name}_Skeleton`, `${mesh.name}_skel_id`, this.scene);
     const createdBones: Bone[] = [];
+    const createdNodes: TransformNode[] = [];
+
+    const rootParent = mesh.parent as Nullable<Node>;
+    let invParentMat: Nullable<Matrix> = null;
+    if (rootParent && 'getWorldMatrix' in rootParent) {
+      (rootParent as any).computeWorldMatrix(true);
+      invParentMat = Matrix.Invert((rootParent as any).getWorldMatrix());
+    }
 
     for (let i = 0; i < specs.length; i++) {
       const spec = specs[i];
       const parentBone = spec.parentIndex >= 0 ? createdBones[spec.parentIndex] : null;
+      const parentNode =
+        spec.parentIndex >= 0 ? createdNodes[spec.parentIndex] : rootParent;
       const localOffset =
         spec.parentIndex >= 0
           ? spec.headWorldPos.subtract(specs[spec.parentIndex].headWorldPos)
+          : invParentMat
+          ? Vector3.TransformCoordinates(spec.headWorldPos, invParentMat)
           : spec.headWorldPos.clone();
       const localMat = Matrix.Translation(localOffset.x, localOffset.y, localOffset.z);
       const bone = new Bone(spec.name, skeleton, parentBone, localMat, localMat.clone());
+
+      const tNode = new TransformNode(spec.name, this.scene);
+      if (parentNode) {
+        tNode.parent = parentNode;
+      }
+      tNode.position.copyFrom(localOffset);
+      tNode.metadata = { isBoneNode: true, skeletonId: skeleton.id };
+      bone.linkTransformNode(tNode);
+
       createdBones.push(bone);
+      createdNodes.push(tNode);
     }
 
-    if (!mesh.metadata) mesh.metadata = {};
-    mesh.metadata.rigBoneSpecs = specs.map((s) => ({
+    const serializedSpecs = specs.map((s) => ({
       name: s.name,
       parentIndex: s.parentIndex,
       head: [s.headWorldPos.x, s.headWorldPos.y, s.headWorldPos.z],
@@ -303,18 +442,23 @@ export class WeightPaintController {
       rotationDeg: [0, 0, 0],
     }));
 
-    // Store bind-pose vertex positions so bone pose tests deform cleanly and reversibly
-    const rawPos = mesh.getVerticesData(VertexBuffer.PositionKind);
-    if (rawPos) {
-      mesh.metadata.bindPosePositions = Array.from(rawPos);
+    for (const t of targets) {
+      t.skeleton = skeleton;
+      if (!t.metadata) t.metadata = {};
+      t.metadata.rigBoneSpecs = serializedSpecs;
+      const rawPos = t.getVerticesData(VertexBuffer.PositionKind);
+      if (rawPos) {
+        t.metadata.bindPosePositions = Array.from(rawPos);
+      }
     }
 
-    mesh.skeleton = skeleton;
     this.autoBindSkinWeights(mesh, skeleton);
     this.activeBoneIndex = Math.min(1, specs.length - 1);
 
     if (this.isActive) {
-      if (this.showHeatmap) this.updateWeightHeatmap(mesh);
+      for (const t of targets) {
+        if (this.showHeatmap) this.updateWeightHeatmap(t);
+      }
       if (this.showBoneOverlay) this.refreshBoneOverlay(mesh);
     }
 
@@ -324,9 +468,21 @@ export class WeightPaintController {
 
   /**
    * Computes automatic smooth envelope skin weights (4 influences per vertex, normalized to 1.0)
-   * based on distance from each vertex to each bone capsule segment.
+   * across all target meshes sharing `mesh`'s character skeleton.
    */
   public autoBindSkinWeights(mesh: Mesh, skeleton?: Nullable<Skeleton>): void {
+    const targets = this.getTargetMeshes(mesh);
+    const skel = skeleton || mesh.skeleton;
+    for (const t of targets) {
+      this.bindSingleMeshSkinWeights(t, t.skeleton || skel);
+    }
+  }
+
+  /**
+   * Binds skin weights to an individual mesh based on distance from world-space vertices
+   * to bone capsule segments.
+   */
+  public bindSingleMeshSkinWeights(mesh: Mesh, skeleton?: Nullable<Skeleton>): void {
     const skel = skeleton || mesh.skeleton;
     if (!skel) return;
 
@@ -336,13 +492,18 @@ export class WeightPaintController {
     const specs = this.getBoneSegments(mesh, skel);
     if (specs.length === 0) return;
 
+    mesh.computeWorldMatrix(true);
+    const worldMat = mesh.getWorldMatrix();
+
     const numVerts = Math.floor(positions.length / 3);
     const matrixIndices = new Float32Array(numVerts * 4);
     const matrixWeights = new Float32Array(numVerts * 4);
 
+    const vLocal = new Vector3();
     const vPos = new Vector3();
     for (let i = 0; i < numVerts; i++) {
-      vPos.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+      vLocal.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+      Vector3.TransformCoordinatesToRef(vLocal, worldMat, vPos);
 
       // Calculate inverse-distance-fourth weights to all bones
       const influences: Array<{ boneIdx: number; weight: number }> = [];
@@ -367,7 +528,7 @@ export class WeightPaintController {
       }
     }
 
-    mesh.setVerticesData(VertexBuffer.MatricesIndicesKind, matrixIndices, true);
+    this.setMeshMatrixIndices(mesh, matrixIndices);
     mesh.setVerticesData(VertexBuffer.MatricesWeightsKind, matrixWeights, true);
 
     if (this.isActive && this.showHeatmap) {
@@ -388,15 +549,39 @@ export class WeightPaintController {
       }));
     }
 
+    // Check if any sibling mesh sharing this skeleton has stored rigBoneSpecs
+    const scene = mesh.getScene() || this.scene;
+    const siblingWithSpecs = scene.meshes.find(
+      (m): m is Mesh =>
+        m instanceof Mesh &&
+        m.skeleton === skel &&
+        Array.isArray(m.metadata?.rigBoneSpecs) &&
+        m.metadata.rigBoneSpecs.length === skel.bones.length
+    );
+    if (siblingWithSpecs) {
+      return siblingWithSpecs.metadata.rigBoneSpecs.map((s: any) => ({
+        name: s.name,
+        parentIndex: s.parentIndex,
+        headWorldPos: new Vector3(s.head[0], s.head[1], s.head[2]),
+        tailWorldPos: new Vector3(s.tail[0], s.tail[1], s.tail[2]),
+      }));
+    }
+
     // Fallback for imported GLTF skeletons
     const bones = skel.bones;
     const specs: BoneNodeSpec[] = [];
     for (let i = 0; i < bones.length; i++) {
       const b = bones[i];
       const pIdx = b.getParent() ? bones.indexOf(b.getParent()!) : -1;
-      const pos = b.getAbsolutePosition();
+      const tNode = b.getTransformNode();
+      const pos = tNode ? tNode.getAbsolutePosition().clone() : b.getAbsolutePosition();
       const child = bones.find((c) => c.getParent() === b);
-      const tail = child ? child.getAbsolutePosition() : pos.add(new Vector3(0, 0.15, 0));
+      const childTNode = child?.getTransformNode();
+      const tail = childTNode
+        ? childTNode.getAbsolutePosition().clone()
+        : child
+        ? child.getAbsolutePosition()
+        : pos.add(new Vector3(0, 0.15, 0));
       specs.push({
         name: b.name || `Bone_${i}`,
         parentIndex: pIdx,
@@ -507,14 +692,40 @@ export class WeightPaintController {
 
   /**
    * Applies a 3D Weight Paint brush stroke (Add, Subtract, Smooth, or Replace) at `worldHitPoint`.
+   * Automatically targets all parts of the character sharing the skeleton so painting seamlessly
+   * deforms vertices across mesh seams without borders.
    */
   public applyWeightBrushStroke(
     mesh: Mesh,
     worldHitPoint: Vector3,
     boneIndex: number = this.activeBoneIndex
   ): number {
+    const targets = this.getTargetMeshes(mesh);
+    let totalModified = 0;
+
+    for (const target of targets) {
+      totalModified += this.paintSingleMesh(target, worldHitPoint, boneIndex);
+    }
+
+    if (this.showHeatmap) {
+      for (const target of targets) {
+        this.updateSingleMeshHeatmap(target, boneIndex);
+      }
+    }
+
+    this.onWeightsModified?.(mesh, this.analyzeWeights(mesh));
+    return totalModified;
+  }
+
+  private paintSingleMesh(
+    mesh: Mesh,
+    worldHitPoint: Vector3,
+    boneIndex: number
+  ): number {
     if (!mesh.skeleton) {
-      this.createAutoRig(mesh, 'humanoid');
+      const skel = this.getActiveTargetMesh()?.skeleton;
+      if (skel) mesh.skeleton = skel;
+      else this.createAutoRig(mesh, 'humanoid');
     }
 
     const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
@@ -523,7 +734,7 @@ export class WeightPaintController {
     if (!positions) return 0;
 
     if (!mIndices || !mWeights) {
-      this.autoBindSkinWeights(mesh, mesh.skeleton);
+      this.bindSingleMeshSkinWeights(mesh, mesh.skeleton);
       mIndices = mesh.getVerticesData(VertexBuffer.MatricesIndicesKind);
       mWeights = mesh.getVerticesData(VertexBuffer.MatricesWeightsKind);
     }
@@ -536,9 +747,23 @@ export class WeightPaintController {
     const invWorld = mesh.getWorldMatrix().clone().invert();
     const localHit = Vector3.TransformCoordinates(worldHitPoint, invWorld);
 
-    const worldScale = mesh.scaling ? Math.max(0.01, (mesh.scaling.x + mesh.scaling.y + mesh.scaling.z) / 3) : 1.0;
+    const row0 = mesh.getWorldMatrix().getRow(0);
+    const worldScale = row0 ? Math.max(0.001, Math.sqrt(row0.x * row0.x + row0.y * row0.y + row0.z * row0.z)) : 1.0;
     const localRadius = this.radius / worldScale;
     const localRadiusSq = localRadius * localRadius;
+
+    // Quick bounding box check: if localHit is far outside this mesh's bounding box, skip it
+    const bbox = mesh.getBoundingInfo().boundingBox;
+    if (
+      localHit.x < bbox.minimum.x - localRadius ||
+      localHit.x > bbox.maximum.x + localRadius ||
+      localHit.y < bbox.minimum.y - localRadius ||
+      localHit.y > bbox.maximum.y + localRadius ||
+      localHit.z < bbox.minimum.z - localRadius ||
+      localHit.z > bbox.maximum.z + localRadius
+    ) {
+      return 0;
+    }
 
     // Identify mirrored bone index if symmetryX is enabled (e.g. UpperArm_L <-> UpperArm_R)
     let mirrorBoneIndex = boneIndex;
@@ -589,7 +814,7 @@ export class WeightPaintController {
         const currW = this.getVertexBoneWeight(indicesArr, weightsArr, i, targetBone);
 
         let nextW = currW;
-        const delta = this.strength * falloff * 0.35;
+        const delta = Math.min(1.0, this.strength * falloff * 0.8);
 
         if (this.brushMode === 'add') {
           nextW = Math.min(1.0, currW + delta);
@@ -613,22 +838,45 @@ export class WeightPaintController {
       paintAroundLocalPoint(symLocalHit, mirrorBoneIndex);
     }
 
-    mesh.setVerticesData(VertexBuffer.MatricesIndicesKind, indicesArr, true);
-    mesh.setVerticesData(VertexBuffer.MatricesWeightsKind, weightsArr, true);
-
-    if (this.showHeatmap) {
-      this.updateWeightHeatmap(mesh);
+    if (modifiedCount > 0) {
+      this.setMeshMatrixIndices(mesh, indicesArr);
+      mesh.setVerticesData(VertexBuffer.MatricesWeightsKind, weightsArr, true);
     }
 
-    this.onWeightsModified?.(mesh, this.analyzeWeights(mesh));
     return modifiedCount;
+  }
+
+  public getOrCreateHeatmapMaterial(targetScene: Scene = this.scene): StandardMaterial {
+    if (targetScene !== this.scene) {
+      const mat = new StandardMaterial('editor_weight_heatmap_mat', targetScene);
+      mat.disableLighting = true;
+      mat.emissiveColor = new Color3(1, 1, 1);
+      mat.diffuseColor = new Color3(1, 1, 1);
+      mat.backFaceCulling = false;
+      return mat;
+    }
+    if (!this.heatmapMaterial || (this.heatmapMaterial as any)._isDisposed) {
+      this.heatmapMaterial = new StandardMaterial('editor_weight_heatmap_mat', this.scene);
+      this.heatmapMaterial.disableLighting = true;
+      this.heatmapMaterial.emissiveColor = new Color3(1, 1, 1);
+      this.heatmapMaterial.diffuseColor = new Color3(1, 1, 1);
+      this.heatmapMaterial.backFaceCulling = false;
+    }
+    return this.heatmapMaterial;
   }
 
   /**
    * Updates the real-time Vertex Color Weight Heatmap (Blue 0.0 -> Cyan -> Green -> Yellow -> Red 1.0)
-   * on `mesh` for `activeBoneIndex`.
+   * on all target meshes for `activeBoneIndex`.
    */
-  public updateWeightHeatmap(mesh: Mesh, boneIndex: number = this.activeBoneIndex): void {
+  public updateWeightHeatmap(mesh?: Mesh, boneIndex: number = this.activeBoneIndex): void {
+    const targets = this.getTargetMeshes(mesh);
+    for (const t of targets) {
+      this.updateSingleMeshHeatmap(t, boneIndex);
+    }
+  }
+
+  private updateSingleMeshHeatmap(mesh: Mesh, boneIndex: number): void {
     const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
     const mIndices = mesh.getVerticesData(VertexBuffer.MatricesIndicesKind);
     const mWeights = mesh.getVerticesData(VertexBuffer.MatricesWeightsKind);
@@ -638,6 +886,18 @@ export class WeightPaintController {
       const existingColors = mesh.getVerticesData(VertexBuffer.ColorKind);
       this.originalColorsMap.set(mesh, existingColors ? Array.from(existingColors) : null);
       this.originalVertexColorFlag.set(mesh, mesh.useVertexColors);
+    }
+
+    if (!this.originalMaterialMap.has(mesh) && mesh.material) {
+      this.originalMaterialMap.set(mesh, mesh.material);
+    }
+
+    // Switch to pure unlit vertex color heatmap material so dark textures never turn black
+    mesh.material = this.getOrCreateHeatmapMaterial(mesh.getScene() || this.scene);
+
+    // Remove selection highlight glow so it does not drown out the heatmap colors with bright blue
+    if (this.service.highlightLayer) {
+      this.service.highlightLayer.removeMesh(mesh);
     }
 
     const numVerts = Math.floor(positions.length / 3);
@@ -659,18 +919,35 @@ export class WeightPaintController {
     mesh.useVertexColors = true;
   }
 
-  public restoreOriginalVertexColors(mesh: Mesh): void {
-    if (!this.originalColorsMap.has(mesh)) return;
-    const orig = this.originalColorsMap.get(mesh);
-    const origFlag = this.originalVertexColorFlag.get(mesh) ?? false;
-    if (orig) {
-      mesh.setVerticesData(VertexBuffer.ColorKind, orig, true);
-    } else {
-      mesh.removeVerticesData(VertexBuffer.ColorKind);
+  public restoreOriginalVertexColors(mesh?: Mesh): void {
+    const targets = mesh ? this.getTargetMeshes(mesh) : Array.from(this.originalMaterialMap.keys());
+    for (const t of targets) {
+      this.restoreSingleMeshVertexColors(t);
     }
-    mesh.useVertexColors = origFlag;
-    this.originalColorsMap.delete(mesh);
-    this.originalVertexColorFlag.delete(mesh);
+  }
+
+  private restoreSingleMeshVertexColors(mesh: Mesh): void {
+    if (this.originalMaterialMap.has(mesh)) {
+      mesh.material = this.originalMaterialMap.get(mesh);
+      this.originalMaterialMap.delete(mesh);
+    }
+
+    if (this.originalColorsMap.has(mesh)) {
+      const orig = this.originalColorsMap.get(mesh);
+      const origFlag = this.originalVertexColorFlag.get(mesh) ?? false;
+      if (orig) {
+        mesh.setVerticesData(VertexBuffer.ColorKind, orig, true);
+      } else {
+        mesh.removeVerticesData(VertexBuffer.ColorKind);
+      }
+      mesh.useVertexColors = origFlag;
+      this.originalColorsMap.delete(mesh);
+      this.originalVertexColorFlag.delete(mesh);
+    }
+
+    if (this.service.selectedMesh === mesh && this.service.highlightLayer && !this.isActive) {
+      this.service.highlightLayer.addMesh(mesh, new Color3(0.2, 0.6, 1.0));
+    }
   }
 
   private weightToHeatmapRGB(w: number): [number, number, number] {
@@ -692,9 +969,21 @@ export class WeightPaintController {
 
   /**
    * Rotates the active bone (and its descendant bone chain) by `(pitchDeg, yawDeg, rollDeg)` and
-   * deforms the mesh vertices using Linear Blend Skinning (LBS) so the artist can test joint deformation!
+   * deforms all target character meshes using Linear Blend Skinning (LBS) so the artist can test joint deformation!
    */
   public poseActiveBone(
+    mesh: Mesh,
+    pitchDeg: number,
+    yawDeg: number = 0,
+    rollDeg: number = 0
+  ): void {
+    const targets = this.getTargetMeshes(mesh);
+    for (const t of targets) {
+      this.poseSingleMeshActiveBone(t, pitchDeg, yawDeg, rollDeg);
+    }
+  }
+
+  private poseSingleMeshActiveBone(
     mesh: Mesh,
     pitchDeg: number,
     yawDeg: number = 0,
@@ -729,7 +1018,10 @@ export class WeightPaintController {
       }
     }
 
-    const pivot = specs[this.activeBoneIndex].headWorldPos;
+    mesh.computeWorldMatrix(true);
+    const invWorld = mesh.getWorldMatrix().clone().invert();
+    const pivot = Vector3.TransformCoordinates(specs[this.activeBoneIndex].headWorldPos, invWorld);
+
     const quat = Quaternion.FromEulerAngles(
       (pitchDeg * Math.PI) / 180,
       (yawDeg * Math.PI) / 180,
@@ -781,9 +1073,16 @@ export class WeightPaintController {
   }
 
   /**
-   * Restores the mesh back to its clean Bind Pose (T-Pose / rest pose).
+   * Restores all target character meshes back to clean Bind Pose (T-Pose / rest pose).
    */
   public resetBindPose(mesh: Mesh): void {
+    const targets = this.getTargetMeshes(mesh);
+    for (const t of targets) {
+      this.resetSingleMeshBindPose(t);
+    }
+  }
+
+  private resetSingleMeshBindPose(mesh: Mesh): void {
     const bindPos: number[] | undefined = mesh.metadata?.bindPosePositions;
     if (!bindPos) return;
 
@@ -798,6 +1097,318 @@ export class WeightPaintController {
   }
 
   /**
+   * Dynamically adjusts the heights of the arms/shoulders and hips/legs across the skeleton
+   * and automatically re-binds envelope skin weights so the rig matches any stylized character!
+   */
+  public adjustBoneHeights(mesh: Mesh, armRatio: number, hipRatio: number): void {
+    if (!mesh || !mesh.skeleton) return;
+    const specs = this.getBoneSegments(mesh, mesh.skeleton);
+    if (specs.length === 0) return;
+
+    const targets = this.getTargetMeshes(mesh);
+    let minW = new Vector3(Infinity, Infinity, Infinity);
+    let maxW = new Vector3(-Infinity, -Infinity, -Infinity);
+    for (const t of targets) {
+      t.computeWorldMatrix(true);
+      t.refreshBoundingInfo();
+      const b = t.getBoundingInfo().boundingBox;
+      minW = Vector3.Minimize(minW, b.minimumWorld);
+      maxW = Vector3.Maximize(maxW, b.maximumWorld);
+    }
+    const height = Math.max(0.2, maxW.y - minW.y);
+    const bottomY = minW.y;
+
+    const armY = bottomY + armRatio * height;
+    const hipY = bottomY + hipRatio * height;
+    const chestY = bottomY + (hipRatio + (armRatio - hipRatio) * 0.75) * height;
+    const neckY = bottomY + Math.min(0.95, armRatio + 0.06) * height;
+
+    for (const s of specs) {
+      if (s.name.includes('Arm') || s.name.includes('Shoulder') || s.name.includes('Hand')) {
+        s.headWorldPos.y = armY;
+        s.tailWorldPos.y = armY;
+      } else if (s.name === 'Chest') {
+        s.headWorldPos.y = chestY;
+        s.tailWorldPos.y = armY;
+      } else if (s.name === 'Neck') {
+        s.headWorldPos.y = armY;
+        s.tailWorldPos.y = neckY;
+      } else if (s.name === 'Head') {
+        s.headWorldPos.y = neckY;
+      } else if (s.name === 'Hips') {
+        s.headWorldPos.y = hipY;
+        s.tailWorldPos.y = chestY;
+      } else if (s.name === 'Root') {
+        s.tailWorldPos.y = hipY;
+      } else if (s.name.includes('UpLeg')) {
+        s.headWorldPos.y = hipY;
+        s.tailWorldPos.y = bottomY + hipRatio * 0.5 * height;
+      } else if (s.name.includes('Leg_')) {
+        s.headWorldPos.y = bottomY + hipRatio * 0.5 * height;
+      }
+    }
+
+    this.syncBonesWithSpecs(mesh, specs);
+
+    if (this.showBoneOverlay) {
+      this.refreshBoneOverlay(mesh);
+    }
+
+    for (const t of targets) {
+      this.bindSingleMeshSkinWeights(t, t.skeleton || mesh.skeleton);
+      if (this.showHeatmap && this.isActive) {
+        this.updateSingleMeshHeatmap(t, this.activeBoneIndex);
+      }
+    }
+    this.onWeightsModified?.(mesh, this.analyzeWeights(mesh));
+  }
+
+  /**
+   * Nudges the active joint/bone position by a world delta vector and recalculates weights.
+   */
+  public nudgeActiveBone(mesh: Mesh, delta: Vector3): void {
+    if (!mesh || !mesh.skeleton) return;
+    const specs = this.getBoneSegments(mesh, mesh.skeleton);
+    const idx = Math.min(this.activeBoneIndex, specs.length - 1);
+    if (!specs[idx]) return;
+
+    specs[idx].headWorldPos.addInPlace(delta);
+    specs[idx].tailWorldPos.addInPlace(delta);
+
+    this.syncBonesWithSpecs(mesh, specs);
+
+    if (this.showBoneOverlay) {
+      this.refreshBoneOverlay(mesh);
+    }
+
+    const targets = this.getTargetMeshes(mesh);
+    for (const t of targets) {
+      this.bindSingleMeshSkinWeights(t, t.skeleton || mesh.skeleton);
+      if (this.showHeatmap && this.isActive) {
+        this.updateSingleMeshHeatmap(t, this.activeBoneIndex);
+      }
+    }
+    this.onWeightsModified?.(mesh, this.analyzeWeights(mesh));
+  }
+
+  /**
+   * Synchronizes bone local matrices and linked TransformNodes with updated specs.
+   */
+  public syncBonesWithSpecs(mesh: Mesh, customSpecs?: BoneNodeSpec[]): void {
+    if (!mesh || !mesh.skeleton) return;
+    const specs = customSpecs || this.getBoneSegments(mesh, mesh.skeleton);
+    const bones = mesh.skeleton.bones;
+    const rootParent = mesh.parent as Nullable<Node>;
+    let invParentMat: Nullable<Matrix> = null;
+    if (rootParent && 'getWorldMatrix' in rootParent) {
+      (rootParent as any).computeWorldMatrix(true);
+      invParentMat = Matrix.Invert((rootParent as any).getWorldMatrix());
+    }
+
+    for (let i = 0; i < specs.length && i < bones.length; i++) {
+      const spec = specs[i];
+      const bone = bones[i];
+      const pIdx = spec.parentIndex;
+      const headPos = spec.headWorldPos;
+      const parentHeadPos =
+        pIdx >= 0 && specs[pIdx]
+          ? specs[pIdx].headWorldPos
+          : Vector3.Zero();
+      const localOffset =
+        pIdx >= 0
+          ? headPos.subtract(parentHeadPos)
+          : invParentMat
+          ? Vector3.TransformCoordinates(headPos, invParentMat)
+          : headPos.clone();
+      const localMat = Matrix.Translation(localOffset.x, localOffset.y, localOffset.z);
+      bone.updateMatrix(localMat);
+      bone.getBaseMatrix().copyFrom(localMat);
+
+      let tNode = bone.getTransformNode();
+      if (!tNode) {
+        const pBone = bone.getParent();
+        const pNode = pBone ? pBone.getTransformNode() : rootParent;
+        tNode = new TransformNode(spec.name, this.scene);
+        if (pNode) tNode.parent = pNode;
+        tNode.metadata = { isBoneNode: true, skeletonId: mesh.skeleton.id };
+        bone.linkTransformNode(tNode);
+      }
+      tNode.position.copyFrom(localOffset);
+    }
+
+    const serializedSpecs = specs.map((s) => ({
+      name: s.name,
+      parentIndex: s.parentIndex,
+      head: [s.headWorldPos.x, s.headWorldPos.y, s.headWorldPos.z],
+      tail: [s.tailWorldPos.x, s.tailWorldPos.y, s.tailWorldPos.z],
+      rotationDeg: [0, 0, 0],
+    }));
+
+    const targets = this.getTargetMeshes(mesh);
+    for (const t of targets) {
+      if (!t.metadata) t.metadata = {};
+      t.metadata.rigBoneSpecs = serializedSpecs;
+    }
+  }
+
+  /**
+   * Ensures every bone in skeleton has a linked TransformNode so GLTF2Export writes out skins & joints.
+   */
+  public ensureSkeletonLinkedTransformNodes(skeleton: Skeleton, mesh: Mesh): void {
+    for (const bone of skeleton.bones) {
+      if (!bone.getTransformNode()) {
+        const parentBone = bone.getParent();
+        const parentNode = parentBone ? parentBone.getTransformNode() : (mesh.parent as Nullable<Node>);
+        const tNode = new TransformNode(bone.name || 'Bone', this.scene);
+        if (parentNode) {
+          tNode.parent = parentNode;
+        }
+        tNode.metadata = { isBoneNode: true, skeletonId: skeleton.id };
+        const localMat = bone.getLocalMatrix();
+        const scaling = new Vector3();
+        const rot = new Quaternion();
+        const trans = new Vector3();
+        localMat.decompose(scaling, rot, trans);
+        tNode.position.copyFrom(trans);
+        tNode.rotationQuaternion = rot;
+        tNode.scaling.copyFrom(scaling);
+        bone.linkTransformNode(tNode);
+      }
+    }
+  }
+
+  /**
+   * Prepares all meshes in the scene for clean GLTF/GLB/OBJ export by restoring
+   * original materials, removing temporary weight heatmap vertex colors,
+   * resetting pose tests, and ensuring all bones have linked transform nodes.
+   */
+  public prepareMeshesForExport(): void {
+    // 1. Reset any active pose bend test to bind pose
+    for (const mesh of this.scene.meshes) {
+      if (mesh instanceof Mesh && mesh.metadata?.bindPosePositions) {
+        this.resetBindPose(mesh);
+      }
+    }
+
+    // 2. Restore all original materials and vertex colors
+    const meshesWithHeatmap = new Set<Mesh>([
+      ...this.originalMaterialMap.keys(),
+      ...this.originalColorsMap.keys(),
+    ]);
+
+    for (const mesh of meshesWithHeatmap) {
+      if (mesh.isDisposed()) continue;
+      this.restoreOriginalVertexColors(mesh);
+    }
+
+    // Double check any mesh that might still have heatmap material or temporary colors
+    for (const mesh of this.scene.meshes) {
+      if (mesh instanceof Mesh) {
+        if (mesh.material && mesh.material.name === 'editor_weight_heatmap_mat') {
+          if (this.originalMaterialMap.has(mesh)) {
+            mesh.material = this.originalMaterialMap.get(mesh);
+          } else {
+            mesh.material = null;
+          }
+        }
+      }
+    }
+
+    // 3. Ensure all skeletons on meshes have linked transform nodes so GLTF2Export writes skins & joints
+    for (const mesh of this.scene.meshes) {
+      if (mesh instanceof Mesh && mesh.skeleton) {
+        this.ensureSkeletonLinkedTransformNodes(mesh.skeleton, mesh);
+      }
+    }
+
+    // 4. Ensure joint matrices indices are stored as UNSIGNED_BYTE (or UNSIGNED_SHORT) vertex buffers
+    // to prevent Babylon GLTF exporter from calculating mismatched byte offsets across submeshes
+    for (const mesh of this.scene.meshes) {
+      if (mesh instanceof Mesh && mesh.isVerticesDataPresent(VertexBuffer.MatricesIndicesKind)) {
+        const vb = mesh.getVertexBuffer(VertexBuffer.MatricesIndicesKind);
+        if (vb && vb.type === VertexBuffer.FLOAT) {
+          const raw = mesh.getVerticesData(VertexBuffer.MatricesIndicesKind);
+          if (raw) {
+            this.setMeshMatrixIndices(mesh, raw);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Sets MatricesIndicesKind as an UNSIGNED_BYTE (or UNSIGNED_SHORT) vertex buffer.
+   * Standard glTF requires integer types (UNSIGNED_BYTE / UNSIGNED_SHORT) for JOINTS_0.
+   * If stored as floats in Babylon, the glTF serializer converts the buffer to bytes but
+   * incorrectly computes submesh accessor byteOffsets using the float byteStride (16),
+   * causing bufferView overflow and corrupt GLB files!
+   */
+  public setMeshMatrixIndices(mesh: Mesh, indices: ArrayLike<number>): void {
+    const numIndices = indices.length;
+    let maxIdx = 0;
+    for (let i = 0; i < numIndices; i++) {
+      if (indices[i] > maxIdx) maxIdx = indices[i];
+    }
+
+    if (maxIdx < 256) {
+      const uint8Arr = indices instanceof Uint8Array ? indices : new Uint8Array(numIndices);
+      if (!(indices instanceof Uint8Array)) {
+        for (let i = 0; i < numIndices; i++) {
+          uint8Arr[i] = Math.round(indices[i]);
+        }
+      }
+      const vb = new VertexBuffer(
+        mesh.getEngine(),
+        uint8Arr,
+        VertexBuffer.MatricesIndicesKind,
+        false,
+        false,
+        4,
+        false,
+        0,
+        4,
+        VertexBuffer.UNSIGNED_BYTE
+      );
+      mesh.setVerticesBuffer(vb);
+    } else {
+      const uint16Arr = indices instanceof Uint16Array ? indices : new Uint16Array(numIndices);
+      if (!(indices instanceof Uint16Array)) {
+        for (let i = 0; i < numIndices; i++) {
+          uint16Arr[i] = Math.round(indices[i]);
+        }
+      }
+      const vb = new VertexBuffer(
+        mesh.getEngine(),
+        uint16Arr,
+        VertexBuffer.MatricesIndicesKind,
+        false,
+        false,
+        4,
+        false,
+        0,
+        4,
+        VertexBuffer.UNSIGNED_SHORT
+      );
+      mesh.setVerticesBuffer(vb);
+    }
+  }
+
+  /**
+   * Re-activates the weight heatmap and bone overlay after an export completes.
+   */
+  public restoreMeshesAfterExport(): void {
+    const mesh = this.activeMesh || this.getActiveTargetMesh();
+    if (this.isActive && mesh && !mesh.isDisposed()) {
+      if (this.showHeatmap) {
+        this.updateWeightHeatmap(mesh);
+      }
+      if (this.showBoneOverlay) {
+        this.refreshBoneOverlay(mesh);
+      }
+    }
+  }
+
+  /**
    * Renders a 3D bone wireframe overlay and active joint sphere in the viewport.
    */
   public refreshBoneOverlay(mesh: Mesh): void {
@@ -807,15 +1418,10 @@ export class WeightPaintController {
     const specs = this.getBoneSegments(mesh, mesh.skeleton);
     if (specs.length === 0) return;
 
-    mesh.computeWorldMatrix(true);
-    const worldMat = mesh.getWorldMatrix();
-
     const lines: Vector3[][] = [];
     for (let i = 0; i < specs.length; i++) {
       const s = specs[i];
-      const h = Vector3.TransformCoordinates(s.headWorldPos, worldMat);
-      const t = Vector3.TransformCoordinates(s.tailWorldPos, worldMat);
-      lines.push([h, t]);
+      lines.push([s.headWorldPos.clone(), s.tailWorldPos.clone()]);
     }
 
     this.boneOverlayMesh = MeshBuilder.CreateLineSystem(
@@ -829,13 +1435,12 @@ export class WeightPaintController {
 
     const activeSpec = specs[Math.min(this.activeBoneIndex, specs.length - 1)];
     if (activeSpec) {
-      const jointPos = Vector3.TransformCoordinates(activeSpec.headWorldPos, worldMat);
       this.activeBoneMarker = MeshBuilder.CreateSphere(
         'editor_rig_active_bone_marker',
         { diameter: 0.08, segments: 10 },
         this.scene
       );
-      this.activeBoneMarker.position.copyFrom(jointPos);
+      this.activeBoneMarker.position.copyFrom(activeSpec.headWorldPos);
       const mat = new StandardMaterial('editor_rig_active_marker_mat', this.scene);
       mat.emissiveColor = new Color3(1.0, 0.35, 0.1);
       mat.disableLighting = true;
@@ -857,10 +1462,11 @@ export class WeightPaintController {
     }
   }
 
-  public analyzeWeights(mesh: Nullable<Mesh>): WeightStats {
-    if (!mesh || mesh.isDisposed() || !mesh.skeleton) {
+  public analyzeWeights(primaryMesh?: Nullable<Mesh>): WeightStats {
+    const root = primaryMesh || this.getActiveTargetMesh();
+    if (!root || root.isDisposed() || !root.skeleton) {
       return {
-        meshName: mesh?.name || 'None',
+        meshName: root?.name || 'None',
         hasSkeleton: false,
         boneCount: 0,
         activeBoneName: 'None',
@@ -870,29 +1476,37 @@ export class WeightPaintController {
       };
     }
 
-    const bones = mesh.skeleton.bones;
+    const targets = this.getTargetMeshes(root);
+    const bones = root.skeleton.bones;
     const boneIdx = Math.min(this.activeBoneIndex, Math.max(0, bones.length - 1));
     const activeBoneName = bones[boneIdx]?.name || `Bone_${boneIdx}`;
-
-    const mIndices = mesh.getVerticesData(VertexBuffer.MatricesIndicesKind);
-    const mWeights = mesh.getVerticesData(VertexBuffer.MatricesWeightsKind);
-    const numVerts = mesh.getTotalVertices();
 
     let influencedVertexCount = 0;
     let sumWeight = 0;
 
-    if (mIndices && mWeights && numVerts > 0) {
-      for (let i = 0; i < numVerts; i++) {
-        const w = this.getVertexBoneWeight(mIndices, mWeights, i, boneIdx);
-        if (w > 0.01) {
-          influencedVertexCount++;
-          sumWeight += w;
+    for (const m of targets) {
+      const mIndices = m.getVerticesData(VertexBuffer.MatricesIndicesKind);
+      const mWeights = m.getVerticesData(VertexBuffer.MatricesWeightsKind);
+      const numVerts = m.getTotalVertices();
+
+      if (mIndices && mWeights && numVerts > 0) {
+        for (let i = 0; i < numVerts; i++) {
+          const w = this.getVertexBoneWeight(mIndices, mWeights, i, boneIdx);
+          if (w > 0.01) {
+            influencedVertexCount++;
+            sumWeight += w;
+          }
         }
       }
     }
 
+    const meshDisplayName =
+      targets.length > 1
+        ? `${root.name} (+${targets.length - 1} parts)`
+        : root.name;
+
     return {
-      meshName: mesh.name,
+      meshName: meshDisplayName,
       hasSkeleton: true,
       boneCount: bones.length,
       activeBoneName,
@@ -953,10 +1567,18 @@ export class WeightPaintController {
       this.scene.activeCamera.detachControl();
     }
 
-    const preW = mesh.getVerticesData(VertexBuffer.MatricesWeightsKind);
-    const preI = mesh.getVerticesData(VertexBuffer.MatricesIndicesKind);
-    this.strokePreWeights = preW ? Array.from(preW) : null;
-    this.strokePreIndices = preI ? Array.from(preI) : null;
+    this.strokePreStates.clear();
+    const targets = this.getTargetMeshes(mesh);
+    for (const t of targets) {
+      const preW = t.getVerticesData(VertexBuffer.MatricesWeightsKind);
+      const preI = t.getVerticesData(VertexBuffer.MatricesIndicesKind);
+      if (preW && preI) {
+        this.strokePreStates.set(t, {
+          weights: Array.from(preW),
+          indices: Array.from(preI),
+        });
+      }
+    }
 
     this.applyWeightBrushStroke(mesh, pick.pickedPoint, this.activeBoneIndex);
   }
@@ -978,7 +1600,7 @@ export class WeightPaintController {
         const normal = pick.getNormal(true) || Vector3.Up();
         this.cursorRing.lookAt(pick.pickedPoint.add(normal));
       }
-      if (this.isPainting && this.activeMesh === pick.pickedMesh) {
+      if (this.isPainting && this.activeMesh) {
         this.applyWeightBrushStroke(this.activeMesh, pick.pickedPoint, this.activeBoneIndex);
       }
     } else if (this.cursorRing) {
@@ -992,37 +1614,62 @@ export class WeightPaintController {
       this.scene.activeCamera.attachControl(this.service.canvas, true);
     }
 
-    const mesh = this.activeMesh;
-    if (mesh && this.strokePreWeights && this.strokePreIndices) {
-      const preW = this.strokePreWeights.slice();
-      const preI = this.strokePreIndices.slice();
-      const postW = Array.from(mesh.getVerticesData(VertexBuffer.MatricesWeightsKind) || []);
-      const postI = Array.from(mesh.getVerticesData(VertexBuffer.MatricesIndicesKind) || []);
+    const modifiedMeshes: Array<{
+      mesh: Mesh;
+      preW: number[];
+      preI: number[];
+      postW: number[];
+      postI: number[];
+    }> = [];
 
-      this.service.recordAction({
-        name: `Weight Paint (${mesh.name})`,
-        undo: () => {
-          if (!mesh.isDisposed()) {
-            mesh.setVerticesData(VertexBuffer.MatricesIndicesKind, preI, true);
-            mesh.setVerticesData(VertexBuffer.MatricesWeightsKind, preW, true);
-            if (this.showHeatmap && this.isActive) this.updateWeightHeatmap(mesh);
-            this.onWeightsModified?.(mesh, this.analyzeWeights(mesh));
+    for (const [m, pre] of this.strokePreStates.entries()) {
+      if (m.isDisposed()) continue;
+      const postW = Array.from(m.getVerticesData(VertexBuffer.MatricesWeightsKind) || []);
+      const postI = Array.from(m.getVerticesData(VertexBuffer.MatricesIndicesKind) || []);
+      let changed = false;
+      if (postW.length !== pre.weights.length) {
+        changed = true;
+      } else {
+        for (let i = 0; i < postW.length; i++) {
+          if (Math.abs(postW[i] - pre.weights[i]) > 1e-4) {
+            changed = true;
+            break;
           }
+        }
+      }
+      if (changed) {
+        modifiedMeshes.push({ mesh: m, preW: pre.weights, preI: pre.indices, postW, postI });
+      }
+    }
+
+    if (modifiedMeshes.length > 0) {
+      this.service.recordAction({
+        name: `Weight Paint (${modifiedMeshes.map((x) => x.mesh.name).join(', ')})`,
+        undo: () => {
+          for (const item of modifiedMeshes) {
+            if (!item.mesh.isDisposed()) {
+              this.setMeshMatrixIndices(item.mesh, item.preI);
+              item.mesh.setVerticesData(VertexBuffer.MatricesWeightsKind, item.preW, true);
+              if (this.showHeatmap && this.isActive) this.updateWeightHeatmap(item.mesh);
+            }
+          }
+          this.onWeightsModified?.(modifiedMeshes[0].mesh, this.analyzeWeights(modifiedMeshes[0].mesh));
         },
         redo: () => {
-          if (!mesh.isDisposed()) {
-            mesh.setVerticesData(VertexBuffer.MatricesIndicesKind, postI, true);
-            mesh.setVerticesData(VertexBuffer.MatricesWeightsKind, postW, true);
-            if (this.showHeatmap && this.isActive) this.updateWeightHeatmap(mesh);
-            this.onWeightsModified?.(mesh, this.analyzeWeights(mesh));
+          for (const item of modifiedMeshes) {
+            if (!item.mesh.isDisposed()) {
+              this.setMeshMatrixIndices(item.mesh, item.postI);
+              item.mesh.setVerticesData(VertexBuffer.MatricesWeightsKind, item.postW, true);
+              if (this.showHeatmap && this.isActive) this.updateWeightHeatmap(item.mesh);
+            }
           }
+          this.onWeightsModified?.(modifiedMeshes[0].mesh, this.analyzeWeights(modifiedMeshes[0].mesh));
         },
       });
     }
 
+    this.strokePreStates.clear();
     this.activeMesh = null;
-    this.strokePreWeights = null;
-    this.strokePreIndices = null;
   }
 
   public dispose(): void {

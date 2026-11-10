@@ -26,6 +26,7 @@ export interface BakeOptions {
   flipNormalY?: boolean;
   paddingPx?: number;
   applyToMaterial?: boolean;
+  autoUnwrapIfOverlapping?: boolean;
 }
 
 export interface BakeResult {
@@ -241,6 +242,7 @@ export class TextureBaker {
     const flipY = options.flipNormalY ?? this.flipNormalY;
     const paddingPx = options.paddingPx ?? this.paddingPx;
     const applyToMaterial = options.applyToMaterial ?? true;
+    const autoUnwrapIfOverlapping = options.autoUnwrapIfOverlapping ?? false;
 
     // Ensure low-poly mesh has valid UVs
     let lowUVs = lowPoly.getVerticesData(VertexBuffer.UVKind);
@@ -253,6 +255,12 @@ export class TextureBaker {
     if (!lowUVs || lowUVs.length < (lowPos.length / 3) * 2) {
       this.service.uvUnwrapController?.unwrapMesh(lowPoly);
       lowUVs = lowPoly.getVerticesData(VertexBuffer.UVKind);
+    } else if (autoUnwrapIfOverlapping && this.service.uvUnwrapController) {
+      const stats = this.service.uvUnwrapController.analyzeUVs(lowPoly);
+      if (stats.overlapDetected) {
+        this.service.uvUnwrapController.unwrapMesh(lowPoly);
+        lowUVs = lowPoly.getVerticesData(VertexBuffer.UVKind);
+      }
     }
 
     const finalLowPos = lowPoly.getVerticesData(VertexBuffer.PositionKind)!;
@@ -297,6 +305,80 @@ export class TextureBaker {
     let coveredTexelCount = 0;
     const numLowTris = Math.floor(finalLowInd.length / 3);
     const maxRayDist = Math.max(cageDist * 3.5, 0.25);
+
+    // For Self-Bake mode: precompute face normals and crease flags so internal coplanar edges (e.g. quad diagonals) are not beveled
+    const triEdgeCrease = new Uint8Array(numLowTris * 3);
+    if (highPoly === lowPoly || highTris.length === 0) {
+      const quant = 10000;
+      const getCanonKey = (idx: number) =>
+        `${Math.round(finalLowPos[idx * 3] * quant)},${Math.round(finalLowPos[idx * 3 + 1] * quant)},${Math.round(finalLowPos[idx * 3 + 2] * quant)}`;
+
+      const faceNormals: Vector3[] = new Array(numLowTris);
+      for (let f = 0; f < numLowTris; f++) {
+        const i0 = finalLowInd[f * 3];
+        const i1 = finalLowInd[f * 3 + 1];
+        const i2 = finalLowInd[f * 3 + 2];
+        const p0 = new Vector3(finalLowPos[i0 * 3], finalLowPos[i0 * 3 + 1], finalLowPos[i0 * 3 + 2]);
+        const p1 = new Vector3(finalLowPos[i1 * 3], finalLowPos[i1 * 3 + 1], finalLowPos[i1 * 3 + 2]);
+        const p2 = new Vector3(finalLowPos[i2 * 3], finalLowPos[i2 * 3 + 1], finalLowPos[i2 * 3 + 2]);
+        const fn = Vector3.Cross(p1.subtract(p0), p2.subtract(p0));
+        if (fn.lengthSquared() > 1e-12) fn.normalize();
+        else fn.set(0, 1, 0);
+        faceNormals[f] = fn;
+      }
+
+      const edgeMap = new Map<string, { tri: number; edge: number }[]>();
+      for (let f = 0; f < numLowTris; f++) {
+        const k0 = getCanonKey(finalLowInd[f * 3]);
+        const k1 = getCanonKey(finalLowInd[f * 3 + 1]);
+        const k2 = getCanonKey(finalLowInd[f * 3 + 2]);
+
+        const edges = [
+          k0 < k1 ? `${k0}_${k1}` : `${k1}_${k0}`,
+          k1 < k2 ? `${k1}_${k2}` : `${k2}_${k1}`,
+          k2 < k0 ? `${k2}_${k0}` : `${k0}_${k2}`,
+        ];
+
+        for (let e = 0; e < 3; e++) {
+          const ek = edges[e];
+          let list = edgeMap.get(ek);
+          if (!list) {
+            list = [];
+            edgeMap.set(ek, list);
+          }
+          list.push({ tri: f, edge: e });
+        }
+      }
+
+      for (let f = 0; f < numLowTris; f++) {
+        const k0 = getCanonKey(finalLowInd[f * 3]);
+        const k1 = getCanonKey(finalLowInd[f * 3 + 1]);
+        const k2 = getCanonKey(finalLowInd[f * 3 + 2]);
+
+        const edges = [
+          k0 < k1 ? `${k0}_${k1}` : `${k1}_${k0}`,
+          k1 < k2 ? `${k1}_${k2}` : `${k2}_${k1}`,
+          k2 < k0 ? `${k2}_${k0}` : `${k0}_${k2}`,
+        ];
+
+        for (let e = 0; e < 3; e++) {
+          const sharing = edgeMap.get(edges[e]);
+          let isCoplanar = false;
+          if (sharing && sharing.length > 1) {
+            for (const other of sharing) {
+              if (other.tri !== f) {
+                const dot = Vector3.Dot(faceNormals[f], faceNormals[other.tri]);
+                if (dot > 0.85) {
+                  isCoplanar = true;
+                  break;
+                }
+              }
+            }
+          }
+          triEdgeCrease[f * 3 + e] = isCoplanar ? 0 : 1;
+        }
+      }
+    }
 
     for (let f = 0; f < numLowTris; f++) {
       const i0 = finalLowInd[f * 3];
@@ -444,8 +526,18 @@ export class TextureBaker {
               rayHitCount++;
             }
           } else {
-            // Self-baking: blend smooth cage normal with bevel edge relief near triangle edges
-            const edgeMinBary = Math.min(b0, b1, b2) * 3.0; // 0 at edge, 1 at center
+            // Self-baking: blend smooth cage normal with bevel edge relief near sharp/boundary edges only
+            // Edge 0 (i0->i1) is opposite vertex 2 (b2 -> 0)
+            // Edge 1 (i1->i2) is opposite vertex 0 (b0 -> 0)
+            // Edge 2 (i2->i0) is opposite vertex 1 (b1 -> 0)
+            const isCrease0 = triEdgeCrease[f * 3] === 1;
+            const isCrease1 = triEdgeCrease[f * 3 + 1] === 1;
+            const isCrease2 = triEdgeCrease[f * 3 + 2] === 1;
+
+            const dist0 = isCrease1 ? b0 : 1.0;
+            const dist1 = isCrease2 ? b1 : 1.0;
+            const dist2 = isCrease0 ? b2 : 1.0;
+            const edgeMinBary = Math.min(dist0, dist1, dist2) * 3.0;
             const bevelBlend = Math.min(1.0, edgeMinBary * 2.2);
             sampledNormal = Vector3.Lerp(cageNormal, lowNormal, bevelBlend).normalize();
             hitDepthRatio = (1.0 - bevelBlend) * 0.35;

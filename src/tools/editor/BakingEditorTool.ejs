@@ -23,6 +23,19 @@
           <option value="self" selected>Self (Bevel &amp; Cavity Detail)</option>
         </select>
       </div>
+      <div id="bakeUVWarning" class="tool-help-box" style="display: none; margin-top: 8px; border-color: rgba(234, 179, 8, 0.4); background: rgba(234, 179, 8, 0.08); color: #f2cc60; font-size: 11px;">
+        <div style="display: flex; align-items: flex-start; gap: 6px;">
+          <i class="app-icon" data-lucide="alert-triangle" style="color: #eab308; flex-shrink: 0; width: 14px; height: 14px; margin-top: 2px;"></i>
+          <div>
+            <strong>Overlapping UVs detected:</strong> All faces share the same UV space. Unpack islands before baking.
+            <div style="margin-top: 6px;">
+              <button type="button" id="btnBakeQuickUnwrap" class="tool-btn" style="padding: 2px 8px; font-size: 10px; font-weight: 600;">
+                <i class="app-icon" data-lucide="scissors"></i> Unwrap UV Islands
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 2. Projection Cage Controls -->
@@ -77,6 +90,13 @@
         <label class="sculpt-checkbox-label">
           <input type="checkbox" id="chkBakeApplyMaterial" checked />
           <span>Apply to Mesh</span>
+        </label>
+      </div>
+
+      <div class="sculpt-options-row" style="margin-top: 6px;">
+        <label class="sculpt-checkbox-label" title="Automatically unwrap low-poly mesh islands if overlapping UVs are detected">
+          <input type="checkbox" id="chkBakeAutoUnwrap" checked />
+          <span>Auto-Unwrap if Overlapping</span>
         </label>
       </div>
 

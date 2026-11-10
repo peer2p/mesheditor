@@ -42,6 +42,52 @@ import {
 import '@babylonjs/loaders';
 import { GridMaterial } from '@babylonjs/materials';
 import { GLTF2Export, OBJExport, RegisterEXT_texture_webp, STLExport } from '@babylonjs/serializers';
+import { DataWriter } from '@babylonjs/serializers/glTF/2.0/dataWriter';
+
+// Ensure cross-realm typed arrays (e.g. jsdom testing / iframes) are compatible with DataWriter
+if (DataWriter && DataWriter.prototype) {
+  const origWriteTypedArray = DataWriter.prototype.writeTypedArray;
+  DataWriter.prototype.writeTypedArray = function (this: any, value: any): void {
+    try {
+      origWriteTypedArray.call(this, value);
+    } catch {
+      this._checkGrowBuffer(value.byteLength);
+      const typeName = value?.constructor?.name;
+      const isLittleEndian = true;
+      for (let i = 0; i < value.length; i++) {
+        const v = value[i];
+        switch (typeName) {
+          case 'Uint8Array':
+          case 'Uint8ClampedArray':
+            this._dataView.setUint8(this._byteOffset, v);
+            break;
+          case 'Int8Array':
+            this._dataView.setInt8(this._byteOffset, v);
+            break;
+          case 'Uint16Array':
+            this._dataView.setUint16(this._byteOffset, v, isLittleEndian);
+            break;
+          case 'Int16Array':
+            this._dataView.setInt16(this._byteOffset, v, isLittleEndian);
+            break;
+          case 'Uint32Array':
+            this._dataView.setUint32(this._byteOffset, v, isLittleEndian);
+            break;
+          case 'Int32Array':
+            this._dataView.setInt32(this._byteOffset, v, isLittleEndian);
+            break;
+          case 'Float32Array':
+            this._dataView.setFloat32(this._byteOffset, v, isLittleEndian);
+            break;
+          case 'Float64Array':
+            this._dataView.setFloat64(this._byteOffset, v, isLittleEndian);
+            break;
+        }
+        this._byteOffset += value.BYTES_PER_ELEMENT;
+      }
+    }
+  };
+}
 import { AIAgentService } from './AIAgentService';
 import {
   TextureAtlasManager,
@@ -622,7 +668,8 @@ export class MeshEditorService {
           !this.pathExtrusion?.isActive &&
           !this.decalController?.isActive &&
           !(this.textMeshController?.isSurfacePlacementActive && evt?.shiftKey) &&
-          !this.isSculptModeActive()
+          !this.isSculptModeActive() &&
+          !this.isWeightPaintModeActive()
         ) {
           this.isMarqueeCandidate = true;
           this.isMarqueeActive = false;
@@ -647,7 +694,12 @@ export class MeshEditorService {
           }
         }
 
-        if (this.isMarqueeCandidate && !this.isAnyGizmoDragging() && !this.isSculptModeActive()) {
+        if (
+          this.isMarqueeCandidate &&
+          !this.isAnyGizmoDragging() &&
+          !this.isSculptModeActive() &&
+          !this.isWeightPaintModeActive()
+        ) {
           const dist = Math.hypot(
             this.scene.pointerX - this.marqueeStartPointer.x,
             this.scene.pointerY - this.marqueeStartPointer.y
@@ -697,13 +749,14 @@ export class MeshEditorService {
           return;
         }
 
-        // If voxel painter, path extrusion, decal painter, text surface placement or sculpt tool is active, ignore default mesh selection
+        // If voxel painter, path extrusion, decal painter, text surface placement, sculpt tool or weight paint is active, ignore default mesh selection
         if (
           this.voxelPainter?.isActive ||
           this.pathExtrusion?.isActive ||
           this.decalController?.isActive ||
           (this.textMeshController?.isSurfacePlacementActive && evt?.shiftKey) ||
-          this.isSculptModeActive()
+          this.isSculptModeActive() ||
+          this.isWeightPaintModeActive()
         ) {
           return;
         }
@@ -770,6 +823,7 @@ export class MeshEditorService {
 
   public isEditorHelper(mesh: AbstractMesh | TransformNode): boolean {
     if (!mesh) return false;
+    if ((mesh as any).metadata?.isBoneNode) return false;
     if (mesh === this.gridMesh || mesh === this.facetHighlightMesh) return true;
     const name = mesh.name || '';
     if (
@@ -814,9 +868,29 @@ export class MeshEditorService {
         !sculptDialog.classList.contains('minimized') &&
         !this.voxelPainter?.isActive &&
         !this.pathExtrusion?.isActive &&
+        !this.isWeightPaintModeActive() &&
         !this.facetEditorActive
       ) {
         this.sculptController.setActive(true);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public isWeightPaintModeActive(): boolean {
+    if (!this.weightPaintController) return false;
+    if (this.weightPaintController.isActive) return true;
+    if (typeof document !== 'undefined') {
+      const riggingDialog = document.getElementById('dialog-rigging');
+      if (
+        riggingDialog &&
+        riggingDialog.style.display !== 'none' &&
+        !riggingDialog.classList.contains('minimized') &&
+        !this.voxelPainter?.isActive &&
+        !this.pathExtrusion?.isActive
+      ) {
+        this.weightPaintController.setActive(true);
         return true;
       }
     }
@@ -1056,7 +1130,11 @@ export class MeshEditorService {
       this.lastClickedNode = nodes[nodes.length - 1];
     }
 
+    const isWeightPainting = this.isWeightPaintModeActive();
     for (const node of this.selectedNodes) {
+      if (isWeightPainting) {
+        continue;
+      }
       if (node instanceof Mesh) {
         if (!this.isEditorHelper(node)) {
           this.highlightLayer.addMesh(node, new Color3(0.2, 0.6, 1.0));
@@ -2171,7 +2249,6 @@ export class MeshEditorService {
     const baseName = meshesToMerge[0].name.replace(/_merged(_\d+)?$/, '');
     merged.name = `${baseName}_merged`;
     merged.parent = targetParent;
-    this.centerMeshPivot(merged);
     this.importedMeshes.push(merged);
 
     // Deselect source meshes before disabling them
@@ -6117,6 +6194,17 @@ export class MeshEditorService {
     const selectedSet = new Set(selectedNodes);
     if (selectedSet.has(node)) return true;
 
+    // Check if node is a linked bone transform node of any selected mesh
+    for (const sel of selectedNodes) {
+      if (sel instanceof AbstractMesh && (sel as Mesh).skeleton) {
+        for (const bone of (sel as Mesh).skeleton!.bones) {
+          if (bone.getTransformNode() === node) {
+            return true;
+          }
+        }
+      }
+    }
+
     // Check if any ancestor is in selectedSet (child of selected parent/group)
     let parent = node.parent;
     while (parent) {
@@ -6160,6 +6248,9 @@ export class MeshEditorService {
     if (this.decalController && this.decalController.getUnmergedDecals().length > 0) {
       this.decalController.mergeAllDecalsIntoMeshes();
     }
+
+    // Restore materials & clean up temporary weight heatmap vertex colors and ensure bone nodes before export
+    this.weightPaintController?.prepareMeshesForExport();
 
     const shouldExport = (node: any) => this.shouldExportNode(node, opts.selectedOnly);
 
@@ -6304,6 +6395,8 @@ export class MeshEditorService {
       console.error('Export error:', err);
       this.events.onToast?.(`Export failed: ${err.message || err}`, 'error');
       this.events.onStatusChanged?.('Export error');
+    } finally {
+      this.weightPaintController?.restoreMeshesAfterExport();
     }
   }
 
@@ -6311,35 +6404,40 @@ export class MeshEditorService {
     if (this.decalController && this.decalController.getUnmergedDecals().length > 0) {
       this.decalController.mergeAllDecalsIntoMeshes();
     }
-    const shouldExport = (node: any) => this.shouldExportNode(node, false);
-    const glb = await GLTF2Export.GLBAsync(this.scene, filename, {
-      shouldExportNode: shouldExport,
-    });
+    this.weightPaintController?.prepareMeshesForExport();
+    try {
+      const shouldExport = (node: any) => this.shouldExportNode(node, false);
+      const glb = await GLTF2Export.GLBAsync(this.scene, filename, {
+        shouldExportNode: shouldExport,
+      });
 
-    const fileMap = (glb as any)._glTFData?.files || (glb as any).files;
-    if (fileMap) {
-      for (const k in fileMap) {
-        if (k.endsWith('.glb')) {
-          return fileMap[k] as Blob;
+      const fileMap = (glb as any)._glTFData?.files || (glb as any).files;
+      if (fileMap) {
+        for (const k in fileMap) {
+          if (k.endsWith('.glb')) {
+            return fileMap[k] as Blob;
+          }
         }
       }
-    }
 
-    // Fallback: intercept download
-    return new Promise<Blob>((resolve, reject) => {
-      const originalCreateObjectURL = URL.createObjectURL;
-      URL.createObjectURL = (blob: any) => {
-        URL.createObjectURL = originalCreateObjectURL;
-        resolve(blob);
-        return originalCreateObjectURL(blob);
-      };
-      try {
-        glb.downloadFiles();
-      } catch (err) {
-        URL.createObjectURL = originalCreateObjectURL;
-        reject(err);
-      }
-    });
+      // Fallback: intercept download
+      return new Promise<Blob>((resolve, reject) => {
+        const originalCreateObjectURL = URL.createObjectURL;
+        URL.createObjectURL = (blob: any) => {
+          URL.createObjectURL = originalCreateObjectURL;
+          resolve(blob);
+          return originalCreateObjectURL(blob);
+        };
+        try {
+          glb.downloadFiles();
+        } catch (err) {
+          URL.createObjectURL = originalCreateObjectURL;
+          reject(err);
+        }
+      });
+    } finally {
+      this.weightPaintController?.restoreMeshesAfterExport();
+    }
   }
 
   /**

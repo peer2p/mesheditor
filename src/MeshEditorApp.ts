@@ -74,7 +74,9 @@ import {
   AlertCircle,
   AlertTriangle,
   AppWindow,
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   BarChart2,
   Bone,
   Bot,
@@ -186,7 +188,9 @@ export const editorIcons = {
   AlertCircle,
   AlertTriangle,
   AppWindow,
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   BarChart2,
   Bone,
   Bot,
@@ -7384,6 +7388,7 @@ export class MeshEditorApp {
     const selectPad = this.getElement<HTMLSelectElement>('selectBakePadding');
     const chkFlipY = this.getElement<HTMLInputElement>('chkBakeFlipY');
     const chkApply = this.getElement<HTMLInputElement>('chkBakeApplyMaterial');
+    const chkAutoUnwrap = this.getElement<HTMLInputElement>('chkBakeAutoUnwrap');
     const selectPreviewChannel = this.getElement<HTMLSelectElement>('selectBakePreviewChannel');
     const previewCanvas = this.getElement<HTMLCanvasElement>('bakePreviewCanvas');
 
@@ -7408,6 +7413,22 @@ export class MeshEditorApp {
       }
       return low;
     };
+
+    selectLow?.addEventListener('change', () => this.updateBakingUI());
+    selectHigh?.addEventListener('change', () => this.updateBakingUI());
+
+    this.getElement('btnBakeQuickUnwrap')?.addEventListener('click', () => {
+      const low = resolveLowPoly();
+      if (!low) {
+        this.showToast('Please select a Low-Poly mesh first.', 'warning');
+        return;
+      }
+      if (this.service.uvUnwrapController) {
+        this.service.uvUnwrapController.unwrapMesh(low);
+        this.updateBakingUI();
+        this.showToast(`Unwrapped and packed UV islands for "${low.name}".`, 'success');
+      }
+    });
 
     if (sliderCage) {
       sliderCage.addEventListener('input', () => {
@@ -7467,6 +7488,7 @@ export class MeshEditorApp {
       const paddingPx = parseInt(selectPad?.value || '4', 10) || 4;
       const flipNormalY = !!chkFlipY?.checked;
       const applyToMaterial = chkApply ? chkApply.checked : true;
+      const autoUnwrapIfOverlapping = chkAutoUnwrap ? chkAutoUnwrap.checked : false;
 
       try {
         const res = await this.service.textureBaker.bakeTextures({
@@ -7477,6 +7499,7 @@ export class MeshEditorApp {
           paddingPx,
           flipNormalY,
           applyToMaterial,
+          autoUnwrapIfOverlapping,
         });
 
         const statusEl = this.getElement('bakeStatusText');
@@ -7565,6 +7588,21 @@ export class MeshEditorApp {
         selectHigh.value = prev;
       }
     }
+
+    const warningEl = this.getElement('bakeUVWarning');
+    if (warningEl) {
+      const targetMesh =
+        selectLow && selectLow.value !== 'selected'
+          ? validMeshes.find((m) => m.name === selectLow.value)
+          : this.service.selectedMesh || validMeshes[0];
+
+      if (targetMesh && this.service.uvUnwrapController) {
+        const stats = this.service.uvUnwrapController.analyzeUVs(targetMesh);
+        warningEl.style.display = stats.overlapDetected ? 'block' : 'none';
+      } else {
+        warningEl.style.display = 'none';
+      }
+    }
   }
 
   /* =========================================================================
@@ -7595,7 +7633,8 @@ export class MeshEditorApp {
         this.showToast('Please select a 3D mesh to rig.', 'warning');
         return;
       }
-      const preset = (selectPreset?.value || 'humanoid') as 'humanoid' | 'quadruped' | 'spine_chain';
+
+      const preset = (selectPreset?.value || 'humanoid') as 'humanoid' | 'chibi' | 'quadruped' | 'spine_chain';
       const skel = this.service.weightPaintController.createAutoRig(mesh, preset);
       this.service.weightPaintController.setActive(true);
       this.showToast(
@@ -7604,6 +7643,64 @@ export class MeshEditorApp {
       );
       this.updateRiggingUI();
       this.updatePanelButtonStates();
+    });
+
+    const sliderArmHeight = this.getElement<HTMLInputElement>('sliderRigArmHeight');
+    const valArmHeight = this.getElement('rigArmHeightVal');
+    const sliderHipHeight = this.getElement<HTMLInputElement>('sliderRigHipHeight');
+    const valHipHeight = this.getElement('rigHipHeightVal');
+
+    if (selectPreset) {
+      selectPreset.addEventListener('change', () => {
+        const val = selectPreset.value;
+        if (val === 'chibi') {
+          if (sliderArmHeight) sliderArmHeight.value = '0.59';
+          if (valArmHeight) valArmHeight.textContent = '59%';
+          if (sliderHipHeight) sliderHipHeight.value = '0.36';
+          if (valHipHeight) valHipHeight.textContent = '36%';
+        } else if (val === 'humanoid') {
+          if (sliderArmHeight) sliderArmHeight.value = '0.78';
+          if (valArmHeight) valArmHeight.textContent = '78%';
+          if (sliderHipHeight) sliderHipHeight.value = '0.48';
+          if (valHipHeight) valHipHeight.textContent = '48%';
+        }
+      });
+    }
+
+    const applyProportionAdjustments = () => {
+      const mesh = this.service.weightPaintController.getActiveTargetMesh();
+      if (!mesh || !mesh.skeleton) return;
+      const armRatio = parseFloat(sliderArmHeight?.value || '0.78');
+      const hipRatio = parseFloat(sliderHipHeight?.value || '0.48');
+      this.service.weightPaintController.adjustBoneHeights(mesh, armRatio, hipRatio);
+    };
+
+    if (sliderArmHeight) {
+      sliderArmHeight.addEventListener('input', () => {
+        const v = parseFloat(sliderArmHeight.value) || 0.78;
+        if (valArmHeight) valArmHeight.textContent = `${Math.round(v * 100)}%`;
+        applyProportionAdjustments();
+      });
+    }
+
+    if (sliderHipHeight) {
+      sliderHipHeight.addEventListener('input', () => {
+        const v = parseFloat(sliderHipHeight.value) || 0.48;
+        if (valHipHeight) valHipHeight.textContent = `${Math.round(v * 100)}%`;
+        applyProportionAdjustments();
+      });
+    }
+
+    this.getElement('btnNudgeBoneUp')?.addEventListener('click', () => {
+      const mesh = this.service.weightPaintController.getActiveTargetMesh();
+      if (!mesh || !mesh.skeleton) return;
+      this.service.weightPaintController.nudgeActiveBone(mesh, new Vector3(0, 0.03, 0));
+    });
+
+    this.getElement('btnNudgeBoneDown')?.addEventListener('click', () => {
+      const mesh = this.service.weightPaintController.getActiveTargetMesh();
+      if (!mesh || !mesh.skeleton) return;
+      this.service.weightPaintController.nudgeActiveBone(mesh, new Vector3(0, -0.03, 0));
     });
 
     this.getElement('btnAutoBindWeights')?.addEventListener('click', () => {
@@ -7615,6 +7712,25 @@ export class MeshEditorApp {
       this.service.weightPaintController.autoBindSkinWeights(mesh, mesh.skeleton);
       this.showToast(`Recalculated smooth envelope skin weights for "${mesh.name}".`, 'info');
       this.updateRiggingUI();
+    });
+
+    this.getElement('btnMergeRigParts')?.addEventListener('click', () => {
+      const mesh = this.service.weightPaintController.getActiveTargetMesh();
+      if (!mesh) return;
+      const targets = this.service.weightPaintController.getTargetMeshes(mesh);
+      if (targets.length <= 1) {
+        this.showToast('Model is already a single unified mesh.', 'info');
+        return;
+      }
+      this.service.weightPaintController.prepareMeshesForExport();
+      this.service.selectNodes(targets);
+      const merged = this.service.mergeSelectedMeshes();
+      if (merged) {
+        this.service.selectNodes([merged]);
+        this.service.weightPaintController.setActive(true);
+        this.showToast(`Merged ${targets.length} character parts into "${merged.name}".`, 'success');
+        this.updateRiggingUI();
+      }
     });
 
     if (selectBone) {
@@ -7727,6 +7843,18 @@ export class MeshEditorApp {
     }
     if (influencedEl) {
       influencedEl.textContent = `${stats.influencedVertexCount} verts (avg ${stats.averageActiveWeight.toFixed(2)})`;
+    }
+
+    const targets = mesh ? this.service.weightPaintController.getTargetMeshes(mesh) : [];
+    const multiBadge = this.getElement('rigMultiPartsBadge');
+    const multiCount = this.getElement('rigMultiPartsCount');
+    if (multiBadge) {
+      if (targets.length > 1) {
+        multiBadge.style.display = 'block';
+        if (multiCount) multiCount.textContent = `${targets.length} Parts`;
+      } else {
+        multiBadge.style.display = 'none';
+      }
     }
   }
 

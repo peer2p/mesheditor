@@ -1,8 +1,11 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   Mesh,
   MeshBuilder,
   NullEngine,
   PBRMaterial,
+  SceneLoader,
   Vector3,
   VertexBuffer,
 } from '@babylonjs/core';
@@ -320,6 +323,168 @@ describe('Gaming Pipeline Tools: Non-Destructive CSG Bevel, Retopo Shrinkwrap/Qu
       });
       const resetPos = hero.getVerticesData(VertexBuffer.PositionKind)!;
       expect(resetPos[0]).toBeCloseTo(prePosePos[0], 4);
+    });
+
+    it('exports rigged model with GLTF skins and joints without blue vertex colors and re-imports with intact skeleton', async () => {
+      const hero = service.sculptController.spawnHumanoidBaseMesh({ name: 'Rigged_Character' });
+      service.selectMesh(hero);
+
+      // Create Auto-Rig
+      service.weightPaintController.createAutoRig(hero, 'chibi');
+      expect(hero.skeleton).toBeDefined();
+      expect(hero.skeleton!.bones.length).toBe(20);
+
+      // Verify all 20 bones have linked TransformNodes
+      for (const bone of hero.skeleton!.bones) {
+        expect(bone.getTransformNode()).toBeDefined();
+      }
+
+      // Activate weight paint and heatmap
+      service.weightPaintController.setActive(true);
+      service.weightPaintController.updateWeightHeatmap(hero, 4);
+      expect(hero.material?.name).toBe('editor_weight_heatmap_mat');
+      expect(hero.isVerticesDataPresent(VertexBuffer.ColorKind)).toBe(true);
+
+      // Export to GLB
+      const glbBlob = await service.exportToGLBBlob('chibi_hero');
+      expect(glbBlob).toBeDefined();
+      expect(glbBlob.size).toBeGreaterThan(0);
+
+      // Inspect GLB chunk 0 to confirm skins array with joints is present
+      const arrayBuffer = await glbBlob.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const jsonLength = buffer.readUInt32LE(12);
+      const jsonText = buffer.toString('utf8', 20, 20 + jsonLength);
+      const parsedGltf = JSON.parse(jsonText);
+
+      expect(parsedGltf.skins).toBeDefined();
+      expect(parsedGltf.skins.length).toBeGreaterThan(0);
+      expect(parsedGltf.skins[0].joints.length).toBe(20);
+
+      // Confirm primitive attributes DO NOT contain COLOR_0 (no blue vertex colors exported)
+      const primitive = parsedGltf.meshes[0].primitives[0];
+      expect(primitive.attributes.JOINTS_0).toBeDefined();
+      expect(primitive.attributes.WEIGHTS_0).toBeDefined();
+      expect(primitive.attributes.COLOR_0).toBeUndefined();
+
+      // Confirm weight heatmap is restored after export since tool remains active
+      expect(service.weightPaintController.isActive).toBe(true);
+      expect(hero.material?.name).toBe('editor_weight_heatmap_mat');
+    });
+
+    it('auto-rigs multi-part Mario model, exports valid GLB and loads it back with 20-bone skeleton without DataView errors', async () => {
+      const marioPath = path.resolve(__dirname, '../../docs/models/mario.glb');
+      const marioBytes = fs.readFileSync(marioPath);
+      const marioContainer = await SceneLoader.LoadAssetContainerAsync(
+        '',
+        'data:base64,' + marioBytes.toString('base64'),
+        service.scene,
+        undefined,
+        '.glb'
+      );
+      marioContainer.addAllToScene();
+
+      const candidateMeshes = service.scene.meshes.filter(
+        (m): m is Mesh => m instanceof Mesh && !service.isEditorHelper(m) && m.getTotalVertices() > 0
+      );
+      expect(candidateMeshes.length).toBeGreaterThan(1);
+
+      // Merge multi-part character
+      service.selectNodes(candidateMeshes);
+      const mergedMario = service.mergeSelectedMeshes()!;
+      expect(mergedMario).toBeDefined();
+
+      // Create Auto-Rig
+      const skel = service.weightPaintController.createAutoRig(mergedMario, 'chibi');
+      expect(skel).toBeDefined();
+      expect(skel.bones.length).toBe(20);
+
+      // Export to GLB
+      const exportedGlb = await service.exportToGLBBlob('mario_rigged');
+      expect(exportedGlb).toBeDefined();
+      expect(exportedGlb.size).toBeGreaterThan(0);
+
+      // Re-import GLB into a fresh scene to verify no DataView RangeError occurs
+      const arrayBuffer = await exportedGlb.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const freshScene = new (service.scene.constructor as any)(engine);
+      const reimportedContainer = await SceneLoader.LoadAssetContainerAsync(
+        '',
+        'data:base64,' + buffer.toString('base64'),
+        freshScene,
+        undefined,
+        '.glb'
+      );
+
+      expect(reimportedContainer.skeletons.length).toBe(1);
+      expect(reimportedContainer.skeletons[0].bones.length).toBe(20);
+      const reimportedMesh = reimportedContainer.meshes.find((m) => m.name.includes('merged'));
+      expect(reimportedMesh?.skeleton).toBeDefined();
+
+      // Verify all 11 character primitives share the same 20-bone skeleton
+      const allRiggedParts = reimportedContainer.meshes.filter(
+        (m): m is Mesh => m instanceof Mesh && m.skeleton === reimportedContainer.skeletons[0]
+      );
+      expect(allRiggedParts.length).toBe(11);
+
+      // Verify WeightPaintController multi-mesh awareness
+      reimportedContainer.addAllToScene();
+      const targetMeshes = service.weightPaintController.getTargetMeshes(reimportedMesh as Mesh);
+      expect(targetMeshes.length).toBe(11);
+
+      // Active bone 5 (Head) or 4 (Neck) aggregates influence across all character parts, not just the 105-vert cap
+      service.weightPaintController.setActiveBoneIndex(5);
+      const stats = service.weightPaintController.analyzeWeights(reimportedMesh as Mesh);
+      expect(stats.hasSkeleton).toBe(true);
+      expect(stats.boneCount).toBe(20);
+      expect(stats.influencedVertexCount).toBeGreaterThan(105);
+
+      // Heatmap is applied to all target meshes
+      service.weightPaintController.setActive(true);
+      service.weightPaintController.updateWeightHeatmap(reimportedMesh as Mesh, 5);
+      for (const part of targetMeshes) {
+        expect(part.isVerticesDataPresent(VertexBuffer.ColorKind)).toBe(true);
+      }
+
+      // Restore vertex colors cleanly restores all 11 parts
+      service.weightPaintController.restoreOriginalVertexColors(reimportedMesh as Mesh);
+      for (const part of targetMeshes) {
+        expect(part.isVerticesDataPresent(VertexBuffer.ColorKind)).toBe(false);
+      }
+
+      // Verify bone overlay and active joint marker align with character and do not float in the air
+      service.weightPaintController.refreshBoneOverlay(reimportedMesh as Mesh);
+      const marker = service.weightPaintController.activeBoneMarker;
+      expect(marker).toBeDefined();
+      const marioBbox = (reimportedMesh as Mesh).getBoundingInfo().boundingBox;
+      expect(marker!.position.y).toBeGreaterThanOrEqual(marioBbox.minimumWorld.y);
+      expect(marker!.position.y).toBeLessThanOrEqual(marioBbox.maximumWorld.y + 0.1);
+    });
+
+    it('auto-rigs multi-part character without destructive merging, keeping base grounded and bounding box aligned', async () => {
+      const p1 = MeshBuilder.CreateBox('body_part1', { size: 0.5 }, service.scene);
+      p1.position.set(0, 0.25, 0);
+      const p2 = MeshBuilder.CreateSphere('body_part2', { diameter: 0.4 }, service.scene);
+      p2.position.set(0, 0.7, 0);
+
+      service.importedMeshes.push(p1, p2);
+      service.selectMesh(p1);
+
+      const origP1Pos = p1.position.clone();
+      const skel = service.weightPaintController.createAutoRig(p1, 'humanoid');
+      expect(skel).toBeDefined();
+      expect(p1.skeleton).toBe(skel);
+      expect(p2.skeleton).toBe(skel);
+
+      // Verify mesh did not jump
+      expect(p1.position.equalsWithEpsilon(origP1Pos, 0.001)).toBe(true);
+
+      // Verify bone overlay is within world bounds
+      service.weightPaintController.refreshBoneOverlay(p1);
+      const marker = service.weightPaintController.activeBoneMarker;
+      expect(marker).toBeDefined();
+      expect(marker!.position.y).toBeGreaterThanOrEqual(0.0);
+      expect(marker!.position.y).toBeLessThanOrEqual(1.0);
     });
   });
 });
