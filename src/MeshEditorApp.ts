@@ -130,9 +130,11 @@ import {
   ListTree,
   Loader2,
   Map as LucideMap,
+  Maximize,
   Maximize2,
   Mic,
   MicOff,
+  Minimize,
   Minimize2,
   Minus,
   Move3d,
@@ -248,9 +250,11 @@ export const editorIcons = {
   ListTree,
   Loader2,
   Map: LucideMap,
+  Maximize,
   Maximize2,
   Mic,
   MicOff,
+  Minimize,
   Minimize2,
   Minus,
   Move3d,
@@ -371,6 +375,7 @@ export class MeshEditorApp {
 
   // Layout Mode
   public layoutMode: 'floating' | 'stackpanel' = 'stackpanel';
+  private onFullscreenChangeHandler: (() => void) | null = null;
 
   // Compress Model Tool State
   public compressLoadedFile: File | null = null;
@@ -846,6 +851,11 @@ export class MeshEditorApp {
       this.sceneLoaderTimerId = null;
     }
     this.stopSpeechRecognition();
+    if (this.onFullscreenChangeHandler && typeof document !== 'undefined') {
+      document.removeEventListener('fullscreenchange', this.onFullscreenChangeHandler);
+      document.removeEventListener('webkitfullscreenchange', this.onFullscreenChangeHandler);
+      this.onFullscreenChangeHandler = null;
+    }
     this.adapter.dispose?.();
     for (const plugin of this.pluginManager.getAllPlugins()) {
       this.pluginManager.unregister(plugin.id);
@@ -1129,6 +1139,20 @@ export class MeshEditorApp {
       this.setLayoutMode('stackpanel');
     });
 
+    // Fullscreen toggle
+    this.getElement('btnToggleFullscreen')?.addEventListener('click', () => {
+      this.closeAllDropdowns();
+      void this.toggleFullscreen();
+    });
+    if (typeof document !== 'undefined') {
+      this.onFullscreenChangeHandler = () => {
+        this.updateFullscreenButtonState();
+        this.service.engine?.resize();
+      };
+      document.addEventListener('fullscreenchange', this.onFullscreenChangeHandler);
+      document.addEventListener('webkitfullscreenchange', this.onFullscreenChangeHandler);
+    }
+
     // Dropdown Toggles Setup
     const setupDropdown = (wrapperId: string, buttonId: string, menuId: string) => {
       const btn = document.getElementById(buttonId);
@@ -1288,6 +1312,68 @@ export class MeshEditorApp {
       el.classList.remove('open');
       el.classList.remove('active');
     });
+  }
+
+  private isFullscreenActive(): boolean {
+    if (typeof document === 'undefined') return false;
+    const doc = document as Document & { webkitFullscreenElement?: Element | null };
+    return Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
+  }
+
+  public async toggleFullscreen(): Promise<void> {
+    if (typeof document === 'undefined') return;
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element | null;
+      webkitExitFullscreen?: () => Promise<void> | void;
+    };
+
+    try {
+      if (this.isFullscreenActive()) {
+        if (typeof doc.exitFullscreen === 'function') {
+          await doc.exitFullscreen();
+        } else if (typeof doc.webkitExitFullscreen === 'function') {
+          await doc.webkitExitFullscreen();
+        }
+      } else {
+        const isWebComponent = Boolean(this.rootContainer?.closest('mesh-editor'));
+        const target = (isWebComponent ? this.rootContainer : document.documentElement) as HTMLElement & {
+          webkitRequestFullscreen?: () => Promise<void> | void;
+        };
+        if (typeof target?.requestFullscreen === 'function') {
+          await target.requestFullscreen();
+        } else if (typeof target?.webkitRequestFullscreen === 'function') {
+          await target.webkitRequestFullscreen();
+        } else {
+          this.showToast('Fullscreen mode is not supported in this browser.', 'warning');
+          return;
+        }
+      }
+      this.updateFullscreenButtonState();
+      this.service.engine?.resize();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.showToast(`Failed to toggle fullscreen: ${msg}`, 'error');
+    }
+  }
+
+  public updateFullscreenButtonState(): void {
+    const btn = this.getElement('btnToggleFullscreen');
+    if (!btn) return;
+    const active = this.isFullscreenActive();
+    btn.classList.toggle('active', active);
+    btn.title = active ? 'Exit fullscreen mode' : 'Enter fullscreen mode';
+    const prev = btn.dataset.fullscreen === 'true';
+    const iconEl = btn.querySelector('.btn-icon');
+    const labelEl = btn.querySelector('.btn-label');
+    if (prev === active && iconEl?.querySelector('svg')) return;
+    btn.dataset.fullscreen = String(active);
+    if (iconEl) {
+      iconEl.innerHTML = `<i class="app-icon" data-lucide="${active ? 'minimize' : 'maximize'}"></i>`;
+    }
+    if (labelEl) {
+      labelEl.textContent = active ? 'Exit Fullscreen' : 'Fullscreen';
+    }
+    this.refreshIcons();
   }
 
   public setLayoutMode(mode: 'floating' | 'stackpanel', save: boolean = true): void {
@@ -3346,6 +3432,8 @@ export class MeshEditorApp {
     if (btnGrid) {
       btnGrid.classList.toggle('active', !!this.service.sceneParams?.grid);
     }
+
+    this.updateFullscreenButtonState();
   }
 
   /* =========================================================================

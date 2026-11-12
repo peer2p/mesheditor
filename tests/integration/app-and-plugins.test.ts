@@ -652,4 +652,59 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
     expect(uvStatus.textContent).toBe('Tri (3 corners)');
     expect(cornerGrid.querySelectorAll('.facet-corner-u').length).toBe(3);
   });
+
+  it('toggles fullscreen mode from the View menu button and tracks fullscreenchange events', async () => {
+    app = new MeshEditorApp({
+      container,
+      engine,
+    });
+
+    const btnFullscreen = container.querySelector('#btnToggleFullscreen') as HTMLButtonElement | null;
+    expect(btnFullscreen).not.toBeNull();
+    expect(btnFullscreen?.closest('#menuView')).not.toBeNull();
+    expect(btnFullscreen?.classList.contains('active')).toBe(false);
+    expect(btnFullscreen?.querySelector('.btn-label')?.textContent).toBe('Fullscreen');
+
+    let fullscreenEl: Element | null = null;
+    const originalFullscreenDesc = Object.getOwnPropertyDescriptor(document, 'fullscreenElement');
+    const originalExitFullscreen = (document as any).exitFullscreen;
+    const originalRequestFullscreen = (document.documentElement as any).requestFullscreen;
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => fullscreenEl,
+    });
+    const requestMock = vi.fn(async () => {
+      fullscreenEl = document.documentElement;
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    const exitMock = vi.fn(async () => {
+      fullscreenEl = null;
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    (document.documentElement as any).requestFullscreen = requestMock;
+    (document as any).exitFullscreen = exitMock;
+
+    try {
+      btnFullscreen?.click();
+      await Promise.resolve();
+      expect(requestMock).toHaveBeenCalledOnce();
+      expect(btnFullscreen?.classList.contains('active')).toBe(true);
+      expect(btnFullscreen?.querySelector('.btn-label')?.textContent).toBe('Exit Fullscreen');
+
+      btnFullscreen?.click();
+      await Promise.resolve();
+      expect(exitMock).toHaveBeenCalledOnce();
+      expect(btnFullscreen?.classList.contains('active')).toBe(false);
+      expect(btnFullscreen?.querySelector('.btn-label')?.textContent).toBe('Fullscreen');
+    } finally {
+      if (originalFullscreenDesc) {
+        Object.defineProperty(document, 'fullscreenElement', originalFullscreenDesc);
+      } else {
+        delete (document as any).fullscreenElement;
+      }
+      (document.documentElement as any).requestFullscreen = originalRequestFullscreen;
+      (document as any).exitFullscreen = originalExitFullscreen;
+    }
+  });
 });
