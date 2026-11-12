@@ -33,7 +33,10 @@ export class MaterialEditorTool extends AbstractEditorTool {
 <h4><i class="app-icon" data-lucide="grid"></i> UV Projection & Textures</h4>
 <ul>
   <li>Load diffuse, bump, and normal image maps. Dropping <code>*_normal</code> or <code>*_bump</code> textures automatically maps them.</li>
-  <li>Auto-generate clean <strong>Box</strong>, <strong>Planar</strong>, and <strong>Cylindrical</strong> UV texture mappings with customizable tiling scales.</li>
+  <li><strong>uScale &amp; vScale:</strong> Adjust independent horizontal and vertical texture tiling scales in real-time.</li>
+  <li><strong>uOffset &amp; vOffset:</strong> Pan texture coordinates across the surface.</li>
+  <li>Auto-generate clean <strong>Box / Triplanar</strong>, <strong>Planar</strong> (Top XZ, Front XY, Side ZY), and <strong>Cylindrical</strong> UV texture mappings respecting the configured <code>uScale</code> and <code>vScale</code>.</li>
+  <li><strong>Bake UV Scale to Mesh:</strong> Permanently bake current <code>uScale</code>, <code>vScale</code>, and UV offsets directly into the mesh vertex UV coordinates.</li>
   <li>Manage embedded textures bundled directly within saved scene projects.</li>
 </ul>
 `.trim();

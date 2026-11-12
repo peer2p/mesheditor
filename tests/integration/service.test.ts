@@ -1,4 +1,13 @@
-import { NullEngine, PointerEventTypes, Vector3, VertexBuffer } from '@babylonjs/core';
+import {
+  Mesh,
+  MultiMaterial,
+  NullEngine,
+  PBRMaterial,
+  PointerEventTypes,
+  Vector3,
+  VertexBuffer,
+  VertexData,
+} from '@babylonjs/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MeshEditorService } from '../../src/MeshEditorService';
 import { PrimitiveConfig } from '../../src/types';
@@ -609,10 +618,12 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
       expect(newMat).not.toBeNull();
       expect(service.getSelectedMaterial()).toBe(newMat);
 
-      service.applyTriplanarUVs(2.0);
-      service.applyPlanarUVs('top', 1.5);
-      service.applyPlanarUVs('front', 1.5);
-      service.applyPlanarUVs('side', 1.5);
+      service.applyTriplanarUVs(2.0, 3.0);
+      service.applyPlanarUVs('top', 1.5, 2.5);
+      service.applyPlanarUVs('front', 1.5, 2.5);
+      service.applyPlanarUVs('side', 1.5, 2.5);
+      service.applyCylindricalUVs(2.0, 4.0);
+      service.scaleMeshUVs(2.0, 3.0, 0.1, 0.2);
 
       const uvs = box.getVerticesData('uv');
       expect(uvs).toBeDefined();
@@ -942,6 +953,300 @@ describe('MeshEditorService Integration Tests (Babylon NullEngine)', () => {
       expect(service.isSnapModifierActive).toBe(false);
       expect(service.gizmoManager.gizmos.rotationGizmo?.snapDistance).toBe(0);
       expect(service.gizmoManager.gizmos.positionGizmo?.snapDistance).toBe(0);
+    });
+  });
+
+  describe('11. Per-Facet UVs & Per-Facet Materials/Textures', () => {
+    function createSharedQuadStripMesh(name: string): Mesh {
+      const mesh = new Mesh(name, service.scene);
+      const vd = new VertexData();
+      // 6 shared vertices forming Quad A [0,1,2,3] and Quad B [2,3,4,5]
+      vd.positions = [
+        0, 0, 0,   // v0
+        1, 0, 0,   // v1
+        0, 0, 1,   // v2 (shared boundary)
+        1, 0, 1,   // v3 (shared boundary)
+        0, 0, 2,   // v4
+        1, 0, 2,   // v5
+      ];
+      vd.uvs = [
+        0.1, 0.1,
+        0.2, 0.1,
+        0.3, 0.3,  // shared v2
+        0.4, 0.3,  // shared v3
+        0.5, 0.8,
+        0.6, 0.8,
+      ];
+      vd.indices = [
+        // Quad A: faces 0, 1
+        0, 1, 3,
+        0, 3, 2,
+        // Quad B: faces 2, 3
+        2, 3, 5,
+        2, 5, 4,
+      ];
+      vd.normals = [
+        0, 1, 0,
+        0, 1, 0,
+        0, 1, 0,
+        0, 1, 0,
+        0, 1, 0,
+        0, 1, 0,
+      ];
+      vd.applyToMesh(mesh, true);
+      mesh.refreshBoundingInfo();
+      service.importedMeshes.push(mesh);
+      return mesh;
+    }
+
+    function readFaceUVs(mesh: Mesh, faceId: number): Array<[number, number]> {
+      const indices = mesh.getIndices()!;
+      const uvs = mesh.getVerticesData(VertexBuffer.UVKind)!;
+      const tri: Array<[number, number]> = [];
+      for (let k = 0; k < 3; k++) {
+        const v = indices[faceId * 3 + k];
+        tri.push([uvs[v * 2], uvs[v * 2 + 1]]);
+      }
+      return tri;
+    }
+
+    it('isolates shared vertices before editing facet UVs so neighboring faces stay untouched', () => {
+      const strip = createSharedQuadStripMesh('SharedStrip');
+      const neighborBeforeF2 = readFaceUVs(strip, 2);
+      const neighborBeforeF3 = readFaceUVs(strip, 3);
+      const vertCountBefore = strip.getTotalVertices();
+
+      expect(service.selectFace(strip, 0)).toBe(true);
+      expect(service.projectSelectedFacetUVs('fit')).toBe(true);
+
+      // Shared boundary vertices v2 & v3 must have been duplicated
+      expect(strip.getTotalVertices()).toBeGreaterThan(vertCountBefore);
+
+      const fitInfo = service.getSelectedFacetUVInfo();
+      expect(fitInfo).not.toBeNull();
+      expect(fitInfo!.isQuad).toBe(true);
+      expect(fitInfo!.uMin).toBeCloseTo(0, 4);
+      expect(fitInfo!.uMax).toBeCloseTo(1, 4);
+      expect(fitInfo!.vMin).toBeCloseTo(0, 4);
+      expect(fitInfo!.vMax).toBeCloseTo(1, 4);
+
+      // Neighboring Quad B UVs must remain completely unaffected
+      expect(readFaceUVs(strip, 2)).toEqual(neighborBeforeF2);
+      expect(readFaceUVs(strip, 3)).toEqual(neighborBeforeF3);
+
+      // Remap region into [0.25..0.75, 0.1..0.9]
+      expect(service.setSelectedFacetUVRect(0.25, 0.75, 0.1, 0.9)).toBe(true);
+      const rectInfo = service.getSelectedFacetUVInfo()!;
+      expect(rectInfo.uMin).toBeCloseTo(0.25, 4);
+      expect(rectInfo.uMax).toBeCloseTo(0.75, 4);
+      expect(rectInfo.vMin).toBeCloseTo(0.1, 4);
+      expect(rectInfo.vMax).toBeCloseTo(0.9, 4);
+
+      // Neighbor still untouched
+      expect(readFaceUVs(strip, 2)).toEqual(neighborBeforeF2);
+
+      // Undo -> back to Fit [0..1]
+      expect(service.canUndo()).toBe(true);
+      service.undo();
+      expect(service.getSelectedFacetUVInfo()!.uMin).toBeCloseTo(0, 4);
+      expect(service.getSelectedFacetUVInfo()!.uMax).toBeCloseTo(1, 4);
+
+      // Undo again -> back to original shared-vertex count & UVs
+      expect(service.canUndo()).toBe(true);
+      service.undo();
+      expect(strip.getTotalVertices()).toBe(vertCountBefore);
+      expect(readFaceUVs(strip, 0)[2][0]).toBeCloseTo(0.4, 4);
+
+      // Redo twice -> restored to [0.25..0.75, 0.1..0.9]
+      expect(service.canRedo()).toBe(true);
+      service.redo();
+      expect(service.canRedo()).toBe(true);
+      service.redo();
+      const redoInfo = service.getSelectedFacetUVInfo()!;
+      expect(redoInfo.uMin).toBeCloseTo(0.25, 4);
+      expect(redoInfo.uMax).toBeCloseTo(0.75, 4);
+    });
+
+    it('supports planar projection, corner UV editing, and 90°/Flip UV transforms', () => {
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box', size: 2 }));
+      expect(service.selectFace(box, 0)).toBe(true);
+
+      // World planar projection on a 2x2 quad with 0.5 scale produces 1.0 UV span
+      expect(service.projectSelectedFacetUVs('planar', { scaleU: 0.5, scaleV: 0.5 })).toBe(true);
+      const planarInfo = service.getSelectedFacetUVInfo()!;
+      expect(planarInfo.uMax - planarInfo.uMin).toBeCloseTo(1.0, 4);
+      expect(planarInfo.vMax - planarInfo.vMin).toBeCloseTo(1.0, 4);
+
+      // Explicit corner UV edit (Float32 vertex buffers introduce ~1e-7 rounding)
+      const customCorners = [
+        { u: 0.1, v: 0.2 },
+        { u: 0.6, v: 0.2 },
+        { u: 0.6, v: 0.5 },
+        { u: 0.1, v: 0.5 },
+      ];
+      expect(service.setSelectedFacetCornerUVs(customCorners)).toBe(true);
+      const cornerInfo = service.getSelectedFacetUVInfo()!;
+      expect(cornerInfo.corners.length).toBe(4);
+      customCorners.forEach((exp, idx) => {
+        expect(cornerInfo.corners[idx].u).toBeCloseTo(exp.u, 5);
+        expect(cornerInfo.corners[idx].v).toBeCloseTo(exp.v, 5);
+      });
+
+      // Rotate 90 degrees swaps spanU (0.5) and spanV (0.3) around UV center
+      expect(service.transformSelectedFacetUVs({ rotateDeg: 90 })).toBe(true);
+      const rotated = service.getSelectedFacetUVInfo()!;
+      expect(rotated.uMax - rotated.uMin).toBeCloseTo(0.3, 4);
+      expect(rotated.vMax - rotated.vMin).toBeCloseTo(0.5, 4);
+
+      // Flip U & Flip V preserve bounding box
+      expect(service.transformSelectedFacetUVs({ flipU: true, flipV: true })).toBe(true);
+      const flipped = service.getSelectedFacetUVInfo()!;
+      expect(flipped.uMin).toBeCloseTo(rotated.uMin, 4);
+      expect(flipped.vMax).toBeCloseTo(rotated.vMax, 4);
+    });
+
+    it('assigns separate materials/textures per facet via MultiMaterial and collapses back to single material', () => {
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box' }));
+      service.selectMesh(box);
+      const baseMat = service.createNewMaterialForSelected('BaseMat') as PBRMaterial;
+      expect(baseMat).not.toBeNull();
+
+      // Assign red material to quad at face 0
+      service.selectFace(box, 0);
+      const redMat = service.assignNewColorMaterialToSelectedFacet('#ff2244', 'RedPanel');
+      expect(redMat).not.toBeNull();
+      expect(box.material).toBeInstanceOf(MultiMaterial);
+      expect(box.subMeshes.length).toBe(2);
+      expect(service.getSelectedFacetMaterialInfo()?.materialName).toBe('RedPanel');
+      expect(service.selectedSubMeshId).toBe(service.getSelectedFacetMaterialInfo()?.subMeshIndex);
+
+      // Find a face still using BaseMat and assign a per-facet texture to it
+      let baseFaceId = -1;
+      for (let f = 0; f < 12; f++) {
+        service.selectFace(box, f);
+        if (service.getSelectedFacetMaterialInfo()?.material === baseMat) {
+          baseFaceId = f;
+          break;
+        }
+      }
+      expect(baseFaceId).toBeGreaterThanOrEqual(0);
+
+      const dummyPngUrl =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=';
+      expect(service.assignTextureToSelectedFacet(dummyPngUrl, 'facetBrick.png')).toBe(true);
+      expect(box.subMeshes.length).toBe(3);
+      expect((box.material as MultiMaterial).subMaterials.length).toBe(3);
+      const texMat = service.getSelectedFacetMaterialInfo()?.material as PBRMaterial;
+      expect(texMat.albedoTexture?.name).toBe('facetBrick.png');
+
+      // Re-assign BaseMat back to all non-base quads -> MultiMaterial collapses cleanly back to BaseMat
+      for (let f = 0; f < 12; f++) {
+        service.selectFace(box, f);
+        if (service.getSelectedFacetMaterialInfo()?.material !== baseMat) {
+          service.assignMaterialToSelectedFacet(baseMat);
+        }
+      }
+      expect(box.material).toBe(baseMat);
+      expect(box.subMeshes.length).toBe(1);
+
+      // Undo collapses back to MultiMaterial cleanly without disposed material loss
+      expect(service.canUndo()).toBe(true);
+      service.undo();
+      expect(box.material).toBeInstanceOf(MultiMaterial);
+      expect(box.subMeshes.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('supports Single Triangle targeting and preserves MultiMaterial SubMeshes across Extrude and Delete', () => {
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box' }));
+      service.selectMesh(box);
+      const baseMat = service.createNewMaterialForSelected('BaseMetal') as PBRMaterial;
+
+      // Paint quad at face 0 with Red
+      service.selectFace(box, 0);
+      service.assignNewColorMaterialToSelectedFacet('#ef4444', 'RedCap');
+      expect(box.subMeshes.length).toBe(2);
+
+      // Pick a BaseMetal triangle in Single Triangle Mode and paint ONLY 1 triangle green
+      let metalFace = -1;
+      for (let f = 0; f < 12; f++) {
+        service.selectFace(box, f);
+        if (service.getSelectedFacetMaterialInfo()?.material === baseMat) {
+          metalFace = f;
+          break;
+        }
+      }
+      expect(metalFace).toBeGreaterThanOrEqual(0);
+
+      service.setFacetSingleTriangleMode(true);
+      expect(service.getSelectedFacetUVInfo()?.isQuad).toBe(false);
+      const greenMat = service.assignNewColorMaterialToSelectedFacet('#22c55e', 'TriAccent');
+      expect(greenMat).not.toBeNull();
+      expect(box.subMeshes.length).toBe(3);
+
+      const greenSlotBefore = box.subMeshes.find((sm) => sm.getMaterial() === greenMat);
+      expect(greenSlotBefore).toBeDefined();
+      expect(greenSlotBefore!.indexCount).toBe(3); // Exactly 1 triangle!
+
+      // Extrude RedCap quad -> MultiMaterial & all SubMesh index ranges must remain intact
+      service.setFacetSingleTriangleMode(false);
+      let redFace = -1;
+      const triCountNow = box.getIndices()!.length / 3;
+      for (let f = 0; f < triCountNow; f++) {
+        service.selectFace(box, f);
+        if (service.getSelectedFacetMaterialInfo()?.materialName === 'RedCap') {
+          redFace = f;
+          break;
+        }
+      }
+      expect(redFace).toBeGreaterThanOrEqual(0);
+      service.extrudeSelectedFacet(0.5);
+
+      expect(box.material).toBeInstanceOf(MultiMaterial);
+      expect(box.subMeshes.length).toBe(3);
+      const sumAfterExtrude = box.subMeshes.reduce((acc, sm) => acc + sm.indexCount, 0);
+      expect(sumAfterExtrude).toBe(box.getIndices()!.length);
+
+      // Delete the single green triangle -> TriAccent slot compacts cleanly out of MultiMaterial
+      service.setFacetSingleTriangleMode(true);
+      let greenFace = -1;
+      for (let f = 0; f < box.getIndices()!.length / 3; f++) {
+        service.selectFace(box, f);
+        if (service.getSelectedFacetMaterialInfo()?.material === greenMat) {
+          greenFace = f;
+          break;
+        }
+      }
+      expect(greenFace).toBeGreaterThanOrEqual(0);
+      service.deleteSelectedFacet();
+
+      expect(box.material).toBeInstanceOf(MultiMaterial);
+      expect(box.subMeshes.length).toBe(2);
+      const sumAfterDelete = box.subMeshes.reduce((acc, sm) => acc + sm.indexCount, 0);
+      expect(sumAfterDelete).toBe(box.getIndices()!.length);
+    });
+
+    it('maps Atlas tile UVs and assigns shared Atlas material per facet', () => {
+      const box = service.createPrimitive(defaultPrimitiveConfig({ shape: 'Box' }));
+      service.selectMesh(box);
+      service.createNewMaterialForSelected('PlainWall');
+
+      const atlas = service.textureAtlasManager.createProceduralTerrainAtlas('FacetAtlas');
+      expect(atlas.frames.length).toBeGreaterThan(2);
+      const targetFrame = atlas.frames[2];
+
+      service.selectFace(box, 4);
+      expect(service.assignAtlasTileToSelectedFacet(atlas.id, targetFrame.id, true)).toBe(true);
+
+      const uvInfo = service.getSelectedFacetUVInfo()!;
+      expect(uvInfo.uMin).toBeCloseTo(targetFrame.uMin, 4);
+      expect(uvInfo.uMax).toBeCloseTo(targetFrame.uMax, 4);
+      expect(uvInfo.vMin).toBeCloseTo(targetFrame.vMin, 4);
+      expect(uvInfo.vMax).toBeCloseTo(targetFrame.vMax, 4);
+
+      expect(box.material).toBeInstanceOf(MultiMaterial);
+      const matInfo = service.getSelectedFacetMaterialInfo()!;
+      expect(matInfo.materialName).toBe(`Atlas_${atlas.name}`);
+      expect((matInfo.material as PBRMaterial).albedoTexture).toBeDefined();
     });
   });
 });

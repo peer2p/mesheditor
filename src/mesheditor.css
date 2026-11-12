@@ -6240,3 +6240,238 @@ progress.loading-spinner:indeterminate {
   border-radius: 12px;
 }
 
+/* =========================================================================
+   Facet UV & Material Sub-Sections
+   ========================================================================= */
+.facet-badge-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.facet-material-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #a5d6ff;
+  background: rgba(56, 139, 253, 0.14);
+  border: 1px solid rgba(56, 139, 253, 0.3);
+  border-radius: 4px;
+  padding: 2px 6px;
+  max-width: 112px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.facet-tri-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #c9d1d9;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.facet-tri-toggle input[type="checkbox"] {
+  accent-color: var(--accent-color, #58a6ff);
+  margin: 0;
+  cursor: pointer;
+}
+
+.facet-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 4px;
+  margin-top: 4px;
+}
+
+.facet-section:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.facet-section-summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 6px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  border-radius: 5px;
+}
+
+.facet-section-summary::-webkit-details-marker {
+  display: none;
+}
+
+.facet-section-summary:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.facet-section:not([open]) .mesh-edit-section-chevron {
+  transform: rotate(-90deg);
+}
+
+.facet-section-tag {
+  margin-left: auto;
+  font-weight: 500;
+}
+
+.facet-section-body {
+  padding: 6px 6px 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.facet-uv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.facet-mini-btn {
+  height: 24px !important;
+  padding: 0 8px !important;
+  font-size: 11px !important;
+  flex: 0 0 auto;
+}
+
+.facet-full-btn {
+  width: 100%;
+  height: 26px !important;
+  font-size: 11px !important;
+}
+
+.facet-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  font-size: 11px;
+}
+
+.facet-uv-rect-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.facet-uv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  color: #8b949e;
+}
+
+.facet-uv-num-input {
+  width: 100%;
+  min-width: 0;
+  height: 24px !important;
+  padding: 2px 4px !important;
+  font-size: 11px !important;
+}
+
+.facet-corner-uv-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.facet-corner-uv-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+}
+
+.facet-corner-uv-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8b949e;
+}
+
+.facet-atlas-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 6px;
+  max-height: 116px;
+  overflow-y: auto;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+
+.facet-atlas-tile-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: #c9d1d9;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.facet-atlas-tile-btn:hover {
+  border-color: var(--accent-color, #58a6ff);
+  background: rgba(88, 166, 255, 0.14);
+}
+
+.facet-atlas-tile-btn img {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  image-rendering: pixelated;
+  border-radius: 2px;
+}
+
+.facet-atlas-tile-btn span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.facet-color-mat-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.facet-color-input {
+  width: 28px;
+  height: 24px;
+  padding: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  background: #21262d;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.facet-mat-name-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 24px !important;
+  font-size: 11px !important;
+  padding: 2px 6px !important;
+}
+
+

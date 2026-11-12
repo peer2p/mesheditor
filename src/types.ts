@@ -37,16 +37,16 @@ export type PrimitiveShape =
 export interface PrimitiveConfig {
   shape: PrimitiveShape;
   name?: string;
-  size: number;
-  width: number;
-  height: number;
-  depth: number;
+  size?: number;
+  width?: number;
+  height?: number;
+  depth?: number;
   diameter?: number;
   thickness?: number;
-  subdivisions: number;
-  tessellation: number;
+  subdivisions?: number;
+  tessellation?: number;
   polyType?: number;
-  color: string;
+  color?: string;
   roughness?: number;
   metallic?: number;
 }

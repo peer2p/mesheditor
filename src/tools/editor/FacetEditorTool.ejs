@@ -25,6 +25,13 @@
 
   <div class="facet-badge-bar">
     <div id="facetSelectedBadge" class="facet-badge">No face picked</div>
+    <div class="facet-badge-actions">
+      <span id="facetMaterialBadge" class="facet-material-badge" title="Active material on selected facet">Mat: -</span>
+      <label class="facet-tri-toggle" title="Target only the picked triangle instead of pairing coplanar triangles into a quad">
+        <input type="checkbox" id="chkFacetSingleTri" />
+        <span>Single Tri</span>
+      </label>
+    </div>
   </div>
 
   <div id="facetVertexCoordsStrip" class="facet-vertex-strip" style="display: none;">
@@ -63,13 +70,13 @@
   </div>
 
   <div class="dialog-body facet-tool-body">
-    <div class="mesh-edit-section-header">
-      <span class="mesh-edit-section-chevron"><i class="app-icon" data-lucide="chevron-down"></i></span>
-      <span class="mesh-edit-section-name">Detail</span>
-    </div>
-    <div class="mesh-edit-subtitle">Mesh Edit</div>
+    <details class="facet-section" open>
+      <summary class="facet-section-summary">
+        <span class="mesh-edit-section-chevron"><i class="app-icon" data-lucide="chevron-down"></i></span>
+        <span class="mesh-edit-section-name">Mesh Edit</span>
+      </summary>
 
-    <div class="mesh-edit-list">
+      <div class="mesh-edit-list">
       <!-- Extrude -->
       <div class="mesh-edit-item" id="btnFacetExtrude" title="Extrude selected face along normal">
         <div class="mesh-edit-icon-wrap" style="color: #58a6ff"><i class="app-icon" data-lucide="box-select"></i></div>
@@ -209,7 +216,112 @@
         </div>
         <div class="mesh-edit-key">Del</div>
       </div>
-    </div>
+      </div>
+    </details>
+
+    <details class="facet-section" id="facetUVSection" open>
+      <summary class="facet-section-summary">
+        <span class="mesh-edit-section-chevron"><i class="app-icon" data-lucide="chevron-down"></i></span>
+        <span class="mesh-edit-section-name">Facet UV Coordinates</span>
+        <span id="facetUVStatus" class="tool-sublabel facet-section-tag">No face</span>
+      </summary>
+      <div class="facet-section-body" id="facetUVControls">
+        <div class="facet-uv-actions">
+          <button id="btnFacetUVFit" type="button" class="tool-btn facet-mini-btn" title="Isolate facet vertices and project UVs into [0..1]">Fit 0..1</button>
+          <button id="btnFacetUVPlanar" type="button" class="tool-btn facet-mini-btn" title="Project world-space planar UVs onto facet">Planar</button>
+          <button id="btnFacetUVRot90" type="button" class="tool-btn facet-mini-btn" title="Rotate facet UVs by 90 degrees">Rot 90°</button>
+          <button id="btnFacetUVFlipU" type="button" class="tool-btn facet-mini-btn" title="Flip U coordinates horizontally">Flip U</button>
+          <button id="btnFacetUVFlipV" type="button" class="tool-btn facet-mini-btn" title="Flip V coordinates vertically">Flip V</button>
+        </div>
+
+        <div class="tool-control-group">
+          <div class="tool-row">
+            <span class="tool-label">UV Region</span>
+            <button id="btnFacetApplyUVRect" type="button" class="tool-btn tool-btn-primary facet-mini-btn" title="Remap facet UVs into specified [uMin..uMax, vMin..vMax] rectangle">Apply Rect</button>
+          </div>
+          <div class="facet-uv-rect-grid">
+            <label class="facet-uv-field">
+              <span>U0</span>
+              <input id="facetUVMinU" type="number" class="tool-input facet-uv-num-input" step="0.05" value="0" />
+            </label>
+            <label class="facet-uv-field">
+              <span>U1</span>
+              <input id="facetUVMaxU" type="number" class="tool-input facet-uv-num-input" step="0.05" value="1" />
+            </label>
+            <label class="facet-uv-field">
+              <span>V0</span>
+              <input id="facetUVMinV" type="number" class="tool-input facet-uv-num-input" step="0.05" value="0" />
+            </label>
+            <label class="facet-uv-field">
+              <span>V1</span>
+              <input id="facetUVMaxV" type="number" class="tool-input facet-uv-num-input" step="0.05" value="1" />
+            </label>
+          </div>
+        </div>
+
+        <div class="tool-control-group">
+          <div class="tool-row">
+            <span class="tool-label">Corner UVs</span>
+            <button id="btnFacetApplyCornerUVs" type="button" class="tool-btn facet-mini-btn" title="Apply edited corner UV coordinates">Apply Corners</button>
+          </div>
+          <div id="facetCornerUVGrid" class="facet-corner-uv-grid">
+            <div class="tool-sublabel">Pick a face to inspect corner UVs.</div>
+          </div>
+        </div>
+
+        <div class="tool-control-group">
+          <div class="tool-row">
+            <label class="tool-label" for="facetUVAtlasSelect">Atlas Tile</label>
+            <label class="facet-tri-toggle" title="Also assign the atlas material exclusively to this facet">
+              <input type="checkbox" id="chkFacetAtlasAssignMat" checked />
+              <span>With Material</span>
+            </label>
+          </div>
+          <select id="facetUVAtlasSelect" class="tool-select facet-select"></select>
+          <div id="facetUVAtlasTileGrid" class="facet-atlas-tile-grid"></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="facet-section" id="facetMaterialSection" open>
+      <summary class="facet-section-summary">
+        <span class="mesh-edit-section-chevron"><i class="app-icon" data-lucide="chevron-down"></i></span>
+        <span class="mesh-edit-section-name">Facet Material &amp; Texture</span>
+        <span id="facetMatSlotInfo" class="tool-sublabel facet-section-tag">Slot 1/1</span>
+      </summary>
+      <div class="facet-section-body" id="facetMaterialControls">
+        <div class="tool-control-group">
+          <label class="tool-label" for="facetMaterialSelect">Assign Scene Material</label>
+          <div class="tool-row">
+            <select id="facetMaterialSelect" class="tool-select facet-select"></select>
+            <button id="btnFacetAssignMaterial" type="button" class="tool-btn tool-btn-primary facet-mini-btn" title="Assign selected scene material to picked facet">Assign</button>
+          </div>
+        </div>
+
+        <div class="tool-control-group">
+          <span class="tool-label">New Color Material</span>
+          <div class="facet-color-mat-row">
+            <input type="color" id="facetNewMatColor" class="facet-color-input" value="#4f8cf6" title="Albedo color for new facet material" />
+            <input type="text" id="facetNewMatName" class="tool-input facet-mat-name-input" placeholder="Material name (optional)" />
+            <button id="btnFacetApplyColorMat" type="button" class="tool-btn facet-mini-btn" title="Create and assign new PBR color material to picked facet">Apply</button>
+          </div>
+        </div>
+
+        <div class="tool-control-group">
+          <label class="tool-label" for="facetEmbeddedTexSelect">Facet Texture</label>
+          <div class="tool-row">
+            <select id="facetEmbeddedTexSelect" class="tool-select facet-select"></select>
+            <button id="btnFacetApplyEmbeddedTex" type="button" class="tool-btn facet-mini-btn" title="Apply selected scene texture to picked facet">Apply</button>
+          </div>
+          <div class="tool-row" style="margin-top: 6px">
+            <button id="btnFacetUploadTexture" type="button" class="tool-btn facet-full-btn" title="Upload an image texture exclusively for the picked facet">
+              <i class="app-icon" data-lucide="upload"></i> Upload Texture for Facet...
+            </button>
+            <input type="file" id="facetTextureFileInput" accept="image/*" style="display: none" />
+          </div>
+        </div>
+      </div>
+    </details>
 
     <div id="gui-facet-container" style="display: none"></div>
   </div>

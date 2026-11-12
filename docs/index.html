@@ -203,7 +203,7 @@
             </li>
             <li class="overview-bullet-item">
               <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span><strong>Shape models with facet &amp; vertex tools:</strong> Transform, Push/Pull, Extrude faces, Inset, Bevel, Knife, normal flipping, subdivision, vertex welding, and soft selection falloffs.</span>
+              <span><strong>Shape models &amp; UVs with facet &amp; vertex tools:</strong> Transform, Push/Pull, Extrude, Inset, Bevel, Knife, normal flipping, subdivision, <strong>Single Tri</strong> targeting, plus <strong>per-facet UV mapping</strong> (Fit <code>[0..1]</code>, World Planar, <code>90°</code> rotate, Flip U/V, UV region, corner editing, and Atlas tiles) with automatic shared-vertex isolation.</span>
             </li>
             <li class="overview-bullet-item">
               <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -215,7 +215,7 @@
             </li>
             <li class="overview-bullet-item">
               <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              <span><strong>Configure PBR materials &amp; textures:</strong> Assign realistic PBR materials with controls for Albedo, Metallic, Roughness, Normal mapping, Emissive glow, Alpha blending, and UV scale/offset with Poly Haven presets.</span>
+              <span><strong>Configure PBR &amp; per-facet materials:</strong> Assign realistic PBR materials with Albedo, Metallic, Roughness, Normal mapping, Emissive glow, and Alpha blending—or assign distinct materials, textures, and atlas tiles to individual facets via automatic <code>MultiMaterial</code> submeshes.</span>
             </li>
             <li class="overview-bullet-item">
               <svg class="overview-bullet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -664,12 +664,12 @@
             </div>
             <h3 class="card-title">Tangent Normal Maps &amp; UV Tiling</h3>
             <p class="card-desc">
-              High-frequency surface detail is automatically derived via Sobel gradient filtering to produce tangent-space normal maps directly from generated albedos. Adjust UV scaling, roughness, and metalness per mesh or submesh.
+              High-frequency surface detail is automatically derived via Sobel gradient filtering to produce tangent-space normal maps directly from generated albedos. Adjust UV scaling, roughness, and metalness per mesh or submesh, or remap UV regions and orientation per individual facet.
             </p>
             <div class="card-tags">
               <span class="card-tag">Tangent Normal Maps</span>
               <span class="card-tag">Sobel Height-to-Normal</span>
-              <span class="card-tag">UV Scale &amp; Tiling</span>
+              <span class="card-tag">UV Scale &amp; Per-Facet UVs</span>
               <span class="card-tag">PBR Metallic-Roughness</span>
             </div>
           </div>
@@ -679,15 +679,15 @@
             <div class="card-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
             </div>
-            <h3 class="card-title">Distinct Embedded Textures</h3>
+            <h3 class="card-title">Distinct Embedded &amp; Per-Facet Textures</h3>
             <p class="card-desc">
-              All project textures are tracked with deduplication and live usage badges (<code>Active Albedo</code>, <code>Active Normal</code>, material counts). Reapplying textures reuses WebGL/WebGPU samplers without memory leaks.
+              All project textures are tracked with deduplication and live usage badges (<code>Active Albedo</code>, <code>Active Normal</code>, material counts). Apply distinct scene textures, uploaded images, or atlas tiles directly to individual quads or triangles via automatic <code>MultiMaterial</code> submeshes.
             </p>
             <div class="card-tags">
               <span class="card-tag">Distinct Texture List</span>
-              <span class="card-tag">Live Usage Badges</span>
+              <span class="card-tag">Per-Facet MultiMaterial</span>
               <span class="card-tag">GPU Sampler Reuse</span>
-              <span class="card-tag">One-Click Re-apply</span>
+              <span class="card-tag">Atlas Tile Mapping</span>
             </div>
           </div>
         </div>
@@ -1166,9 +1166,9 @@
             <div class="feature-box-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path></svg>
             </div>
-            <h4 class="feature-box-title">Facet &amp; Vertex Sculpting</h4>
+            <h4 class="feature-box-title">Facet &amp; Vertex Editor</h4>
             <p class="feature-box-desc">
-              Manipulate vertices directly with Push/Pull, Extrude, Inset, Bevel, Knife, normal flipping, soft selection falloff, and loop cuts.
+              Edit vertices and quads/single triangles with Extrude, Inset, Bevel, Knife, Loop Cut, per-facet UV mapping (Fit <code>[0..1]</code>, Planar, Rotate/Flip, UV region, Corner UVs, Atlas tiles) with shared-vertex isolation, and per-facet <code>MultiMaterial</code> / texture slots.
             </p>
           </div>
 
@@ -1201,7 +1201,7 @@
             </div>
             <h4 class="feature-box-title">AI Texture Generator &amp; PBR Materials</h4>
             <p class="feature-box-desc">
-              Generate AI textures locally (Draw Things, SD WebUI) or via cloud (Google Imagen 3, Pollinations.ai). Full PBR metallic-roughness, tangent normal maps, distinct embedded textures, and Poly Haven library.
+              Generate AI textures locally (Draw Things, SD WebUI) or via cloud (Google Imagen 3, Pollinations.ai). Full PBR metallic-roughness, tangent normal maps, Poly Haven presets, and per-facet material/texture assignment via automatic <code>MultiMaterial</code> submeshes.
             </p>
           </div>
 
@@ -1287,9 +1287,9 @@
             <div class="feature-box-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
             </div>
-            <h4 class="feature-box-title">Smart UV Unwrapping &amp; Packing</h4>
+            <h4 class="feature-box-title">Smart UV Unwrapping &amp; Facet UVs</h4>
             <p class="feature-box-desc">
-              Mark cutting seams automatically or interactively, enforce uniform Texel Density (<code>px/m</code>), and pack 2D UV islands with pixel padding.
+              Mark cutting seams automatically or interactively, enforce uniform Texel Density (<code>px/m</code>), pack 2D UV islands with padding, or fine-tune individual facets with Fit <code>[0..1]</code>, World Planar, <code>90°</code>/Flip, and Corner UV overrides.
             </p>
           </div>
 

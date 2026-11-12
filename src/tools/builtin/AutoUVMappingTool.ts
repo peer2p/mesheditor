@@ -13,10 +13,12 @@ export class AutoUVMappingTool extends AbstractTool {
       meshName: { type: 'string', description: 'Name of the mesh (or "*" for all meshes).' },
       projection: {
         type: 'string',
-        enum: ['triplanar', 'top', 'front', 'side'],
+        enum: ['triplanar', 'top', 'front', 'side', 'cylindrical'],
         description: 'Projection mode (default "triplanar").',
       },
-      scale: { type: 'number', description: 'UV tiling scale factor (default 1.0).' },
+      scale: { type: 'number', description: 'Uniform UV tiling scale factor (default 1.0).' },
+      uScale: { type: 'number', description: 'Horizontal UV scale factor (defaults to scale or 1.0).' },
+      vScale: { type: 'number', description: 'Vertical UV scale factor (defaults to scale or 1.0).' },
     },
     required: ['meshName'],
   };
@@ -25,6 +27,8 @@ export class AutoUVMappingTool extends AbstractTool {
     const meshTarget = String(args.meshName || args.meshId || '*');
     const projection = args.projection || 'triplanar';
     const scale = args.scale !== undefined ? Number(args.scale) : 1.0;
+    const uScale = args.uScale !== undefined ? Number(args.uScale) : scale;
+    const vScale = args.vScale !== undefined ? Number(args.vScale) : scale;
 
     const targets =
       meshTarget === '*'
@@ -39,9 +43,11 @@ export class AutoUVMappingTool extends AbstractTool {
     for (const m of targets) {
       context.service.selectedMesh = m;
       if (projection === 'top' || projection === 'front' || projection === 'side') {
-        context.service.applyPlanarUVs(projection, scale);
+        context.service.applyPlanarUVs(projection, uScale, vScale);
+      } else if (projection === 'cylindrical') {
+        context.service.applyCylindricalUVs(uScale, vScale);
       } else {
-        context.service.applyTriplanarUVs(scale);
+        context.service.applyTriplanarUVs(uScale, vScale);
       }
     }
     context.service.selectedMesh = prevSelected;
@@ -50,6 +56,8 @@ export class AutoUVMappingTool extends AbstractTool {
       status: 'ok',
       mappedMeshes: targets.map((m) => m.name),
       projection,
+      uScale,
+      vScale,
     });
   }
 }

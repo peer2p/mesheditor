@@ -40,6 +40,26 @@ import {
   VertexData,
 } from '@babylonjs/core';
 import '@babylonjs/loaders';
+import {
+  applyFacetUVProjection,
+  captureMeshSurfaceSnapshot,
+  ensureBaseMaterial,
+  FacetMaterialInfo,
+  FacetUVInfo,
+  FacetUVProjectionOptions,
+  FacetUVTransformOptions,
+  getFaceTriangleMaterialIndices,
+  getFacetMaterialInfo,
+  getFacetUVInfo,
+  getMeshSlotMaterials,
+  isolateFacetVertices,
+  MeshSurfaceSnapshot,
+  rebuildMeshSubMeshes,
+  remapFacetUVRect,
+  restoreMeshSurfaceSnapshot,
+  setFacetCornerUVs,
+  transformFacetUVs,
+} from './geometry/facetSurfaceUtils';
 import { GridMaterial } from '@babylonjs/materials';
 import { GLTF2Export, OBJExport, RegisterEXT_texture_webp, STLExport } from '@babylonjs/serializers';
 import { DataWriter } from '@babylonjs/serializers/glTF/2.0/dataWriter';
@@ -202,6 +222,7 @@ export class MeshEditorService {
   // Facet & Vertex Editor state
   public facetEditorActive: boolean = false;
   public facetEditMode: 'face' | 'vertex' = 'face';
+  public facetSingleTriangleMode: boolean = false;
   public selectedFaceId: number | null = null;
   public selectedFaceIsQuad: boolean = false;
   public facetHighlightMesh: Nullable<LinesMesh> = null;
@@ -3075,7 +3096,12 @@ export class MeshEditorService {
       if (pick.faceId !== undefined) {
         this.selectedFaceId = pick.faceId;
         this.highlightFace(picked, pick.faceId);
-        const quad = this.getQuadFaceInfo(picked, pick.faceId);
+        const quad = this.facetSingleTriangleMode ? null : this.getQuadFaceInfo(picked, pick.faceId);
+        const matInfo = getFacetMaterialInfo(picked, pick.faceId);
+        if (this.selectedSubMeshId !== matInfo.subMeshIndex) {
+          this.selectedSubMeshId = matInfo.subMeshIndex;
+          this.events.onSelectionChanged?.(this.selectedNodes, this.selectedMesh, this.selectedSubMeshId);
+        }
         this.events.onFaceSelected?.(pick.faceId, !!quad);
         const desc = quad ? `Quad Face #${pick.faceId} & #${quad.faceIds[1]}` : `Face #${pick.faceId}`;
         this.events.onToast?.(`${desc} selected on "${picked.name}".`, 'info');
@@ -3549,9 +3575,12 @@ export class MeshEditorService {
     const lenA = nA.length();
     if (lenA < 1e-6) return null;
     const normalA = nA.scale(1 / lenA);
+    const triMats = mesh.subMeshes && mesh.subMeshes.length > 1 ? getFaceTriangleMaterialIndices(mesh) : null;
+    const matA = triMats ? (triMats[faceId] ?? 0) : 0;
 
     for (let f = 0; f < numTriangles; f++) {
       if (f === faceId) continue;
+      if (triMats && (triMats[f] ?? 0) !== matA) continue;
       const j0 = indices[f * 3];
       const j1 = indices[f * 3 + 1];
       const j2 = indices[f * 3 + 2];
@@ -3650,7 +3679,7 @@ export class MeshEditorService {
     mesh.computeWorldMatrix(true);
     const wm = mesh.getWorldMatrix();
 
-    const quad = this.getQuadFaceInfo(mesh, faceId);
+    const quad = this.facetSingleTriangleMode ? null : this.getQuadFaceInfo(mesh, faceId);
     if (quad) {
       this.selectedFaceIsQuad = true;
       const [p0, p1, p2, p3] = quad.quadPositions;
@@ -3721,9 +3750,166 @@ export class MeshEditorService {
     this.selectMesh(mesh);
     this.selectedFaceId = faceId;
     this.highlightFace(mesh, faceId);
-    const quad = this.getQuadFaceInfo(mesh, faceId);
+    const quad = this.facetSingleTriangleMode ? null : this.getQuadFaceInfo(mesh, faceId);
+    const matInfo = getFacetMaterialInfo(mesh, faceId);
+    if (this.selectedSubMeshId !== matInfo.subMeshIndex) {
+      this.selectedSubMeshId = matInfo.subMeshIndex;
+      this.events.onSelectionChanged?.(this.selectedNodes, this.selectedMesh, this.selectedSubMeshId);
+    }
     this.events.onFaceSelected?.(faceId, !!quad);
     return true;
+  }
+
+  public setFacetSingleTriangleMode(enabled: boolean): void {
+    this.facetSingleTriangleMode = !!enabled;
+    if (this.selectedMesh && this.selectedFaceId !== null) {
+      const indices = this.selectedMesh.getIndices();
+      if (indices && this.selectedFaceId * 3 + 2 < indices.length) {
+        this.highlightFace(this.selectedMesh, this.selectedFaceId);
+        const quad = this.facetSingleTriangleMode
+          ? null
+          : this.getQuadFaceInfo(this.selectedMesh, this.selectedFaceId);
+        this.events.onFaceSelected?.(this.selectedFaceId, !!quad);
+      }
+    }
+  }
+
+  private resolveTargetFacet(
+    mesh: Mesh,
+    faceId: number
+  ): {
+    faceIds: number[];
+    isQuad: boolean;
+    normal: Vector3;
+    cornerPositions: Vector3[];
+  } | null {
+    const indices = mesh.getIndices();
+    const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+    if (!indices || !positions || faceId < 0 || faceId * 3 + 2 >= indices.length) return null;
+
+    const quad = this.facetSingleTriangleMode ? null : this.getQuadFaceInfo(mesh, faceId);
+    if (quad) {
+      return {
+        faceIds: [...quad.faceIds],
+        isQuad: true,
+        normal: quad.normal.clone(),
+        cornerPositions: quad.quadPositions.map((p) => p.clone()),
+      };
+    }
+
+    const i0 = indices[faceId * 3];
+    const i1 = indices[faceId * 3 + 1];
+    const i2 = indices[faceId * 3 + 2];
+    const p0 = new Vector3(positions[i0 * 3], positions[i0 * 3 + 1], positions[i0 * 3 + 2]);
+    const p1 = new Vector3(positions[i1 * 3], positions[i1 * 3 + 1], positions[i1 * 3 + 2]);
+    const p2 = new Vector3(positions[i2 * 3], positions[i2 * 3 + 1], positions[i2 * 3 + 2]);
+    const n = Vector3.Cross(p2.subtract(p0), p1.subtract(p0));
+    const normal = n.lengthSquared() > 1e-12 ? n.normalize() : new Vector3(0, 1, 0);
+
+    return {
+      faceIds: [faceId],
+      isQuad: false,
+      normal,
+      cornerPositions: [p0, p1, p2],
+    };
+  }
+
+  private capturePreEditSubMeshContext(mesh: Mesh): {
+    triMaterials: number[];
+    slotMaterials: (Material | null)[];
+    origTriCount: number;
+  } | null {
+    const isMultiMat = mesh.material instanceof MultiMaterial;
+    const hasMultipleSubMeshes = !!(mesh.subMeshes && mesh.subMeshes.length > 1);
+    if (!isMultiMat && !hasMultipleSubMeshes) {
+      return null;
+    }
+    const indices = mesh.getIndices();
+    return {
+      triMaterials: getFaceTriangleMaterialIndices(mesh),
+      slotMaterials: getMeshSlotMaterials(mesh),
+      origTriCount: Math.floor((indices?.length || 0) / 3),
+    };
+  }
+
+  private finalizeSubMeshesAfterTopologyEdit(
+    mesh: Mesh,
+    ctx: { triMaterials: number[]; slotMaterials: (Material | null)[]; origTriCount: number } | null,
+    sourceMaterialIndex: number,
+    deletedFaceIds?: Set<number>,
+    explicitTriMaterials?: number[]
+  ): Int32Array | null {
+    if (!ctx) return null;
+    const indices = mesh.getIndices();
+    const newTriCount = Math.floor((indices?.length || 0) / 3);
+    let nextTriMats: number[];
+
+    if (explicitTriMaterials) {
+      nextTriMats = explicitTriMaterials;
+    } else if (deletedFaceIds && deletedFaceIds.size > 0) {
+      nextTriMats = [];
+      for (let t = 0; t < ctx.origTriCount; t++) {
+        if (!deletedFaceIds.has(t)) {
+          nextTriMats.push(ctx.triMaterials[t] ?? 0);
+        }
+      }
+      while (nextTriMats.length < newTriCount) {
+        nextTriMats.push(sourceMaterialIndex);
+      }
+    } else {
+      nextTriMats = new Array<number>(newTriCount);
+      for (let t = 0; t < newTriCount; t++) {
+        nextTriMats[t] = t < ctx.origTriCount ? (ctx.triMaterials[t] ?? 0) : sourceMaterialIndex;
+      }
+    }
+
+    const { faceIdMap } = rebuildMeshSubMeshes(mesh, nextTriMats, ctx.slotMaterials, true);
+    if (this.selectedFaceId !== null && this.selectedFaceId >= 0 && this.selectedFaceId < faceIdMap.length) {
+      this.selectedFaceId = faceIdMap[this.selectedFaceId];
+      const matInfo = getFacetMaterialInfo(mesh, this.selectedFaceId);
+      this.selectedSubMeshId = matInfo.subMeshIndex;
+    }
+    return faceIdMap;
+  }
+
+  private recordMeshSurfaceEdit(
+    mesh: Mesh,
+    actionName: string,
+    beforeSnap: MeshSurfaceSnapshot,
+    faceIdBefore: number | null,
+    faceIdAfter: number | null
+  ): void {
+    const afterSnap = captureMeshSurfaceSnapshot(mesh);
+    const applySurfaceState = (snap: MeshSurfaceSnapshot, targetFaceId: number | null) => {
+      restoreMeshSurfaceSnapshot(mesh, snap);
+      if (this.selectedMesh === mesh) {
+        const indices = mesh.getIndices();
+        const validFace = targetFaceId !== null && !!indices && targetFaceId >= 0 && targetFaceId * 3 + 2 < indices.length;
+        this.selectedFaceId = validFace ? targetFaceId : null;
+        if (validFace && targetFaceId !== null) {
+          this.highlightFace(mesh, targetFaceId);
+          const quad = this.facetSingleTriangleMode ? null : this.getQuadFaceInfo(mesh, targetFaceId);
+          const matInfo = getFacetMaterialInfo(mesh, targetFaceId);
+          this.selectedSubMeshId = matInfo.subMeshIndex;
+          this.events.onFaceSelected?.(targetFaceId, !!quad);
+        } else {
+          if (this.facetHighlightMesh) {
+            this.facetHighlightMesh.dispose();
+            this.facetHighlightMesh = null;
+          }
+          this.selectedFaceIsQuad = false;
+          this.events.onFaceSelected?.(null, false);
+        }
+      }
+      this.events.onSelectionChanged?.(this.selectedNodes, this.selectedMesh, this.selectedSubMeshId);
+      this.events.onSceneModified?.();
+    };
+
+    this.recordAction({
+      name: actionName,
+      undo: () => applySurfaceState(beforeSnap, faceIdBefore),
+      redo: () => applySurfaceState(afterSnap, faceIdAfter),
+    });
   }
 
   public findFaceId(
@@ -3930,11 +4116,13 @@ export class MeshEditorService {
     }
     const mesh = this.selectedMesh;
     const faceId = this.selectedFaceId;
+    const preCtx = this.capturePreEditSubMeshContext(mesh);
+    const srcMatIdx = getFacetMaterialInfo(mesh, faceId).materialIndex;
     const indices = Array.from(mesh.getIndices() || []);
     const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
     const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
 
-    const quad = this.getQuadFaceInfo(mesh, faceId);
+    const quad = this.facetSingleTriangleMode ? null : this.getQuadFaceInfo(mesh, faceId);
 
     if (quad) {
       const [V0, V1, V2, V3] = quad.quadPositions;
@@ -4004,7 +4192,8 @@ export class MeshEditorService {
       mesh.setVerticesData(VertexBuffer.NormalKind, normals);
       mesh.refreshBoundingInfo();
 
-      this.highlightFace(mesh, fA);
+      this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, srcMatIdx);
+      this.highlightFace(mesh, this.selectedFaceId ?? fA);
       this.events.onSceneModified?.();
       this.events.onToast?.(`Extruded Quad Face by ${distance}!`, 'success');
       return;
@@ -4070,7 +4259,8 @@ export class MeshEditorService {
     mesh.setVerticesData(VertexBuffer.NormalKind, normals);
     mesh.refreshBoundingInfo();
 
-    this.highlightFace(mesh, faceId);
+    this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, srcMatIdx);
+    this.highlightFace(mesh, this.selectedFaceId ?? faceId);
     this.events.onSceneModified?.();
     this.events.onToast?.(`Extruded face by ${distance}!`, 'success');
   }
@@ -4082,11 +4272,13 @@ export class MeshEditorService {
     }
     const mesh = this.selectedMesh;
     const faceId = this.selectedFaceId;
+    const preCtx = this.capturePreEditSubMeshContext(mesh);
+    const srcMatIdx = getFacetMaterialInfo(mesh, faceId).materialIndex;
     const indices = Array.from(mesh.getIndices() || []);
     const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
     const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
 
-    const quad = this.getQuadFaceInfo(mesh, faceId);
+    const quad = this.facetSingleTriangleMode ? null : this.getQuadFaceInfo(mesh, faceId);
 
     if (quad) {
       const [V0, V1, V2, V3] = quad.quadPositions;
@@ -4168,7 +4360,8 @@ export class MeshEditorService {
       mesh.setVerticesData(VertexBuffer.NormalKind, normals);
       mesh.refreshBoundingInfo();
 
-      this.highlightFace(mesh, fA);
+      this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, srcMatIdx);
+      this.highlightFace(mesh, this.selectedFaceId ?? fA);
       this.events.onSceneModified?.();
       this.events.onToast?.(`Inset Quad Face #${fA} & #${fB} (factor ${ratio.toFixed(2)})!`, 'success');
       return;
@@ -4245,7 +4438,8 @@ export class MeshEditorService {
     mesh.setVerticesData(VertexBuffer.NormalKind, normals);
     mesh.refreshBoundingInfo();
 
-    this.highlightFace(mesh, faceId);
+    this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, srcMatIdx);
+    this.highlightFace(mesh, this.selectedFaceId ?? faceId);
     this.events.onSceneModified?.();
     this.events.onToast?.(`Inset face #${faceId} (factor ${ratio.toFixed(2)})!`, 'success');
   }
@@ -4261,6 +4455,8 @@ export class MeshEditorService {
     }
     const mesh = this.selectedMesh;
     const faceId = this.selectedFaceId;
+    const preCtx = this.capturePreEditSubMeshContext(mesh);
+    const srcMatIdx = getFacetMaterialInfo(mesh, faceId).materialIndex;
     const indices = Array.from(mesh.getIndices() || []);
     const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
     const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
@@ -4317,7 +4513,8 @@ export class MeshEditorService {
     mesh.setVerticesData(VertexBuffer.NormalKind, normals);
     mesh.refreshBoundingInfo();
 
-    this.highlightFace(mesh, faceId);
+    this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, srcMatIdx);
+    this.highlightFace(mesh, this.selectedFaceId ?? faceId);
     this.events.onSceneModified?.();
     this.events.onToast?.(`Subdivided face #${faceId} into 4 facets!`, 'success');
   }
@@ -4485,6 +4682,8 @@ export class MeshEditorService {
     // If selected face only
     if (selectedOnly && this.selectedFaceId !== null && this.selectedFaceId * 3 + 2 < indices.length) {
       const faceId = this.selectedFaceId;
+      const preCtx = this.capturePreEditSubMeshContext(mesh);
+      const srcMatIdx = getFacetMaterialInfo(mesh, faceId).materialIndex;
       const i0 = indices[faceId * 3];
       const i1 = indices[faceId * 3 + 1];
       const i2 = indices[faceId * 3 + 2];
@@ -4530,13 +4729,15 @@ export class MeshEditorService {
       mesh.setVerticesData(VertexBuffer.NormalKind, normals);
       mesh.refreshBoundingInfo();
 
-      this.highlightFace(mesh, faceId);
+      this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, srcMatIdx);
+      this.highlightFace(mesh, this.selectedFaceId ?? faceId);
       this.events.onSceneModified?.();
       this.events.onToast?.(`Solidified face #${faceId} (thickness: ${thickness})!`, 'success');
       return;
     }
 
     // Solidify entire mesh
+    const preCtx = this.capturePreEditSubMeshContext(mesh);
     const origVertCount = positions.length / 3;
     const normalsOrig: number[] = [];
     VertexData.ComputeNormals(positions, indices, normalsOrig);
@@ -4556,14 +4757,18 @@ export class MeshEditorService {
     }
 
     const origTriCount = Math.floor(indices.length / 3);
+    const explicitTriMats: number[] | undefined = preCtx ? [...preCtx.triMaterials] : undefined;
     for (let t = 0; t < origTriCount; t++) {
       const i0 = indices[t * 3];
       const i1 = indices[t * 3 + 1];
       const i2 = indices[t * 3 + 2];
       indices.push(i0 + origVertCount, i2 + origVertCount, i1 + origVertCount);
+      if (explicitTriMats) {
+        explicitTriMats.push(preCtx!.triMaterials[t] ?? 0);
+      }
     }
 
-    const edgeCounts = new Map<string, { count: number; a: number; b: number }>();
+    const edgeCounts = new Map<string, { count: number; a: number; b: number; tri: number }>();
     for (let t = 0; t < origTriCount; t++) {
       const tri = [indices[t * 3], indices[t * 3 + 1], indices[t * 3 + 2]];
       for (let e = 0; e < 3; e++) {
@@ -4572,7 +4777,7 @@ export class MeshEditorService {
         const key = a < b ? `${a}_${b}` : `${b}_${a}`;
         const cur = edgeCounts.get(key);
         if (cur) cur.count++;
-        else edgeCounts.set(key, { count: 1, a, b });
+        else edgeCounts.set(key, { count: 1, a, b, tri: t });
       }
     }
 
@@ -4583,6 +4788,10 @@ export class MeshEditorService {
         const aInner = a + origVertCount;
         const bInner = b + origVertCount;
         indices.push(a, b, bInner, a, bInner, aInner);
+        if (explicitTriMats) {
+          const borderMat = preCtx!.triMaterials[val.tri] ?? 0;
+          explicitTriMats.push(borderMat, borderMat);
+        }
       }
     }
 
@@ -4595,6 +4804,7 @@ export class MeshEditorService {
     mesh.setVerticesData(VertexBuffer.NormalKind, newNormals);
     mesh.refreshBoundingInfo();
 
+    this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, 0, undefined, explicitTriMats);
     this.events.onSceneModified?.();
     this.events.onToast?.(`Solidified "${mesh.name}" with thickness ${thickness}!`, 'success');
   }
@@ -4615,6 +4825,8 @@ export class MeshEditorService {
     }
     const mesh = this.selectedMesh;
     const faceId = this.selectedFaceId;
+    const preCtx = this.capturePreEditSubMeshContext(mesh);
+    const srcMatIdx = getFacetMaterialInfo(mesh, faceId).materialIndex;
     const indices = Array.from(mesh.getIndices() || []);
     const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
     const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
@@ -4685,7 +4897,8 @@ export class MeshEditorService {
     mesh.setVerticesData(VertexBuffer.NormalKind, normals);
     mesh.refreshBoundingInfo();
 
-    this.highlightFace(mesh, faceId);
+    this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, srcMatIdx);
+    this.highlightFace(mesh, this.selectedFaceId ?? faceId);
     this.events.onSceneModified?.();
     this.events.onToast?.(`Created segmented arch (${segs} segments)!`, 'success');
   }
@@ -4697,6 +4910,8 @@ export class MeshEditorService {
     }
     const mesh = this.selectedMesh;
     const faceId = this.selectedFaceId;
+    const preCtx = this.capturePreEditSubMeshContext(mesh);
+    const srcMatIdx = getFacetMaterialInfo(mesh, faceId).materialIndex;
     const indices = Array.from(mesh.getIndices() || []);
     const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
     const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
@@ -4753,7 +4968,8 @@ export class MeshEditorService {
     mesh.setVerticesData(VertexBuffer.NormalKind, normals);
     mesh.refreshBoundingInfo();
 
-    this.highlightFace(mesh, faceId);
+    this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, srcMatIdx);
+    this.highlightFace(mesh, this.selectedFaceId ?? faceId);
     this.events.onSceneModified?.();
     this.events.onToast?.(`Knife cut face #${faceId} in two!`, 'success');
   }
@@ -4774,6 +4990,8 @@ export class MeshEditorService {
     }
     const mesh = this.selectedMesh;
     const faceId = this.selectedFaceId;
+    const preCtx = this.capturePreEditSubMeshContext(mesh);
+    const srcMatIdx = getFacetMaterialInfo(mesh, faceId).materialIndex;
     const indices = Array.from(mesh.getIndices() || []);
     const positions = Array.from(mesh.getVerticesData(VertexBuffer.PositionKind) || []);
     const uvs = Array.from(mesh.getVerticesData(VertexBuffer.UVKind) || []);
@@ -4831,7 +5049,8 @@ export class MeshEditorService {
     mesh.setVerticesData(VertexBuffer.NormalKind, normals);
     mesh.refreshBoundingInfo();
 
-    this.highlightFace(mesh, faceId);
+    this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, srcMatIdx);
+    this.highlightFace(mesh, this.selectedFaceId ?? faceId);
     this.events.onSceneModified?.();
     this.events.onToast?.(`Cut through face #${faceId} (opening created)!`, 'success');
   }
@@ -4909,6 +5128,8 @@ export class MeshEditorService {
 
     if (this.selectedFaceId !== null && this.selectedFaceId * 3 + 2 < indices.length) {
       const faceId = this.selectedFaceId;
+      const preCtx = this.capturePreEditSubMeshContext(mesh);
+      const srcMatIdx = getFacetMaterialInfo(mesh, faceId).materialIndex;
       const i0 = indices[faceId * 3];
       const i1 = indices[faceId * 3 + 1];
       const i2 = indices[faceId * 3 + 2];
@@ -4948,6 +5169,7 @@ export class MeshEditorService {
       mesh.setVerticesData(VertexBuffer.NormalKind, normals);
       mesh.refreshBoundingInfo();
 
+      this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, srcMatIdx);
       this.events.onSceneModified?.();
       this.events.onToast?.(`Created array of ${numCopies} faces!`, 'success');
       return;
@@ -4969,9 +5191,12 @@ export class MeshEditorService {
     }
     const mesh = this.selectedMesh;
     const faceId = this.selectedFaceId;
+    const preCtx = this.capturePreEditSubMeshContext(mesh);
+    const srcMatIdx = getFacetMaterialInfo(mesh, faceId).materialIndex;
     const indices = Array.from(mesh.getIndices() || []);
 
-    const quad = this.getQuadFaceInfo(mesh, faceId);
+    const quad = this.facetSingleTriangleMode ? null : this.getQuadFaceInfo(mesh, faceId);
+    const deletedFaces = quad ? new Set(quad.faceIds) : new Set([faceId]);
     if (quad) {
       const facesToDelete = new Set(quad.faceIds);
       const newIndices: number[] = [];
@@ -4993,12 +5218,14 @@ export class MeshEditorService {
     mesh.setVerticesData(VertexBuffer.NormalKind, normals);
     mesh.refreshBoundingInfo();
 
+    this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, srcMatIdx, deletedFaces);
     if (this.facetHighlightMesh) {
       this.facetHighlightMesh.dispose();
       this.facetHighlightMesh = null;
     }
     this.selectedFaceId = null;
     this.events.onFaceSelected?.(null);
+    this.events.onSelectionChanged?.(this.selectedNodes, this.selectedMesh, this.selectedSubMeshId);
     this.events.onSceneModified?.();
     this.events.onToast?.(quad ? 'Quad face deleted.' : 'Face deleted.', 'success');
   }
@@ -5010,9 +5237,11 @@ export class MeshEditorService {
     }
     const mesh = this.selectedMesh;
     const faceId = this.selectedFaceId;
+    const preCtx = this.capturePreEditSubMeshContext(mesh);
+    const srcMatIdx = getFacetMaterialInfo(mesh, faceId).materialIndex;
     const indices = Array.from(mesh.getIndices() || []);
 
-    const quad = this.getQuadFaceInfo(mesh, faceId);
+    const quad = this.facetSingleTriangleMode ? null : this.getQuadFaceInfo(mesh, faceId);
     if (quad) {
       for (const f of quad.faceIds) {
         const temp = indices[f * 3 + 1];
@@ -5034,9 +5263,428 @@ export class MeshEditorService {
       mesh.setVerticesData(VertexBuffer.NormalKind, normals);
     }
     mesh.refreshBoundingInfo();
-    this.highlightFace(mesh, faceId);
+    this.finalizeSubMeshesAfterTopologyEdit(mesh, preCtx, srcMatIdx);
+    this.highlightFace(mesh, this.selectedFaceId ?? faceId);
     this.events.onSceneModified?.();
     this.events.onToast?.(quad ? 'Quad face normal inverted!' : 'Face normal inverted!', 'success');
+  }
+
+  public getSceneEditableMaterials(): Material[] {
+    const result: Material[] = [];
+    const seen = new Set<Material>();
+    for (const mat of this.scene.materials) {
+      if (!mat || seen.has(mat)) continue;
+      if (mat instanceof MultiMaterial) continue;
+      if (mat === this.gridMaterial) continue;
+      if (
+        mat.name.startsWith('editor_') ||
+        mat.name === 'gridMat' ||
+        mat.name.endsWith('_wiremat') ||
+        mat.name === 'BackgroundSkyboxMaterial'
+      ) {
+        continue;
+      }
+      seen.add(mat);
+      result.push(mat);
+    }
+    return result;
+  }
+
+  public getSelectedFacetUVInfo(): FacetUVInfo | null {
+    if (!this.selectedMesh || this.selectedFaceId === null) return null;
+    const target = this.resolveTargetFacet(this.selectedMesh, this.selectedFaceId);
+    if (!target) return null;
+    return getFacetUVInfo(this.selectedMesh, target.faceIds, target.cornerPositions, target.isQuad);
+  }
+
+  public getSelectedFacetMaterialInfo(): FacetMaterialInfo | null {
+    if (!this.selectedMesh || this.selectedFaceId === null) return null;
+    const indices = this.selectedMesh.getIndices();
+    if (!indices || this.selectedFaceId < 0 || this.selectedFaceId * 3 + 2 >= indices.length) {
+      return null;
+    }
+    return getFacetMaterialInfo(this.selectedMesh, this.selectedFaceId);
+  }
+
+  public projectSelectedFacetUVs(
+    mode: 'fit' | 'planar',
+    options: FacetUVProjectionOptions = {}
+  ): boolean {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face first.', 'warning');
+      return false;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const target = this.resolveTargetFacet(mesh, faceId);
+    if (!target) return false;
+
+    const beforeSnap = captureMeshSurfaceSnapshot(mesh);
+    applyFacetUVProjection(mesh, target.faceIds, target.normal, mode, options);
+    this.highlightFace(mesh, faceId);
+    this.recordMeshSurfaceEdit(
+      mesh,
+      mode === 'fit' ? 'Facet UV Fit [0..1]' : 'Facet UV World Planar',
+      beforeSnap,
+      faceId,
+      faceId
+    );
+    this.events.onFaceSelected?.(faceId, target.isQuad);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(
+      `Projected ${mode === 'fit' ? 'Fit [0..1]' : 'World Planar'} UVs onto ${
+        target.isQuad ? 'quad' : 'face'
+      } #${faceId}.`,
+      'success'
+    );
+    return true;
+  }
+
+  public setSelectedFacetUVRect(
+    uMin: number,
+    uMax: number,
+    vMin: number,
+    vMax: number
+  ): boolean {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face first.', 'warning');
+      return false;
+    }
+    if (![uMin, uMax, vMin, vMax].every((n) => Number.isFinite(n))) {
+      this.events.onToast?.('Invalid UV bounds.', 'warning');
+      return false;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const target = this.resolveTargetFacet(mesh, faceId);
+    if (!target) return false;
+
+    const beforeSnap = captureMeshSurfaceSnapshot(mesh);
+    remapFacetUVRect(mesh, target.faceIds, target.normal, uMin, uMax, vMin, vMax);
+    this.highlightFace(mesh, faceId);
+    this.recordMeshSurfaceEdit(mesh, 'Remap Facet UV Region', beforeSnap, faceId, faceId);
+    this.events.onFaceSelected?.(faceId, target.isQuad);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Updated UV region for ${target.isQuad ? 'quad' : 'face'} #${faceId}.`, 'success');
+    return true;
+  }
+
+  public transformSelectedFacetUVs(options: FacetUVTransformOptions): boolean {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face first.', 'warning');
+      return false;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const target = this.resolveTargetFacet(mesh, faceId);
+    if (!target) return false;
+
+    const beforeSnap = captureMeshSurfaceSnapshot(mesh);
+    if (!mesh.isVerticesDataPresent(VertexBuffer.UVKind)) {
+      applyFacetUVProjection(mesh, target.faceIds, target.normal, 'fit');
+    }
+    transformFacetUVs(mesh, target.faceIds, options);
+    this.highlightFace(mesh, faceId);
+    this.recordMeshSurfaceEdit(mesh, 'Transform Facet UVs', beforeSnap, faceId, faceId);
+    this.events.onFaceSelected?.(faceId, target.isQuad);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Transformed UVs on ${target.isQuad ? 'quad' : 'face'} #${faceId}.`, 'success');
+    return true;
+  }
+
+  public setSelectedFacetCornerUVs(cornerUVs: Array<{ u: number; v: number }>): boolean {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face first.', 'warning');
+      return false;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const target = this.resolveTargetFacet(mesh, faceId);
+    if (!target) return false;
+    if (
+      cornerUVs.length < target.cornerPositions.length ||
+      cornerUVs.some((c) => !Number.isFinite(c.u) || !Number.isFinite(c.v))
+    ) {
+      this.events.onToast?.('Invalid corner UV coordinates.', 'warning');
+      return false;
+    }
+
+    const beforeSnap = captureMeshSurfaceSnapshot(mesh);
+    setFacetCornerUVs(mesh, target.faceIds, target.cornerPositions, cornerUVs);
+    this.highlightFace(mesh, faceId);
+    this.recordMeshSurfaceEdit(mesh, 'Edit Facet Corner UVs', beforeSnap, faceId, faceId);
+    this.events.onFaceSelected?.(faceId, target.isQuad);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Updated corner UVs on ${target.isQuad ? 'quad' : 'face'} #${faceId}.`, 'success');
+    return true;
+  }
+
+  private applyMaterialToTargetFacet(
+    mesh: Mesh,
+    faceIds: number[],
+    mat: Material
+  ): { newFaceId: number; isQuad: boolean } {
+    ensureBaseMaterial(mesh);
+    const triMats = getFaceTriangleMaterialIndices(mesh);
+    const slots = getMeshSlotMaterials(mesh);
+
+    let slotIdx = slots.indexOf(mat);
+    if (slotIdx === -1) {
+      slotIdx = slots.length;
+      slots.push(mat);
+    }
+
+    for (const fid of faceIds) {
+      if (fid >= 0 && fid < triMats.length) {
+        triMats[fid] = slotIdx;
+      }
+    }
+
+    const { faceIdMap } = rebuildMeshSubMeshes(mesh, triMats, slots, true);
+    const primaryOldFaceId = faceIds[0] ?? 0;
+    const newFaceId =
+      primaryOldFaceId >= 0 && primaryOldFaceId < faceIdMap.length
+        ? faceIdMap[primaryOldFaceId]
+        : primaryOldFaceId;
+
+    this.selectedFaceId = newFaceId;
+    const matInfo = getFacetMaterialInfo(mesh, newFaceId);
+    this.selectedSubMeshId = matInfo.subMeshIndex;
+    const quadAfter = this.facetSingleTriangleMode ? null : this.getQuadFaceInfo(mesh, newFaceId);
+    this.highlightFace(mesh, newFaceId);
+    return { newFaceId, isQuad: !!quadAfter };
+  }
+
+  public assignMaterialToSelectedFacet(materialOrId: Material | string): boolean {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face first.', 'warning');
+      return false;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const target = this.resolveTargetFacet(mesh, faceId);
+    if (!target) return false;
+
+    let mat: Material | undefined;
+    if (typeof materialOrId === 'string') {
+      mat =
+        this.getSceneEditableMaterials().find(
+          (m) => m.id === materialOrId || m.name === materialOrId
+        ) ||
+        this.scene.materials.find(
+          (m) => !(m instanceof MultiMaterial) && (m.id === materialOrId || m.name === materialOrId)
+        );
+    } else if (!(materialOrId instanceof MultiMaterial)) {
+      mat = materialOrId;
+    }
+
+    if (!mat) {
+      this.events.onToast?.('Material not found.', 'warning');
+      return false;
+    }
+
+    const beforeSnap = captureMeshSurfaceSnapshot(mesh);
+    const { newFaceId, isQuad } = this.applyMaterialToTargetFacet(mesh, target.faceIds, mat);
+    this.recordMeshSurfaceEdit(mesh, 'Assign Material to Facet', beforeSnap, faceId, newFaceId);
+    this.events.onSelectionChanged?.(this.selectedNodes, this.selectedMesh, this.selectedSubMeshId);
+    this.events.onFaceSelected?.(newFaceId, isQuad);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(
+      `Assigned material "${mat.name}" to ${isQuad ? 'quad' : 'face'} #${newFaceId}.`,
+      'success'
+    );
+    return true;
+  }
+
+  public assignNewColorMaterialToSelectedFacet(
+    hexColor: string,
+    name?: string
+  ): Material | null {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face first.', 'warning');
+      return null;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const target = this.resolveTargetFacet(mesh, faceId);
+    if (!target) return null;
+
+    const cleanHex = (hexColor || '#4f8cf6').trim();
+    let color: Color3;
+    try {
+      color = Color3.FromHexString(cleanHex.startsWith('#') ? cleanHex : `#${cleanHex}`);
+    } catch {
+      color = new Color3(0.31, 0.55, 0.96);
+    }
+
+    const matName =
+      name?.trim() || `FacetMat_${cleanHex.replace('#', '')}_${Date.now().toString().slice(-4)}`;
+    const mat = new PBRMaterial(matName, this.scene);
+    mat.albedoColor = color;
+    mat.roughness = 0.5;
+    mat.metallic = 0.0;
+
+    const beforeSnap = captureMeshSurfaceSnapshot(mesh);
+    const { newFaceId, isQuad } = this.applyMaterialToTargetFacet(mesh, target.faceIds, mat);
+    this.recordMeshSurfaceEdit(
+      mesh,
+      'Assign Color Material to Facet',
+      beforeSnap,
+      faceId,
+      newFaceId
+    );
+    this.events.onSelectionChanged?.(this.selectedNodes, this.selectedMesh, this.selectedSubMeshId);
+    this.events.onFaceSelected?.(newFaceId, isQuad);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Assigned new material "${mat.name}" to facet.`, 'success');
+    return mat;
+  }
+
+  public assignTextureToSelectedFacet(fileOrUrl: File | string, name?: string): boolean {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face first.', 'warning');
+      return false;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const target = this.resolveTargetFacet(mesh, faceId);
+    if (!target) return false;
+
+    let url: string;
+    let texName: string;
+    if (fileOrUrl instanceof File) {
+      url = URL.createObjectURL(fileOrUrl);
+      this.objectUrls.add(url);
+      texName = name?.trim() || fileOrUrl.name;
+      this.registerDroppedFiles([fileOrUrl]);
+    } else {
+      url = fileOrUrl;
+      texName = name?.trim() || 'FacetTexture';
+    }
+    if (!url) {
+      this.events.onToast?.('No texture source provided.', 'warning');
+      return false;
+    }
+
+    let tex = this.scene.textures.find(
+      (t): t is Texture => t instanceof Texture && !(t as any).isRenderTarget && t.url === url
+    );
+    if (!tex) {
+      tex = new Texture(url, this.scene, false, false, Texture.NEAREST_SAMPLINGMODE);
+      tex.name = texName;
+    } else if (name) {
+      tex.name = texName;
+    }
+    tex.hasAlpha = false;
+
+    let mat = this.scene.materials.find(
+      (m): m is PBRMaterial =>
+        m instanceof PBRMaterial && m.metadata && m.metadata.facetTextureUrl === url
+    );
+    if (!mat) {
+      const safeName = texName.replace(/[^a-zA-Z0-9_-]/g, '_');
+      mat = new PBRMaterial(`FacetTex_${safeName}_${Date.now().toString().slice(-4)}`, this.scene);
+      mat.albedoColor = Color3.White();
+      mat.albedoTexture = tex;
+      mat.roughness = 0.6;
+      mat.metallic = 0.0;
+      mat.useAlphaFromAlbedoTexture = false;
+      mat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
+      mat.metadata = { facetTextureUrl: url };
+    }
+
+    const beforeSnap = captureMeshSurfaceSnapshot(mesh);
+    if (!mesh.isVerticesDataPresent(VertexBuffer.UVKind)) {
+      applyFacetUVProjection(mesh, target.faceIds, target.normal, 'fit');
+    }
+    const { newFaceId, isQuad } = this.applyMaterialToTargetFacet(mesh, target.faceIds, mat);
+    this.recordMeshSurfaceEdit(mesh, 'Assign Texture to Facet', beforeSnap, faceId, newFaceId);
+    this.events.onSelectionChanged?.(this.selectedNodes, this.selectedMesh, this.selectedSubMeshId);
+    this.events.onFaceSelected?.(newFaceId, isQuad);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Applied texture "${texName}" to facet.`, 'success');
+    return true;
+  }
+
+  public assignAtlasTileToSelectedFacet(
+    atlasId: string,
+    frameId: string,
+    assignAtlasMaterial: boolean = true
+  ): boolean {
+    if (!this.selectedMesh || this.selectedFaceId === null) {
+      this.events.onToast?.('Please pick a face first.', 'warning');
+      return false;
+    }
+    const mesh = this.selectedMesh;
+    const faceId = this.selectedFaceId;
+    const target = this.resolveTargetFacet(mesh, faceId);
+    if (!target) return false;
+
+    const atlas = this.textureAtlasManager.getAtlas(atlasId);
+    if (!atlas) {
+      this.events.onToast?.('Atlas not found.', 'error');
+      return false;
+    }
+    const frame = atlas.frames.find((f) => f.id === frameId || f.name === frameId);
+    if (!frame) {
+      this.events.onToast?.('Tile not found in atlas.', 'error');
+      return false;
+    }
+
+    const beforeSnap = captureMeshSurfaceSnapshot(mesh);
+    remapFacetUVRect(
+      mesh,
+      target.faceIds,
+      target.normal,
+      frame.uMin,
+      frame.uMax,
+      frame.vMin,
+      frame.vMax
+    );
+
+    let finalFaceId = faceId;
+    let isQuad = target.isQuad;
+    if (assignAtlasMaterial) {
+      let atlasMat = this.scene.materials.find(
+        (m): m is PBRMaterial =>
+          m instanceof PBRMaterial && m.metadata && m.metadata.atlasId === atlas.id
+      );
+      if (!atlasMat) {
+        let atlasTex = atlas.texture;
+        if (!atlasTex && atlas.dataUrl) {
+          atlasTex = new Texture(atlas.dataUrl, this.scene, false, true, Texture.NEAREST_SAMPLINGMODE);
+        }
+        atlasMat = new PBRMaterial(`Atlas_${atlas.name}`, this.scene);
+        atlasMat.albedoColor = Color3.White();
+        atlasMat.albedoTexture = atlasTex || null;
+        atlasMat.roughness = 0.85;
+        atlasMat.metallic = 0.0;
+        atlasMat.useAlphaFromAlbedoTexture = false;
+        atlasMat.transparencyMode = PBRMaterial.PBRMATERIAL_OPAQUE;
+        atlasMat.metadata = { atlasId: atlas.id };
+      }
+      const res = this.applyMaterialToTargetFacet(mesh, target.faceIds, atlasMat);
+      finalFaceId = res.newFaceId;
+      isQuad = res.isQuad;
+    } else {
+      this.highlightFace(mesh, finalFaceId);
+    }
+
+    this.recordMeshSurfaceEdit(
+      mesh,
+      assignAtlasMaterial ? 'Assign Atlas Tile to Facet' : 'Map Facet UVs to Atlas Tile',
+      beforeSnap,
+      faceId,
+      finalFaceId
+    );
+    this.events.onSelectionChanged?.(this.selectedNodes, this.selectedMesh, this.selectedSubMeshId);
+    this.events.onFaceSelected?.(finalFaceId, isQuad);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(
+      `Mapped tile "${frame.name}" from "${atlas.name}" onto ${isQuad ? 'quad' : 'face'} #${finalFaceId}.`,
+      'success'
+    );
+    return true;
   }
 
   /* =========================================================================
@@ -5412,7 +6060,7 @@ export class MeshEditorService {
     return { hasAlpha, mode, twoSided, alphaCutOff };
   }
 
-  public applyTriplanarUVs(scale: number = 1.0): void {
+  public applyTriplanarUVs(scaleOrUScale: number = 1.0, vScaleParam?: number): void {
     if (!this.selectedMesh) {
       this.events.onToast?.('Please select a mesh first.', 'warning');
       return;
@@ -5421,6 +6069,9 @@ export class MeshEditorService {
     const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
     const normals = mesh.getVerticesData(VertexBuffer.NormalKind);
     if (!positions || !normals) return;
+
+    const uScale = typeof scaleOrUScale === 'number' && !isNaN(scaleOrUScale) ? scaleOrUScale : 1.0;
+    const vScale = typeof vScaleParam === 'number' && !isNaN(vScaleParam) ? vScaleParam : uScale;
 
     const uvs: number[] = [];
     const count = positions.length / 3;
@@ -5438,17 +6089,17 @@ export class MeshEditorService {
       let v = 0;
 
       if (ny >= nx && ny >= nz) {
-        // Top projection
-        u = x * scale;
-        v = z * scale;
+        // Top projection (XZ)
+        u = x * uScale;
+        v = z * vScale;
       } else if (nx >= ny && nx >= nz) {
-        // Side projection
-        u = z * scale;
-        v = y * scale;
+        // Side projection (ZY)
+        u = z * uScale;
+        v = y * vScale;
       } else {
-        // Front projection
-        u = x * scale;
-        v = y * scale;
+        // Front projection (XY)
+        u = x * uScale;
+        v = y * vScale;
       }
 
       uvs.push(u, v);
@@ -5456,14 +6107,24 @@ export class MeshEditorService {
 
     mesh.setVerticesData(VertexBuffer.UVKind, uvs);
     this.events.onSceneModified?.();
-    this.events.onToast?.('Applied Triplanar UV mapping to mesh!', 'success');
+    this.events.onToast?.(`Applied Triplanar UV mapping to mesh (uScale: ${uScale}, vScale: ${vScale})!`, 'success');
   }
 
-  public applyPlanarUVs(direction: 'top' | 'front' | 'side' = 'top', scale: number = 1.0): void {
-    if (!this.selectedMesh) return;
+  public applyPlanarUVs(
+    direction: 'top' | 'front' | 'side' = 'top',
+    scaleOrUScale: number = 1.0,
+    vScaleParam?: number
+  ): void {
+    if (!this.selectedMesh) {
+      this.events.onToast?.('Please select a mesh first.', 'warning');
+      return;
+    }
     const mesh = this.selectedMesh;
     const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
     if (!positions) return;
+
+    const uScale = typeof scaleOrUScale === 'number' && !isNaN(scaleOrUScale) ? scaleOrUScale : 1.0;
+    const vScale = typeof vScaleParam === 'number' && !isNaN(vScaleParam) ? vScaleParam : uScale;
 
     const uvs: number[] = [];
     const count = positions.length / 3;
@@ -5477,21 +6138,85 @@ export class MeshEditorService {
       let v = 0;
 
       if (direction === 'top') {
-        u = x * scale;
-        v = z * scale;
+        u = x * uScale;
+        v = z * vScale;
       } else if (direction === 'side') {
-        u = z * scale;
-        v = y * scale;
+        u = z * uScale;
+        v = y * vScale;
       } else {
-        u = x * scale;
-        v = y * scale;
+        u = x * uScale;
+        v = y * vScale;
       }
       uvs.push(u, v);
     }
 
     mesh.setVerticesData(VertexBuffer.UVKind, uvs);
     this.events.onSceneModified?.();
-    this.events.onToast?.(`Applied Planar (${direction}) UVs!`, 'success');
+    this.events.onToast?.(`Applied Planar (${direction}) UVs (uScale: ${uScale}, vScale: ${vScale})!`, 'success');
+  }
+
+  public applyCylindricalUVs(scaleOrUScale: number = 1.0, vScaleParam?: number): void {
+    if (!this.selectedMesh) {
+      this.events.onToast?.('Please select a mesh first.', 'warning');
+      return;
+    }
+    const mesh = this.selectedMesh;
+    const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
+    if (!positions) return;
+
+    const uScale = typeof scaleOrUScale === 'number' && !isNaN(scaleOrUScale) ? scaleOrUScale : 1.0;
+    const vScale = typeof vScaleParam === 'number' && !isNaN(vScaleParam) ? vScaleParam : uScale;
+
+    const uvs: number[] = [];
+    const count = positions.length / 3;
+
+    for (let i = 0; i < count; i++) {
+      const x = positions[i * 3];
+      const y = positions[i * 3 + 1];
+      const z = positions[i * 3 + 2];
+
+      const theta = Math.atan2(z, x); // [-PI, PI]
+      const u = ((theta + Math.PI) / (2 * Math.PI)) * uScale;
+      const v = y * vScale;
+      uvs.push(u, v);
+    }
+
+    mesh.setVerticesData(VertexBuffer.UVKind, uvs);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Applied Cylindrical UVs to mesh (uScale: ${uScale}, vScale: ${vScale})!`, 'success');
+  }
+
+  public scaleMeshUVs(
+    scaleOrUScale: number = 1.0,
+    vScaleParam?: number,
+    uOffset: number = 0,
+    vOffset: number = 0
+  ): void {
+    if (!this.selectedMesh) {
+      this.events.onToast?.('Please select a mesh first.', 'warning');
+      return;
+    }
+    const mesh = this.selectedMesh;
+    const uvs = mesh.getVerticesData(VertexBuffer.UVKind);
+    if (!uvs || uvs.length === 0) {
+      this.events.onToast?.('Selected mesh has no UV coordinates to transform.', 'warning');
+      return;
+    }
+
+    const uScale = typeof scaleOrUScale === 'number' && !isNaN(scaleOrUScale) ? scaleOrUScale : 1.0;
+    const vScale = typeof vScaleParam === 'number' && !isNaN(vScaleParam) ? vScaleParam : uScale;
+    const safeUOffset = typeof uOffset === 'number' && !isNaN(uOffset) ? uOffset : 0;
+    const safeVOffset = typeof vOffset === 'number' && !isNaN(vOffset) ? vOffset : 0;
+
+    const newUVs = new Float32Array(uvs.length);
+    for (let i = 0; i < uvs.length; i += 2) {
+      newUVs[i] = uvs[i] * uScale + safeUOffset;
+      newUVs[i + 1] = uvs[i + 1] * vScale + safeVOffset;
+    }
+
+    mesh.setVerticesData(VertexBuffer.UVKind, newUVs);
+    this.events.onSceneModified?.();
+    this.events.onToast?.(`Baked UV transform to mesh (uScale: ${uScale}, vScale: ${vScale})!`, 'success');
   }
 
   public async replaceSelectedTexture(file: File): Promise<void> {

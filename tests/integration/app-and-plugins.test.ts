@@ -517,4 +517,108 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
     expect(helpText).toContain('Snap movement to Move Grid (default: 0.1) or rotation to angle steps (default: 5°)');
     expect(helpText).toContain('Multi-Selection & Scene Tree');
   });
+
+  it('provides uScale and vScale controls in Material & Texture tool and applies them to materials and meshes', () => {
+    app = new MeshEditorApp({ container, engine });
+    const box = app.service.createPrimitive({
+      shape: 'Box',
+      name: 'UVTestBox',
+      size: 1,
+    });
+    app.service.selectMesh(box);
+
+    const mat = app.service.createNewMaterialForSelected('UVBoxMat');
+    expect(mat).not.toBeNull();
+
+    // Verify uvControllers has uScale and vScale
+    expect((app as any).uvControllers['uScale']).toBeDefined();
+    expect((app as any).uvControllers['vScale']).toBeDefined();
+    expect((app as any).uvControllers['uOffset']).toBeDefined();
+    expect((app as any).uvControllers['vOffset']).toBeDefined();
+
+    // Set custom uScale and vScale in uvParams
+    (app as any).uvParams.uScale = 3.5;
+    (app as any).uvParams.vScale = 2.0;
+
+    // Trigger auto-triplanar UV mapping with uScale & vScale
+    (app as any).uvParams.autoTriplanar();
+    let uvs = box.getVerticesData('uv');
+    expect(uvs).toBeDefined();
+    expect(uvs!.length).toBeGreaterThan(0);
+
+    // Trigger cylindrical UV mapping
+    (app as any).uvParams.cylindrical();
+    uvs = box.getVerticesData('uv');
+    expect(uvs).toBeDefined();
+
+    // Trigger baking UV scale to mesh
+    (app as any).uvParams.bakeToMesh();
+    uvs = box.getVerticesData('uv');
+    expect(uvs).toBeDefined();
+  });
+
+  it('controls per-facet UVs and per-facet materials/textures through the Facet & Vertex Editor DOM', () => {
+    app = new MeshEditorApp({ container, engine });
+    const box = app.service.createPrimitive({
+      shape: 'Box',
+      name: 'FacetUITestBox',
+      size: 2,
+      width: 2,
+      height: 2,
+      depth: 2,
+      diameter: 2,
+      thickness: 0.4,
+      subdivisions: 2,
+      tessellation: 16,
+      color: '#4f8cf6',
+      roughness: 0.4,
+      metallic: 0.1,
+    });
+    app.service.createNewMaterialForSelected('UIWallMat');
+
+    // Select quad face 0 via service
+    expect(app.service.selectFace(box, 0)).toBe(true);
+
+    const uvStatus = container.querySelector('#facetUVStatus') as HTMLElement;
+    const matBadge = container.querySelector('#facetMaterialBadge') as HTMLElement;
+    const cornerGrid = container.querySelector('#facetCornerUVGrid') as HTMLElement;
+    expect(uvStatus.textContent).toBe('Quad (4 corners)');
+    expect(matBadge.textContent).toContain('UIWallMat');
+    expect(cornerGrid.querySelectorAll('.facet-corner-u').length).toBe(4);
+
+    // Apply UV Rect via DOM inputs & button
+    const minU = container.querySelector('#facetUVMinU') as HTMLInputElement;
+    const maxU = container.querySelector('#facetUVMaxU') as HTMLInputElement;
+    const minV = container.querySelector('#facetUVMinV') as HTMLInputElement;
+    const maxV = container.querySelector('#facetUVMaxV') as HTMLInputElement;
+    minU.value = '0.2';
+    maxU.value = '0.8';
+    minV.value = '0.25';
+    maxV.value = '0.75';
+    (container.querySelector('#btnFacetApplyUVRect') as HTMLButtonElement).click();
+
+    const updatedUV = app.service.getSelectedFacetUVInfo()!;
+    expect(updatedUV.uMin).toBeCloseTo(0.2, 4);
+    expect(updatedUV.uMax).toBeCloseTo(0.8, 4);
+    expect(updatedUV.vMin).toBeCloseTo(0.25, 4);
+    expect(updatedUV.vMax).toBeCloseTo(0.75, 4);
+
+    // Assign new per-facet color material via DOM controls
+    const colorInput = container.querySelector('#facetNewMatColor') as HTMLInputElement;
+    const nameInput = container.querySelector('#facetNewMatName') as HTMLInputElement;
+    colorInput.value = '#e11d48';
+    nameInput.value = 'RoseFacetMat';
+    (container.querySelector('#btnFacetApplyColorMat') as HTMLButtonElement).click();
+
+    expect(matBadge.textContent).toContain('RoseFacetMat');
+    expect(app.service.getSelectedFacetMaterialInfo()?.materialName).toBe('RoseFacetMat');
+
+    // Toggle Single Triangle mode via DOM checkbox
+    const chkSingleTri = container.querySelector('#chkFacetSingleTri') as HTMLInputElement;
+    chkSingleTri.checked = true;
+    chkSingleTri.dispatchEvent(new Event('change'));
+    expect(app.service.facetSingleTriangleMode).toBe(true);
+    expect(uvStatus.textContent).toBe('Tri (3 corners)');
+    expect(cornerGrid.querySelectorAll('.facet-corner-u').length).toBe(3);
+  });
 });

@@ -485,16 +485,24 @@ export class MeshEditorApp {
   };
 
   private uvParams = {
-    uOffset: 0,
-    vOffset: 0,
     uScale: 1,
     vScale: 1,
+    uOffset: 0,
+    vOffset: 0,
     rotation: 0,
     wrapMode: 'Repeat',
-    autoTriplanar: () => this.service.applyTriplanarUVs(),
-    planarTop: () => this.service.applyPlanarUVs('top'),
-    planarFront: () => this.service.applyPlanarUVs('front'),
-    planarSide: () => this.service.applyPlanarUVs('side'),
+    autoTriplanar: () => this.service.applyTriplanarUVs(this.uvParams.uScale, this.uvParams.vScale),
+    planarTop: () => this.service.applyPlanarUVs('top', this.uvParams.uScale, this.uvParams.vScale),
+    planarFront: () => this.service.applyPlanarUVs('front', this.uvParams.uScale, this.uvParams.vScale),
+    planarSide: () => this.service.applyPlanarUVs('side', this.uvParams.uScale, this.uvParams.vScale),
+    cylindrical: () => this.service.applyCylindricalUVs(this.uvParams.uScale, this.uvParams.vScale),
+    bakeToMesh: () =>
+      this.service.scaleMeshUVs(
+        this.uvParams.uScale,
+        this.uvParams.vScale,
+        this.uvParams.uOffset,
+        this.uvParams.vOffset
+      ),
   };
 
   private createParams = {
@@ -653,6 +661,7 @@ export class MeshEditorApp {
       onSelectionChanged: (nodes, activeMesh, subMeshId) => {
         this.updateMeshGUI();
         this.updateMaterialGUI();
+        this.updateFacetSurfaceUI();
         this.updateOutliner();
         this.updateCSGGUI();
         this.updateSculptUI();
@@ -675,6 +684,7 @@ export class MeshEditorApp {
       onSceneModified: () => {
         this.updateOutliner();
         this.updateMeshGUI();
+        this.updateFacetSurfaceUI();
         this.updateCSGGUI();
         this.updateSculptUI();
         this.updateUVUnwrapUI();
@@ -2702,14 +2712,16 @@ export class MeshEditorApp {
     };
 
     this.service.events.onFaceSelected = (faceId: number | null, isQuad?: boolean) => {
-      if (!badge) return;
-      if (faceId !== null) {
-        badge.textContent = isQuad ? `Quad #${faceId} selected` : `Face #${faceId} selected`;
-        badge.classList.add('active');
-      } else {
-        badge.textContent = this.service.facetEditMode === 'vertex' ? 'No vertex picked' : 'No face picked';
-        badge.classList.remove('active');
+      if (badge) {
+        if (faceId !== null) {
+          badge.textContent = isQuad ? `Quad #${faceId} selected` : `Face #${faceId} selected`;
+          badge.classList.add('active');
+        } else {
+          badge.textContent = this.service.facetEditMode === 'vertex' ? 'No vertex picked' : 'No face picked';
+          badge.classList.remove('active');
+        }
       }
+      this.updateFacetSurfaceUI();
     };
 
     this.service.events.onVertexSelected = (vertexIndex: number | null, pos?: Vector3) => {
@@ -2745,6 +2757,92 @@ export class MeshEditorApp {
     // Initial sync
     updatePickUI();
     updateModeUI(this.service.facetEditMode);
+    this.updateFacetSurfaceUI();
+
+    const chkSingleTri = this.getElement<HTMLInputElement>('chkFacetSingleTri');
+    chkSingleTri?.addEventListener('change', () => {
+      this.service.setFacetSingleTriangleMode(!!chkSingleTri.checked);
+      this.updateFacetSurfaceUI();
+    });
+
+    this.getElement('btnFacetUVFit')?.addEventListener('click', () => {
+      this.service.projectSelectedFacetUVs('fit');
+    });
+    this.getElement('btnFacetUVPlanar')?.addEventListener('click', () => {
+      this.service.projectSelectedFacetUVs('planar');
+    });
+    this.getElement('btnFacetUVRot90')?.addEventListener('click', () => {
+      this.service.transformSelectedFacetUVs({ rotateDeg: 90 });
+    });
+    this.getElement('btnFacetUVFlipU')?.addEventListener('click', () => {
+      this.service.transformSelectedFacetUVs({ flipU: true });
+    });
+    this.getElement('btnFacetUVFlipV')?.addEventListener('click', () => {
+      this.service.transformSelectedFacetUVs({ flipV: true });
+    });
+
+    this.getElement('btnFacetApplyUVRect')?.addEventListener('click', () => {
+      const uMin = parseFloat(this.getElement<HTMLInputElement>('facetUVMinU')?.value ?? '0');
+      const uMax = parseFloat(this.getElement<HTMLInputElement>('facetUVMaxU')?.value ?? '1');
+      const vMin = parseFloat(this.getElement<HTMLInputElement>('facetUVMinV')?.value ?? '0');
+      const vMax = parseFloat(this.getElement<HTMLInputElement>('facetUVMaxV')?.value ?? '1');
+      this.service.setSelectedFacetUVRect(uMin, uMax, vMin, vMax);
+    });
+
+    this.getElement('btnFacetApplyCornerUVs')?.addEventListener('click', () => {
+      const cornerGrid = this.getElement<HTMLElement>('facetCornerUVGrid');
+      if (!cornerGrid) return;
+      const uInputs = Array.from(cornerGrid.querySelectorAll<HTMLInputElement>('.facet-corner-u'));
+      const vInputs = Array.from(cornerGrid.querySelectorAll<HTMLInputElement>('.facet-corner-v'));
+      const pairs: Array<{ u: number; v: number }> = [];
+      for (let i = 0; i < Math.min(uInputs.length, vInputs.length); i++) {
+        pairs.push({
+          u: parseFloat(uInputs[i].value),
+          v: parseFloat(vInputs[i].value),
+        });
+      }
+      this.service.setSelectedFacetCornerUVs(pairs);
+    });
+
+    const atlasSelect = this.getElement<HTMLSelectElement>('facetUVAtlasSelect');
+    atlasSelect?.addEventListener('change', () => {
+      this.renderFacetAtlasTileGrid(atlasSelect.value);
+    });
+
+    this.getElement('btnFacetAssignMaterial')?.addEventListener('click', () => {
+      const matSelect = this.getElement<HTMLSelectElement>('facetMaterialSelect');
+      if (matSelect?.value) {
+        this.service.assignMaterialToSelectedFacet(matSelect.value);
+      }
+    });
+
+    this.getElement('btnFacetApplyColorMat')?.addEventListener('click', () => {
+      const colorInput = this.getElement<HTMLInputElement>('facetNewMatColor');
+      const nameInput = this.getElement<HTMLInputElement>('facetNewMatName');
+      this.service.assignNewColorMaterialToSelectedFacet(
+        colorInput?.value || '#4f8cf6',
+        nameInput?.value
+      );
+    });
+
+    this.getElement('btnFacetApplyEmbeddedTex')?.addEventListener('click', () => {
+      const texSelect = this.getElement<HTMLSelectElement>('facetEmbeddedTexSelect');
+      if (!texSelect?.value) return;
+      const selectedOpt = texSelect.options[texSelect.selectedIndex];
+      this.service.assignTextureToSelectedFacet(texSelect.value, selectedOpt?.textContent || undefined);
+    });
+
+    const texFileInput = this.getElement<HTMLInputElement>('facetTextureFileInput');
+    this.getElement('btnFacetUploadTexture')?.addEventListener('click', () => {
+      texFileInput?.click();
+    });
+    texFileInput?.addEventListener('change', () => {
+      const file = texFileInput.files?.[0];
+      if (file) {
+        this.service.assignTextureToSelectedFacet(file, file.name);
+        texFileInput.value = '';
+      }
+    });
 
     const inputDist = this.getElement<HTMLInputElement>('facetInputDistance');
     inputDist?.addEventListener('input', () => {
@@ -2780,6 +2878,236 @@ export class MeshEditorApp {
     this.getElement('btnFacetSubD')?.addEventListener('click', () => this.facetParams.subDNow());
     this.getElement('btnFacetFlipNormal')?.addEventListener('click', () => this.facetParams.flipNormal());
     this.getElement('btnFacetDelete')?.addEventListener('click', () => this.facetParams.deleteFacet());
+  }
+
+  private renderFacetAtlasTileGrid(selectedAtlasId?: string): void {
+    const grid = this.getElement<HTMLElement>('facetUVAtlasTileGrid');
+    const atlasSelect = this.getElement<HTMLSelectElement>('facetUVAtlasSelect');
+    if (!grid) return;
+
+    const atlases = this.service.textureAtlasManager.getAtlases();
+    const targetId = selectedAtlasId || atlasSelect?.value || atlases[0]?.id;
+    const atlas = atlases.find((a) => a.id === targetId) || atlases[0];
+
+    if (!atlas) {
+      grid.dataset.atlasKey = '';
+      grid.innerHTML = '<div class="tool-sublabel">No texture atlas loaded.</div>';
+      return;
+    }
+
+    const atlasKey = `${atlas.id}:${atlas.frames.length}`;
+    if (grid.dataset.atlasKey === atlasKey && grid.children.length > 0) {
+      return;
+    }
+    grid.dataset.atlasKey = atlasKey;
+    grid.innerHTML = '';
+
+    for (const frame of atlas.frames) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'facet-atlas-tile-btn';
+      btn.dataset.frameId = frame.id;
+      btn.title = `${frame.name} (U: ${frame.uMin.toFixed(2)}..${frame.uMax.toFixed(2)}, V: ${frame.vMin.toFixed(2)}..${frame.vMax.toFixed(2)})`;
+
+      const thumbUrl =
+        frame.thumbnailDataUrl ||
+        this.service.textureAtlasManager.extractFrameDataUrl(atlas.id, frame.id);
+      if (thumbUrl) {
+        const img = document.createElement('img');
+        img.src = thumbUrl;
+        img.alt = frame.name;
+        btn.appendChild(img);
+      }
+
+      const label = document.createElement('span');
+      label.textContent = frame.name;
+      btn.appendChild(label);
+
+      btn.addEventListener('click', () => {
+        const assignMat = !!this.getElement<HTMLInputElement>('chkFacetAtlasAssignMat')?.checked;
+        this.service.assignAtlasTileToSelectedFacet(atlas.id, frame.id, assignMat);
+      });
+
+      grid.appendChild(btn);
+    }
+  }
+
+  private updateFacetSurfaceUI(): void {
+    const chkSingleTri = this.getElement<HTMLInputElement>('chkFacetSingleTri');
+    if (chkSingleTri) {
+      chkSingleTri.checked = this.service.facetSingleTriangleMode;
+    }
+
+    const matInfo = this.service.getSelectedFacetMaterialInfo();
+    const uvInfo = this.service.getSelectedFacetUVInfo();
+    const hasFace = !!matInfo || !!uvInfo;
+
+    const matBadge = this.getElement<HTMLElement>('facetMaterialBadge');
+    if (matBadge) {
+      matBadge.textContent = matInfo ? `Mat: ${matInfo.materialName}` : 'Mat: -';
+      matBadge.title = matInfo ? `Active material: ${matInfo.materialName}` : 'No face picked';
+    }
+
+    const uvStatus = this.getElement<HTMLElement>('facetUVStatus');
+    if (uvStatus) {
+      uvStatus.textContent = uvInfo
+        ? uvInfo.isQuad
+          ? 'Quad (4 corners)'
+          : 'Tri (3 corners)'
+        : 'No face';
+    }
+
+    const slotInfo = this.getElement<HTMLElement>('facetMatSlotInfo');
+    if (slotInfo) {
+      slotInfo.textContent = matInfo
+        ? matInfo.totalSlots > 1
+          ? `Slot ${matInfo.materialIndex + 1}/${matInfo.totalSlots} (Multi)`
+          : 'Slot 1/1 (Single)'
+        : 'No face';
+    }
+
+    const actionBtnIds = [
+      'btnFacetUVFit',
+      'btnFacetUVPlanar',
+      'btnFacetUVRot90',
+      'btnFacetUVFlipU',
+      'btnFacetUVFlipV',
+      'btnFacetApplyUVRect',
+      'btnFacetApplyCornerUVs',
+      'btnFacetAssignMaterial',
+      'btnFacetApplyColorMat',
+      'btnFacetApplyEmbeddedTex',
+      'btnFacetUploadTexture',
+    ];
+    for (const id of actionBtnIds) {
+      const btn = this.getElement<HTMLButtonElement>(id);
+      if (btn) btn.disabled = !hasFace;
+    }
+
+    const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+    const setNumericInput = (id: string, val: number) => {
+      const el = this.getElement<HTMLInputElement>(id);
+      if (!el || activeEl === el) return;
+      el.value = Number(val.toFixed(4)).toString();
+    };
+    setNumericInput('facetUVMinU', uvInfo ? uvInfo.uMin : 0);
+    setNumericInput('facetUVMaxU', uvInfo ? uvInfo.uMax : 1);
+    setNumericInput('facetUVMinV', uvInfo ? uvInfo.vMin : 0);
+    setNumericInput('facetUVMaxV', uvInfo ? uvInfo.vMax : 1);
+
+    const cornerGrid = this.getElement<HTMLElement>('facetCornerUVGrid');
+    if (cornerGrid && (!activeEl || !cornerGrid.contains(activeEl))) {
+      if (!uvInfo || uvInfo.corners.length === 0) {
+        cornerGrid.innerHTML = '<div class="tool-sublabel">Pick a face to inspect corner UVs.</div>';
+      } else {
+        cornerGrid.innerHTML = '';
+        uvInfo.corners.forEach((c, idx) => {
+          const row = document.createElement('div');
+          row.className = 'facet-corner-uv-row';
+
+          const lbl = document.createElement('span');
+          lbl.className = 'facet-corner-uv-label';
+          lbl.textContent = `C${idx}`;
+
+          const uInput = document.createElement('input');
+          uInput.type = 'number';
+          uInput.step = '0.05';
+          uInput.className = 'tool-input facet-uv-num-input facet-corner-u';
+          uInput.value = Number(c.u.toFixed(4)).toString();
+          uInput.title = `Corner ${idx} U`;
+
+          const vInput = document.createElement('input');
+          vInput.type = 'number';
+          vInput.step = '0.05';
+          vInput.className = 'tool-input facet-uv-num-input facet-corner-v';
+          vInput.value = Number(c.v.toFixed(4)).toString();
+          vInput.title = `Corner ${idx} V`;
+
+          row.appendChild(lbl);
+          row.appendChild(uInput);
+          row.appendChild(vInput);
+          cornerGrid.appendChild(row);
+        });
+      }
+    }
+
+    const matSelect = this.getElement<HTMLSelectElement>('facetMaterialSelect');
+    if (matSelect && activeEl !== matSelect) {
+      const editableMats = this.service.getSceneEditableMaterials();
+      const prevVal = matSelect.value;
+      matSelect.innerHTML = '';
+      if (editableMats.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '(No editable materials)';
+        matSelect.appendChild(opt);
+      } else {
+        for (const m of editableMats) {
+          const opt = document.createElement('option');
+          opt.value = m.id || m.name;
+          opt.textContent = m.name || m.id;
+          matSelect.appendChild(opt);
+        }
+        const activeMatKey = matInfo?.material ? matInfo.material.id || matInfo.material.name : '';
+        if (
+          activeMatKey &&
+          editableMats.some((m) => (m.id || m.name) === activeMatKey)
+        ) {
+          matSelect.value = activeMatKey;
+        } else if (prevVal && editableMats.some((m) => (m.id || m.name) === prevVal)) {
+          matSelect.value = prevVal;
+        }
+      }
+    }
+
+    const texSelect = this.getElement<HTMLSelectElement>('facetEmbeddedTexSelect');
+    if (texSelect && activeEl !== texSelect) {
+      const standaloneTex = this.service.getEmbeddedTexturesInfo().filter((t) => !t.isAtlas);
+      const prevTex = texSelect.value;
+      texSelect.innerHTML = '';
+      if (standaloneTex.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '(No scene textures)';
+        texSelect.appendChild(opt);
+      } else {
+        for (const tex of standaloneTex) {
+          const opt = document.createElement('option');
+          opt.value = tex.url;
+          opt.textContent = tex.name;
+          texSelect.appendChild(opt);
+        }
+        if (prevTex && standaloneTex.some((t) => t.url === prevTex)) {
+          texSelect.value = prevTex;
+        }
+      }
+    }
+
+    const atlasSelect = this.getElement<HTMLSelectElement>('facetUVAtlasSelect');
+    if (atlasSelect && activeEl !== atlasSelect) {
+      const atlases = this.service.textureAtlasManager.getAtlases();
+      const prevAtlas = atlasSelect.value;
+      atlasSelect.innerHTML = '';
+      if (atlases.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '(No texture atlas loaded)';
+        atlasSelect.appendChild(opt);
+      } else {
+        for (const atlas of atlases) {
+          const opt = document.createElement('option');
+          opt.value = atlas.id;
+          opt.textContent = `${atlas.name} (${atlas.frames.length} tiles)`;
+          atlasSelect.appendChild(opt);
+        }
+        if (prevAtlas && atlases.some((a) => a.id === prevAtlas)) {
+          atlasSelect.value = prevAtlas;
+        }
+      }
+      this.renderFacetAtlasTileGrid(atlasSelect.value);
+    } else {
+      this.renderFacetAtlasTileGrid();
+    }
   }
 
   private saveDialogLayout(): void {
@@ -3252,21 +3580,21 @@ export class MeshEditorApp {
     fBump.open();
 
     const fUV = this.guiMaterial.addFolder('UV Mapping & Texture');
+    this.uvControllers['uScale'] = fUV
+      .add(this.uvParams, 'uScale', 0.1, 20, 0.05)
+      .name('uScale')
+      .onChange(() => this.applyLiveUVTransform());
+    this.uvControllers['vScale'] = fUV
+      .add(this.uvParams, 'vScale', 0.1, 20, 0.05)
+      .name('vScale')
+      .onChange(() => this.applyLiveUVTransform());
     this.uvControllers['uOffset'] = fUV
       .add(this.uvParams, 'uOffset', -5, 5, 0.05)
-      .name('Offset U')
+      .name('uOffset')
       .onChange(() => this.applyLiveUVTransform());
     this.uvControllers['vOffset'] = fUV
       .add(this.uvParams, 'vOffset', -5, 5, 0.05)
-      .name('Offset V')
-      .onChange(() => this.applyLiveUVTransform());
-    this.uvControllers['uScale'] = fUV
-      .add(this.uvParams, 'uScale', 0.1, 10, 0.05)
-      .name('Tiling U')
-      .onChange(() => this.applyLiveUVTransform());
-    this.uvControllers['vScale'] = fUV
-      .add(this.uvParams, 'vScale', 0.1, 10, 0.05)
-      .name('Tiling V')
+      .name('vOffset')
       .onChange(() => this.applyLiveUVTransform());
     this.uvControllers['rotation'] = fUV
       .add(this.uvParams, 'rotation', -180, 180, 1)
@@ -3280,6 +3608,8 @@ export class MeshEditorApp {
     fUV.add(this.uvParams, 'planarTop').name('Planar Top (XZ)');
     fUV.add(this.uvParams, 'planarFront').name('Planar Front (XY)');
     fUV.add(this.uvParams, 'planarSide').name('Planar Side (ZY)');
+    fUV.add(this.uvParams, 'cylindrical').name('Cylindrical Wrap UV');
+    fUV.add(this.uvParams, 'bakeToMesh').name('Bake UV Scale to Mesh');
     fUV.open();
 
     // 4. Primitive Creation GUI
@@ -4853,9 +5183,23 @@ export class MeshEditorApp {
     const textures: Texture[] = [];
     const baseTex = this.service.getActiveMaterialTexture();
     if (baseTex) textures.push(baseTex);
-    if (mat && (mat instanceof PBRMaterial || mat instanceof StandardMaterial) && mat.bumpTexture instanceof Texture) {
-      if (!textures.includes(mat.bumpTexture)) {
-        textures.push(mat.bumpTexture);
+
+    if (mat) {
+      const candidateKeys = [
+        'albedoTexture',
+        'diffuseTexture',
+        'bumpTexture',
+        'metallicTexture',
+        'ambientTexture',
+        'opacityTexture',
+        'emissiveTexture',
+        'specularTexture',
+      ];
+      for (const k of candidateKeys) {
+        const t = (mat as any)[k];
+        if (t instanceof Texture && !textures.includes(t)) {
+          textures.push(t);
+        }
       }
     }
     if (textures.length === 0) return;
