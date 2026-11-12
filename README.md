@@ -6,7 +6,7 @@
 [![Tests](https://img.shields.io/badge/Vitest%20Integration%20Tests-211%20Passed-brightgreen)](tests/integration/)
 [![Electron](https://img.shields.io/badge/Electron-45.1-47848F?logo=electron)](https://www.electronjs.org/)
 
-A professional, modular 3D model studio and mesh manipulation workbench built with **TypeScript** and **Babylon.js 9.x**. Engineered from the ground up to function across multiple deployment targets through a decoupled **Platform Adapter Architecture**:
+A modular 3D model studio and mesh manipulation workbench built with **TypeScript** and **Babylon.js 9.x**. Engineered from the ground up to function across multiple deployment targets through a decoupled **Platform Adapter Architecture**:
 
 1. **Standalone Web Application** (Full-featured browser 3D studio with local dev server)
 2. **NPM Library & Web Component** (`<mesh-editor>` Custom Element + modular ESM / UMD TypeScript classes)
