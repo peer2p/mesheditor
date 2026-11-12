@@ -1790,15 +1790,19 @@ a:hover {
   color: var(--text-muted);
 }
 
-/* AI Interactive Showcase Simulator */
+/* AI Mesh Agent Real Screenshot Showcase */
 .ai-showcase-box {
   background: var(--bg-dark);
   border: 1px solid rgba(88, 166, 255, 0.35);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-elevated);
   overflow: hidden;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+}
+
+.ai-showcase-screenshot {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .ai-dialog-preview {

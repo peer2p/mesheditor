@@ -91,6 +91,7 @@ import {
   ChevronDown,
   Circle,
   CircleDot,
+  ClipboardPaste,
   Code,
   Combine,
   Compass,
@@ -209,6 +210,7 @@ export const editorIcons = {
   ChevronDown,
   Circle,
   CircleDot,
+  ClipboardPaste,
   Code,
   Combine,
   Compass,
@@ -1080,6 +1082,21 @@ export class MeshEditorApp {
     document.getElementById('btnUngroup')?.addEventListener('click', () => {
       this.closeAllDropdowns();
       this.service.ungroupSelected();
+    });
+    this.getElement('btnCopy')?.addEventListener('click', () => {
+      this.closeAllDropdowns();
+      this.service.copySelected();
+    });
+    this.getElement('btnPaste')?.addEventListener('click', () => {
+      this.closeAllDropdowns();
+      if (this.service.lastPointerX === 0 && this.service.lastPointerY === 0 && this.canvas) {
+        this.service.pasteAtCursor(
+          (this.canvas.clientWidth || this.canvas.width || 800) / 2,
+          (this.canvas.clientHeight || this.canvas.height || 600) / 2
+        );
+      } else {
+        this.service.pasteAtCursor();
+      }
     });
     document.getElementById('btnDeleteSelected')?.addEventListener('click', () => {
       this.closeAllDropdowns();

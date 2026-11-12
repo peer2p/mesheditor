@@ -458,6 +458,37 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
     expect(mergeCalled).toBe(true);
   });
 
+  it('renders btnCopy and btnPaste in Actions menu and triggers service copy/paste', () => {
+    app = new MeshEditorApp({
+      container,
+      engine,
+      layoutMode: 'floating',
+    });
+
+    const btnCopy = container.querySelector('#btnCopy') as HTMLButtonElement | null;
+    const btnPaste = container.querySelector('#btnPaste') as HTMLButtonElement | null;
+    expect(btnCopy).not.toBeNull();
+    expect(btnPaste).not.toBeNull();
+    expect(btnCopy?.textContent).toContain('Copy');
+    expect(btnPaste?.textContent).toContain('Paste');
+
+    let copyCalled = false;
+    let pasteCalled = false;
+    (app.service as any).copySelected = () => {
+      copyCalled = true;
+    };
+    (app.service as any).pasteAtCursor = () => {
+      pasteCalled = true;
+      return [];
+    };
+
+    btnCopy?.click();
+    expect(copyCalled).toBe(true);
+
+    btnPaste?.click();
+    expect(pasteCalled).toBe(true);
+  });
+
   it('switches gizmos via toolbar buttons without deselecting meshes and displays updated help modal with snapping and selection', () => {
     app = new MeshEditorApp({
       container,
