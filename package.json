@@ -1,6 +1,6 @@
 {
   "name": "mesheditor",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Mesh Editor can create, edit and convert 3D meshes in common formats. Usable as (Standalone, Web Component / NPM Library, and macOS/Windows/Linux Desktop App)",
   "private": false,
   "main": "dist-lib/index.umd.js",

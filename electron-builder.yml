@@ -54,6 +54,9 @@ mac:
   category: public.app-category.graphics-design
   icon: build/icon.icns
   darkModeSupport: true
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
   target:
     - target: dmg
       arch:

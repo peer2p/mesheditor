@@ -713,6 +713,20 @@ npm run desktop:build:linux
 npm run desktop:build:all
 ```
 
+> [!NOTE]
+> **macOS Gatekeeper & Apple Silicon Signing Note**:
+> Because the application is distributed as an open-source binary without an Apple Developer ID certificate (\$99/yr), macOS attaches the `com.apple.quarantine` extended attribute to files downloaded via web browsers. On macOS Sonoma/Sequoia, Gatekeeper will report:
+> *"Mesh Editor.app is damaged and can't be opened. You should move it to the Trash."*
+>
+> To resolve this and open the app:
+> 1. **Terminal Command (Instant Fix)**:
+>    ```bash
+>    xattr -cr "/Applications/Mesh Editor.app"
+>    ```
+>    *(Or `xattr -cr ~/Downloads/"Mesh Editor.app"` if running directly from Downloads).*
+> 2. **System Settings**: Go to **System Settings > Privacy & Security**, scroll to the **Security** section, and click **"Open Anyway"**.
+> 3. **Ad-Hoc Signing**: In `electron-builder.yml`, `identity: "-"` is explicitly configured to sign the entire bundle structure ad-hoc, ensuring Mach-O binary validation and sealed resources pass verification on Apple Silicon.
+
 ---
 
 ## Testing Architecture & Test Suites

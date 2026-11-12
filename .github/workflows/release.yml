@@ -186,6 +186,14 @@ jobs:
             ### 🌐 Web & NPM Library
             - **Standalone Web Application**: `MeshEditor-*-standalone-web.zip` (Ready to host on any static web server)
             - **Web Component & Library Bundle**: `MeshEditor-*-webcomponent-lib.zip` & `mesheditor-*.tgz` (`npm install ./mesheditor-*.tgz`)
+
+            ---
+            > [!TIP]
+            > **macOS Gatekeeper Note**: Because this open-source build is distributed without a paid Apple Developer certificate, macOS may show a warning that the app *"is damaged and can't be opened"* due to the browser quarantine attribute. To run the app, open Terminal and execute:
+            > ```bash
+            > xattr -cr "/Applications/Mesh Editor.app"
+            > ```
+            > Or navigate to **System Settings > Privacy & Security** and click **"Open Anyway"**.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
