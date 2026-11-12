@@ -968,10 +968,13 @@ export class TextureBaker {
     for (let i = 0; i < bmp.length; i += chunk) {
       binary += String.fromCharCode(...bmp.subarray(i, i + chunk));
     }
+    const nodeBuffer = (globalThis as unknown as { Buffer?: { from(data: Uint8Array): { toString(enc: string): string } } }).Buffer;
     const b64 =
       typeof btoa === 'function'
         ? btoa(binary)
-        : Buffer.from(bmp).toString('base64');
+        : nodeBuffer
+          ? nodeBuffer.from(bmp).toString('base64')
+          : '';
     return `data:image/bmp;base64,${b64}`;
   }
 

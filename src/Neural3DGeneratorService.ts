@@ -1695,8 +1695,9 @@ export class Neural3DGeneratorService {
   }
 
   public static decodeBase64(b64: string): Uint8Array {
-    if (typeof Buffer !== 'undefined') {
-      return new Uint8Array(Buffer.from(b64, 'base64'));
+    const nodeBuffer = (globalThis as unknown as { Buffer?: { from(data: string, encoding: string): ArrayLike<number> } }).Buffer;
+    if (typeof nodeBuffer !== 'undefined') {
+      return new Uint8Array(nodeBuffer.from(b64, 'base64'));
     }
     const binStr = atob(b64);
     const bytes = new Uint8Array(binStr.length);
