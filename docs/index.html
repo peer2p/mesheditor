@@ -107,10 +107,20 @@
             </div>
 
             <!-- Jumbotron Slide Display -->
-            <div class="hero-carousel-viewport" id="heroCarouselViewport" role="region" aria-label="3D Model Screenshots Showcase">
-              <div class="hero-carousel-slides" id="heroCarouselSlides">
+            <div class="hero-carousel-viewport" id="heroCarouselViewport" role="region" aria-roledescription="carousel" aria-label="3D Model Screenshots Showcase">
+              <!-- Carousel Edge Navigation Controls -->
+              <button type="button" class="hero-carousel-arrow hero-arrow-prev" id="btnHeroPrev" aria-label="Previous Slide" title="Previous model screenshot">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <button type="button" class="hero-carousel-arrow hero-arrow-next" id="btnHeroNext" aria-label="Next Slide" title="Next model screenshot">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+
+              <div class="hero-carousel-slides" id="heroCarouselSlides" tabindex="0" role="group" aria-label="Slides">
                 <!-- Slides will be rendered dynamically -->
               </div>
+
+              <p class="visually-hidden" id="heroCarouselStatus" role="status" aria-live="polite"></p>
 
               <!-- Click for 3D Overlay Badge on Hover -->
               <div class="hero-hover-overlay">
@@ -125,30 +135,22 @@
                 </div>
               </div>
 
-              <!-- Carousel Edge Navigation Controls -->
-              <button type="button" class="hero-carousel-arrow hero-arrow-prev" id="btnHeroPrev" aria-label="Previous Slide" title="Previous model screenshot">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-              </button>
-              <button type="button" class="hero-carousel-arrow hero-arrow-next" id="btnHeroNext" aria-label="Next Slide" title="Next model screenshot">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
-              </button>
-
               <!-- Jumbotron Bottom Bar -->
               <div class="hero-carousel-bar">
                 <div class="hero-slide-info">
-                  <span class="hero-slide-index" id="heroSlideIndex">1 / 10</span>
+                  <span class="hero-slide-index" id="heroSlideIndex">1 / 11</span>
                   <div class="hero-slide-desc-wrap">
                     <span class="hero-slide-title" id="heroBarTitle">Ancient Fluted Pillar</span>
                     <span class="hero-slide-sub" id="heroBarSub">Procedural Fluted Column &amp; Marble PBR</span>
                   </div>
                 </div>
 
-                <div class="hero-carousel-indicators" id="heroCarouselDots">
+                <nav class="hero-carousel-indicators" id="heroCarouselDots" aria-label="Choose a slide">
                   <!-- Dots generated dynamically -->
-                </div>
+                </nav>
 
                 <div class="hero-carousel-actions">
-                  <button type="button" class="hero-play-btn" id="btnHeroPlayPause" aria-label="Pause Slideshow" title="Pause / Play Slideshow">
+                  <button type="button" class="hero-play-btn" id="btnHeroPlayPause" aria-label="Pause Slideshow" title="Pause Slideshow">
                     <svg id="heroPlayIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
                   </button>
                 </div>
@@ -1658,9 +1660,15 @@
       }
     ];
 
+    const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     let currentSlide = 0;
-    let isAutoplayActive = true;
+    let settledSlide = 0;
+    let pendingTarget = null;
+    let pendingAnnounce = false;
+    let isAutoplayActive = !reducedMotionQuery.matches;
     let autoplayTimer = null;
+    let scrollRafId = null;
+    let scrollSettleFallbackTimer = null;
     const AUTOPLAY_INTERVAL = 4500;
 
     // Carousel DOM Elements
@@ -1674,16 +1682,26 @@
     const btnHeroPlayPause = document.getElementById('btnHeroPlayPause');
     const heroCarouselViewport = document.getElementById('heroCarouselViewport');
     const heroOpen3dTrigger = document.getElementById('heroOpen3dTrigger');
+    const heroCarouselStatus = document.getElementById('heroCarouselStatus');
+
+    const slideElements = [];
+    const slideImages = [];
+    const dotElements = [];
 
     // Build Carousel Slides & Indicator Dots
     SHOWCASE_ITEMS.forEach((item, idx) => {
-      // Slide container
       const slide = document.createElement('div');
       slide.className = 'hero-slide' + (idx === 0 ? ' active' : '');
+      slide.setAttribute('role', 'group');
+      slide.setAttribute('aria-roledescription', 'slide');
+      slide.setAttribute('aria-label', `${idx + 1} of ${SHOWCASE_ITEMS.length}`);
       slide.setAttribute('data-index', idx);
+      slide.setAttribute('data-marker-name', `Go to slide ${idx + 1}: ${item.title}`);
+
       const img = document.createElement('img');
       img.src = item.screenshot;
       img.alt = item.title + ' — Mesh Editor 3D Model Studio';
+      img.decoding = 'async';
       if (idx === 0) {
         img.loading = 'eager';
         img.fetchPriority = 'high';
@@ -1692,53 +1710,166 @@
       }
       slide.appendChild(img);
       heroSlidesContainer.appendChild(slide);
+      slideElements.push(slide);
+      slideImages.push(img);
 
       // Indicator Dot
       const dot = document.createElement('button');
       dot.type = 'button';
       dot.className = 'carousel-dot' + (idx === 0 ? ' active' : '');
       dot.setAttribute('aria-label', `Go to slide ${idx + 1}: ${item.title}`);
+      if (idx === 0) {
+        dot.setAttribute('aria-current', 'true');
+      }
       dot.addEventListener('click', (e) => {
         e.stopPropagation();
-        goToSlide(idx);
+        goToSlide(idx, true);
       });
       heroDotsContainer.appendChild(dot);
+      dotElements.push(dot);
     });
 
-    function updateSlideDisplay() {
-      const slides = heroSlidesContainer.querySelectorAll('.hero-slide');
-      const dots = heroDotsContainer.querySelectorAll('.carousel-dot');
-      slides.forEach((s, idx) => {
-        s.classList.toggle('active', idx === currentSlide);
+    function preloadSlideImage(idx) {
+      const normalized = (idx + SHOWCASE_ITEMS.length) % SHOWCASE_ITEMS.length;
+      const img = slideImages[normalized];
+      if (!img) return;
+      if (img.loading !== 'eager') {
+        img.loading = 'eager';
+      }
+      if (typeof img.decode === 'function' && img.complete) {
+        img.decode().catch(() => {});
+      }
+    }
+
+    // Preload remaining slide images once initial page load completes to eliminate decode flashes
+    window.addEventListener('load', () => {
+      slideImages.forEach((_, idx) => {
+        if (idx > 0) preloadSlideImage(idx);
       });
-      dots.forEach((d, idx) => {
-        d.classList.toggle('active', idx === currentSlide);
+    }, { once: true });
+
+    function updateActiveUI(index) {
+      if (index === currentSlide && heroSlideIndex.textContent === `${index + 1} / ${SHOWCASE_ITEMS.length}`) {
+        return;
+      }
+      currentSlide = index;
+      slideElements.forEach((s, idx) => {
+        s.classList.toggle('active', idx === index);
+      });
+      dotElements.forEach((d, idx) => {
+        const isCurrent = idx === index;
+        d.classList.toggle('active', isCurrent);
+        if (isCurrent) {
+          d.setAttribute('aria-current', 'true');
+        } else {
+          d.removeAttribute('aria-current');
+        }
       });
 
-      const currentItem = SHOWCASE_ITEMS[currentSlide];
+      const currentItem = SHOWCASE_ITEMS[index];
       heroShowcaseTitle.textContent = currentItem.title;
       heroBarTitle.textContent = currentItem.title;
       heroBarSub.textContent = currentItem.sub;
-      heroSlideIndex.textContent = `${currentSlide + 1} / ${SHOWCASE_ITEMS.length}`;
+      heroSlideIndex.textContent = `${index + 1} / ${SHOWCASE_ITEMS.length}`;
     }
 
-    function goToSlide(idx) {
-      currentSlide = (idx + SHOWCASE_ITEMS.length) % SHOWCASE_ITEMS.length;
-      updateSlideDisplay();
+    function getNearestSlideIndex() {
+      const width = heroSlidesContainer.clientWidth;
+      if (!width) return currentSlide;
+      return Math.max(0, Math.min(SHOWCASE_ITEMS.length - 1, Math.round(heroSlidesContainer.scrollLeft / width)));
     }
 
-    function nextSlide() {
-      goToSlide(currentSlide + 1);
+    function handleScrollSettled() {
+      const settled = pendingTarget !== null ? pendingTarget : getNearestSlideIndex();
+      pendingTarget = null;
+      updateActiveUI(settled);
+      preloadSlideImage(settled + 1);
+      if (pendingAnnounce && settled !== settledSlide) {
+        const item = SHOWCASE_ITEMS[settled];
+        heroCarouselStatus.textContent = `Slide ${settled + 1} of ${SHOWCASE_ITEMS.length}: ${item.title}`;
+      }
+      pendingAnnounce = false;
+      settledSlide = settled;
     }
 
-    function prevSlide() {
-      goToSlide(currentSlide - 1);
+    heroSlidesContainer.addEventListener('scroll', () => {
+      if (pendingTarget === null) {
+        if (!scrollRafId) {
+          scrollRafId = requestAnimationFrame(() => {
+            scrollRafId = null;
+            const nearest = getNearestSlideIndex();
+            if (nearest !== currentSlide) {
+              updateActiveUI(nearest);
+            }
+          });
+        }
+      }
+      if (!('onscrollend' in window)) {
+        clearTimeout(scrollSettleFallbackTimer);
+        scrollSettleFallbackTimer = setTimeout(() => {
+          pendingAnnounce = true;
+          handleScrollSettled();
+        }, 120);
+      }
+    }, { passive: true });
+
+    heroSlidesContainer.addEventListener('pointerdown', () => {
+      pendingTarget = null;
+    }, { passive: true });
+
+    heroSlidesContainer.addEventListener('wheel', () => {
+      pendingTarget = null;
+    }, { passive: true });
+
+    if ('onscrollend' in window) {
+      heroSlidesContainer.addEventListener('scrollend', handleScrollSettled);
+    }
+
+    function goToSlide(idx, userInitiated = false) {
+      const targetIdx = (idx + SHOWCASE_ITEMS.length) % SHOWCASE_ITEMS.length;
+      preloadSlideImage(targetIdx);
+      preloadSlideImage(targetIdx + 1);
+      pendingTarget = targetIdx;
+      pendingAnnounce = userInitiated;
+      updateActiveUI(targetIdx);
+
+      const targetLeft = targetIdx * heroSlidesContainer.clientWidth;
+      heroSlidesContainer.scrollTo({
+        left: targetLeft,
+        behavior: reducedMotionQuery.matches ? 'auto' : 'smooth'
+      });
+
+      if (reducedMotionQuery.matches || Math.abs(heroSlidesContainer.scrollLeft - targetLeft) < 1) {
+        handleScrollSettled();
+      }
+    }
+
+    function nextSlide(userInitiated = false) {
+      const base = pendingTarget !== null ? pendingTarget : currentSlide;
+      goToSlide(base + 1, userInitiated);
+    }
+
+    function prevSlide(userInitiated = false) {
+      const base = pendingTarget !== null ? pendingTarget : currentSlide;
+      goToSlide(base - 1, userInitiated);
+    }
+
+    function syncPlayPauseButton() {
+      if (isAutoplayActive) {
+        heroPlayIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
+        btnHeroPlayPause.setAttribute('aria-label', 'Pause Slideshow');
+        btnHeroPlayPause.setAttribute('title', 'Pause Slideshow');
+      } else {
+        heroPlayIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+        btnHeroPlayPause.setAttribute('aria-label', 'Play Slideshow');
+        btnHeroPlayPause.setAttribute('title', 'Play Slideshow');
+      }
     }
 
     function startAutoplay() {
       stopAutoplay();
-      if (isAutoplayActive) {
-        autoplayTimer = setInterval(nextSlide, AUTOPLAY_INTERVAL);
+      if (isAutoplayActive && !document.hidden) {
+        autoplayTimer = setInterval(() => nextSlide(false), AUTOPLAY_INTERVAL);
       }
     }
 
@@ -1751,22 +1882,21 @@
 
     document.getElementById('btnHeroPrev').addEventListener('click', (e) => {
       e.stopPropagation();
-      prevSlide();
+      prevSlide(true);
     });
 
     document.getElementById('btnHeroNext').addEventListener('click', (e) => {
       e.stopPropagation();
-      nextSlide();
+      nextSlide(true);
     });
 
     btnHeroPlayPause.addEventListener('click', (e) => {
       e.stopPropagation();
       isAutoplayActive = !isAutoplayActive;
+      syncPlayPauseButton();
       if (isAutoplayActive) {
-        heroPlayIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
         startAutoplay();
       } else {
-        heroPlayIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
         stopAutoplay();
       }
     });
@@ -1776,10 +1906,32 @@
       if (isAutoplayActive) startAutoplay();
     });
 
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopAutoplay();
+      } else if (isAutoplayActive && !babylonModal.classList.contains('active')) {
+        startAutoplay();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      heroSlidesContainer.scrollTo({
+        left: currentSlide * heroSlidesContainer.clientWidth,
+        behavior: 'auto'
+      });
+    });
+
+    syncPlayPauseButton();
     startAutoplay();
 
-    // Trigger Babylon 3D Preview modal on viewport click or button
-    heroCarouselViewport.addEventListener('click', () => {
+    let pointerDownX = 0;
+    heroCarouselViewport.addEventListener('pointerdown', (e) => {
+      pointerDownX = e.clientX;
+    });
+
+    // Trigger Babylon 3D Preview modal on viewport click or button (skip if user dragged to scroll)
+    heroCarouselViewport.addEventListener('click', (e) => {
+      if (Math.abs(e.clientX - pointerDownX) > 8) return;
       openBabylonModal(currentSlide);
     });
 
