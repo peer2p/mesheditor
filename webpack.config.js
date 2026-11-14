@@ -31,6 +31,18 @@ module.exports = (env, argv) => {
           directory: path.resolve(__dirname, 'dist'),
         },
         {
+          directory: path.resolve(__dirname, 'docs'),
+          publicPath: '/',
+        },
+        {
+          directory: path.resolve(__dirname, 'docs/models'),
+          publicPath: '/models',
+        },
+        {
+          directory: path.resolve(__dirname, 'docs/screenshots'),
+          publicPath: '/screenshots',
+        },
+        {
           directory: path.resolve(__dirname, 'src/promptImages'),
           publicPath: '/promptImages',
         },
@@ -39,12 +51,12 @@ module.exports = (env, argv) => {
           publicPath: '/src/promptImages',
         },
         {
-          directory: path.resolve(__dirname, 'docs/screenshots'),
-          publicPath: '/screenshots',
-        },
-        {
           directory: path.resolve(__dirname, 'src/assets'),
           publicPath: '/assets',
+        },
+        {
+          directory: path.resolve(__dirname, 'dist-lib/standalone'),
+          publicPath: '/',
         },
       ],
       client: {
@@ -121,6 +133,13 @@ module.exports = (env, argv) => {
         filename: 'index.html',
         chunks: ['mesheditor'],
         title: 'Mesh Editor',
+      }),
+      new HtmlWebpackPlugin({
+        template: path.resolve(__dirname, 'docs/webcomponent-example.html'),
+        filename: 'webcomponent-example.html',
+        chunks: ['mesheditor'],
+        inject: 'head',
+        scriptLoading: 'defer',
       }),
       new CopyWebpackPlugin({
         patterns: [

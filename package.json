@@ -27,7 +27,7 @@
     "dev": "webpack serve --mode development",
     "ai:bridge": "node scripts/antigravity-bridge.js",
     "build": "webpack --mode production",
-    "build:pages": "npm run build && node scripts/prepare-pages.js",
+    "build:pages": "npm run build:lib:bundle && npm run build && node scripts/prepare-pages.js",
     "build:dev": "webpack --mode development",
     "prod": "webpack serve --mode production --port 8080",
     "sync:skills": "node scripts/sync-skills.js",

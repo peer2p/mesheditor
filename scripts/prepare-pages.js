@@ -19,8 +19,13 @@ if (fs.existsSync(distIndex)) {
 }
 
 // 2. Copy docs/* to dist/ (marketing landing page at dist/index.html)
+// Note: Exclude webcomponent-example.html so webpack's compiled version with chunk scripts is preserved
 if (fs.existsSync(docsDir)) {
-  fs.cpSync(docsDir, distDir, { recursive: true, force: true });
+  fs.cpSync(docsDir, distDir, {
+    recursive: true,
+    force: true,
+    filter: (src) => !src.endsWith('webcomponent-example.html'),
+  });
   console.log('[prepare-pages] Copied docs/* -> dist/ (Marketing Landing Page at root)');
 }
 

@@ -830,34 +830,74 @@ import 'mesheditor/style.css';</code></pre>
        ========================================================================= -->
   <script>
     (function() {
-      // Step 1: Dynamic fallback bundle loader (supports both root and docs/ paths)
-      function loadBundle() {
-        const primarySrc = './mesheditor-element.bundle.js';
-        const fallbackSrc = '../dist-lib/standalone/mesheditor-element.bundle.js';
+      let isBootstrapped = false;
 
-        const script = document.createElement('script');
-        script.src = primarySrc;
-        script.onload = () => {
-          logEvent('bundle-loaded', `Loaded ${primarySrc}`);
+      function start() {
+        if (isBootstrapped) return;
+
+        if (customElements.get('mesh-editor')) {
+          isBootstrapped = true;
+          logEvent('bundle-ready', '<mesh-editor> custom element registered');
           bootstrapDemo();
-        };
-        script.onerror = () => {
-          console.warn(`[HostDemo] ${primarySrc} not found, trying ${fallbackSrc}`);
-          const altScript = document.createElement('script');
-          altScript.src = fallbackSrc;
-          altScript.onload = () => {
-            logEvent('bundle-loaded', `Loaded ${fallbackSrc}`);
+          return;
+        }
+
+        // Wait for custom element definition (from deferred webpack scripts or standalone bundle)
+        customElements.whenDefined('mesh-editor').then(() => {
+          if (!isBootstrapped) {
+            isBootstrapped = true;
+            logEvent('bundle-ready', '<mesh-editor> custom element registered');
             bootstrapDemo();
-          };
-          altScript.onerror = () => {
-            logEvent('error', 'Could not load standalone bundle. Please ensure build:lib has run.');
-          };
-          document.head.appendChild(altScript);
-        };
-        document.head.appendChild(script);
+          }
+        });
+
+        // Fallback: If not registered after 400ms, search fallback paths
+        setTimeout(() => {
+          if (!customElements.get('mesh-editor') && !isBootstrapped) {
+            loadFallbackBundle();
+          }
+        }, 400);
       }
 
-      loadBundle();
+      function loadFallbackBundle() {
+        const candidatePaths = [
+          './mesheditor-element.bundle.js',
+          '../dist/mesheditor-element.bundle.js',
+          '../dist-lib/standalone/mesheditor-element.bundle.js',
+        ];
+
+        let index = 0;
+        function tryNext() {
+          if (index >= candidatePaths.length) {
+            logEvent('info', 'Waiting for deferred scripts to register <mesh-editor>...');
+            return;
+          }
+          const src = candidatePaths[index++];
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = () => {
+            logEvent('bundle-loaded', `Loaded ${src}`);
+            customElements.whenDefined('mesh-editor').then(() => {
+              if (!isBootstrapped) {
+                isBootstrapped = true;
+                bootstrapDemo();
+              }
+            });
+          };
+          script.onerror = () => {
+            tryNext();
+          };
+          document.head.appendChild(script);
+        }
+
+        tryNext();
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+      } else {
+        start();
+      }
     })();
 
     // Global references
@@ -997,8 +1037,8 @@ import 'mesheditor/style.css';</code></pre>
       editorEl = document.getElementById('meshEditor');
       if (!editorEl) return;
 
-      // 1. Listen for editor-ready event
-      editorEl.addEventListener('editor-ready', async (event) => {
+      // 1. Handle editor-ready event (or trigger immediately if already mounted)
+      const onEditorReady = async () => {
         logEvent('editor-ready', 'Mesh Editor mounted successfully');
         const overlay = document.getElementById('editorLoadingOverlay');
         if (overlay) overlay.classList.add('is-hidden');
@@ -1010,7 +1050,13 @@ import 'mesheditor/style.css';</code></pre>
         } catch (err) {
           console.error('[HostDemo] Failed to register plugin:', err);
         }
-      });
+      };
+
+      if (editorEl.app) {
+        onEditorReady();
+      } else {
+        editorEl.addEventListener('editor-ready', onEditorReady, { once: true });
+      }
 
       // 2. Listen for model-loaded event
       editorEl.addEventListener('model-loaded', (event) => {
