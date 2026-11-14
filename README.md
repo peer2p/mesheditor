@@ -519,11 +519,26 @@ flowchart TD
 
 ### Using `<mesh-editor>` Custom Element
 
-Install the package:
+#### Installation via NPM
+
+You can install Mesh Editor via NPM in multiple ways:
 
 ```bash
+# 1. Direct install from GitHub Release tarball (No npm registry needed):
+npm install https://github.com/peer2p/mesheditor/releases/download/v1.0.1/mesheditor-1.0.1.tgz
+
+# 2. From local downloaded tarball:
+npm install ./mesheditor-1.0.1.tgz
+
+# 3. From extracted release directory:
+npm install ./MeshEditor-1.0.1-webcomponent-lib
+
+# 4. Standard registry install (once published to npmjs):
 npm install mesheditor
 ```
+
+> [!TIP]
+> **Live Integration Example**: Check out the interactive [Host Application & Plugin Integration Demo](https://peer2p.github.io/mesheditor/webcomponent-example.html) (or locally in `docs/webcomponent-example.html`) showcasing live plugins, telemetry, and two-way host communication.
 
 Import and embed `<mesh-editor>` anywhere in your HTML application:
 

@@ -31,5 +31,16 @@ if (fs.existsSync(promptImagesSrc)) {
   console.log('[prepare-pages] Copied src/promptImages -> dist/promptImages');
 }
 
+// 4. Ensure standalone Web Component bundle is available in dist/ for web component demo
+const standaloneBundleSrc = path.join(rootDir, 'dist-lib', 'standalone', 'mesheditor-element.bundle.js');
+if (fs.existsSync(standaloneBundleSrc)) {
+  fs.copyFileSync(standaloneBundleSrc, path.join(distDir, 'mesheditor-element.bundle.js'));
+  const standaloneMapSrc = path.join(rootDir, 'dist-lib', 'standalone', 'mesheditor-element.bundle.js.map');
+  if (fs.existsSync(standaloneMapSrc)) {
+    fs.copyFileSync(standaloneMapSrc, path.join(distDir, 'mesheditor-element.bundle.js.map'));
+  }
+  console.log('[prepare-pages] Copied standalone Web Component bundle -> dist/mesheditor-element.bundle.js');
+}
+
 console.log('[prepare-pages] Successfully prepared GitHub Pages artifact in dist/');
 

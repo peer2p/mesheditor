@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mesh Editor Web Component & Plugin Integration Demo</title>
+  <link rel="icon" type="image/svg+xml" href="app-icon.svg">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    :root {
+      --host-bg: #0b0e14;
+      --host-card: #151b23;
+      --host-border: rgba(255, 255, 255, 0.12);
+      --host-accent: #38bdf8;
+      --host-accent-hover: #7dd3fc;
+      --host-success: #22c55e;
+      --host-warning: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--host-bg);
+      color: #f0f6fc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* =========================================================================
+       HOST APPLICATION TOP NAVBAR
+       ========================================================================= */
+    .host-navbar {
+      height: 52px;
+      background: #111620;
+      border-bottom: 1px solid var(--host-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+
+    .host-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .host-badge {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: var(--host-accent);
+      border-radius: 4px;
+    }
+
+    .host-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .host-title span {
+      color: #8b949e;
+      font-weight: 400;
+      font-size: 13px;
+    }
+
+    .host-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .host-btn {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--host-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: #f0f6fc;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .host-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .host-btn-primary {
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: #ffffff;
+    }
+
+    .host-btn-primary:hover {
+      background: #0369a1;
+      border-color: #7dd3fc;
+    }
+
+    .host-btn-success {
+      background: #15803d;
+      border-color: #22c55e;
+      color: #ffffff;
+    }
+
+    .host-btn-success:hover {
+      background: #166534;
+    }
+
+    .host-select {
+      background: #1a2230;
+      border: 1px solid var(--host-border);
+      color: #f0f6fc;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* =========================================================================
+       THREE-COLUMN HOST WORKSPACE
+       ========================================================================= */
+    .host-workspace {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 52px);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left Sidebar: Host Asset Repository & Telemetry */
+    .host-sidebar-left {
+      width: 320px;
+      background: var(--host-card);
+      border-right: 1px solid var(--host-border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow-y: auto;
+      z-index: 20;
+    }
+
+    /* Center: Web Component Viewport */
+    .host-viewport-main {
+      flex: 1;
+      position: relative;
+      height: 100%;
+      background: #05070a;
+      overflow: hidden;
+      display: flex;
+    }
+
+    /* Right Sidebar: Active Plugins & Code Inspector */
+    .host-sidebar-right {
+      width: 360px;
+      background: var(--host-card);
+      border-left: 1px solid var(--host-border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow-y: auto;
+      z-index: 20;
+    }
+
+    .panel-section {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #8b949e;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Asset Grid in Host CMS */
+    .asset-item-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .asset-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .asset-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .asset-thumb {
+      width: 48px;
+      height: 48px;
+      border-radius: 6px;
+      background: #000;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      flex-shrink: 0;
+    }
+
+    .asset-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .asset-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .asset-type {
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 4px;
+    }
+
+    .asset-btn-row {
+      display: flex;
+      gap: 4px;
+    }
+
+    .asset-btn {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 7px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.06);
+      color: #e2e8f0;
+      cursor: pointer;
+    }
+
+    .asset-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    /* Live Telemetry Cards */
+    .stat-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .stat-card {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #8b949e;
+      margin-bottom: 2px;
+    }
+
+    .stat-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--host-accent);
+    }
+
+    /* Event Stream Log */
+    .event-log-box {
+      background: #090d12;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      height: 140px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 4px;
+    }
+
+    .event-entry {
+      color: #8b949e;
+      line-height: 1.4;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+      padding-bottom: 2px;
+    }
+
+    .event-tag {
+      color: var(--host-accent);
+      font-weight: 600;
+    }
+
+    .event-time {
+      color: #64748b;
+      margin-right: 4px;
+    }
+
+    /* Plugin Showcase Cards */
+    .plugin-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .plugin-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .plugin-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #38bdf8;
+    }
+
+    .plugin-desc {
+      font-size: 11px;
+      color: #94a3b8;
+      line-height: 1.4;
+      margin-bottom: 10px;
+    }
+
+    .plugin-features {
+      font-size: 11px;
+      color: #cbd5e1;
+      padding-left: 16px;
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+
+    /* Tabbed Code Inspector */
+    .tab-bar {
+      display: flex;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      margin-bottom: 10px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 10px;
+      background: transparent;
+      border: none;
+      color: #8b949e;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn.active {
+      color: var(--host-accent);
+      border-bottom-color: var(--host-accent);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .code-box {
+      background: #090d12;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      color: #cbd5e1;
+      line-height: 1.5;
+      overflow-x: auto;
+      max-height: 250px;
+    }
+
+    /* The Embedded Web Component */
+    mesh-editor {
+      display: block;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* Loading Overlay until Web Component is ready */
+    .editor-loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: #0b0e14;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      z-index: 10;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .editor-loading-overlay.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(56, 189, 248, 0.2);
+      border-top-color: var(--host-accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- =========================================================================
+       1. HOST APPLICATION TOP BAR
+       ========================================================================= -->
+  <header class="host-navbar">
+    <div class="host-brand">
+      <span class="host-badge">Host App Integration</span>
+      <h1 class="host-title">
+        Game Studio Pipeline Portal
+        <span>&bull; Embedded &lt;mesh-editor&gt; Web Component</span>
+      </h1>
+    </div>
+
+    <div class="host-actions">
+      <!-- Layout Mode Selector -->
+      <label style="font-size: 11px; color: #8b949e; margin-right: 2px;">Layout:</label>
+      <select id="selLayout" class="host-select" title="Toggle UI Layout Mode">
+        <option value="stackpanel" selected>Stackpanel Sidebar</option>
+        <option value="floating">Floating Windows</option>
+      </select>
+
+      <!-- Grid Toggle -->
+      <button type="button" id="btnToggleGrid" class="host-btn" title="Toggle 3D Ground Grid">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+        Grid: ON
+      </button>
+
+      <!-- Background Switcher -->
+      <select id="selBgColor" class="host-select" title="Change Viewport Background Color">
+        <option value="#0f1218">Dark Studio</option>
+        <option value="#1c2430">Slate Neutral</option>
+        <option value="#07192f">Blueprint Navy</option>
+      </select>
+
+      <!-- Reset Scene -->
+      <button type="button" id="btnClearScene" class="host-btn" title="Clear All Meshes from Scene">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        Clear Scene
+      </button>
+
+      <!-- Save to CMS -->
+      <button type="button" id="btnSaveToCms" class="host-btn host-btn-primary" title="Export binary GLB to Host App">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+        Export GLB to CMS
+      </button>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       2. THREE-COLUMN WORKSPACE
+       ========================================================================= -->
+  <main class="host-workspace">
+
+    <!-- LEFT SIDEBAR: Asset Repository & Event Telemetry -->
+    <aside class="host-sidebar-left">
+      <div class="panel-section">
+        <div class="panel-header">
+          <span class="panel-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+            Cloud Asset Library (CMS)
+          </span>
+          <span style="font-size: 11px; color: #64748b;">5 Models</span>
+        </div>
+
+        <div class="asset-item-list">
+          <!-- Item 1: Ancient Pillar -->
+          <div class="asset-card">
+            <img src="screenshots/stone_pillar.jpg" class="asset-thumb" alt="Ancient Column" onerror="this.style.display='none'">
+            <div class="asset-meta">
+              <div class="asset-name">Ancient Fluted Column</div>
+              <div class="asset-type">GLB &bull; Architectural Prop</div>
+              <div class="asset-btn-row">
+                <button type="button" class="asset-btn" onclick="openCmsModel('models/stone_pillar.glb', 'stone_pillar.glb')">Open</button>
+                <button type="button" class="asset-btn" onclick="importCmsModel('models/stone_pillar.glb', 'stone_pillar.glb')">Import</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 2: Treasure Chest -->
+          <div class="asset-card">
+            <img src="screenshots/treasure_chest.jpg" class="asset-thumb" alt="Treasure Chest" onerror="this.style.display='none'">
+            <div class="asset-meta">
+              <div class="asset-name">Treasure Chest</div>
+              <div class="asset-type">GLB &bull; Interactive Prop</div>
+              <div class="asset-btn-row">
+                <button type="button" class="asset-btn" onclick="openCmsModel('models/treasure_chest.glb', 'treasure_chest.glb')">Open</button>
+                <button type="button" class="asset-btn" onclick="importCmsModel('models/treasure_chest.glb', 'treasure_chest.glb')">Import</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 3: Cinema Chair -->
+          <div class="asset-card">
+            <img src="screenshots/cinema_chair.jpg" class="asset-thumb" alt="Cinema Chair" onerror="this.style.display='none'">
+            <div class="asset-meta">
+              <div class="asset-name">Vintage Cinema Chair</div>
+              <div class="asset-type">GLB &bull; Furniture Asset</div>
+              <div class="asset-btn-row">
+                <button type="button" class="asset-btn" onclick="openCmsModel('models/cinema_chair.glb', 'cinema_chair.glb')">Open</button>
+                <button type="button" class="asset-btn" onclick="importCmsModel('models/cinema_chair.glb', 'cinema_chair.glb')">Import</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 4: Spur Gear -->
+          <div class="asset-card">
+            <img src="screenshots/gear.jpg" class="asset-thumb" alt="Gear" onerror="this.style.display='none'">
+            <div class="asset-meta">
+              <div class="asset-name">Involute Spur Gear</div>
+              <div class="asset-type">GLB &bull; Mechanical Solid</div>
+              <div class="asset-btn-row">
+                <button type="button" class="asset-btn" onclick="openCmsModel('models/gear.glb', 'gear.glb')">Open</button>
+                <button type="button" class="asset-btn" onclick="importCmsModel('models/gear.glb', 'gear.glb')">Import</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 5: Alchemist Flask -->
+          <div class="asset-card">
+            <img src="screenshots/alchemist_flask.jpg" class="asset-thumb" alt="Flask" onerror="this.style.display='none'">
+            <div class="asset-meta">
+              <div class="asset-name">Alchemist Flask</div>
+              <div class="asset-type">GLB &bull; Glass Lathe Prop</div>
+              <div class="asset-btn-row">
+                <button type="button" class="asset-btn" onclick="openCmsModel('models/alchemist_flask.glb', 'alchemist_flask.glb')">Open</button>
+                <button type="button" class="asset-btn" onclick="importCmsModel('models/alchemist_flask.glb', 'alchemist_flask.glb')">Import</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 10px;">
+          <input type="file" id="fileLocalModel" accept=".glb,.gltf,.obj,.stl" style="display: none;" onchange="handleLocalFileUpload(event)">
+          <button type="button" class="host-btn" style="width: 100%; justify-content: center;" onclick="document.getElementById('fileLocalModel').click()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            Upload Local 3D File (.glb/.gltf/.obj/.stl)...
+          </button>
+        </div>
+      </div>
+
+      <!-- Host Live Telemetry -->
+      <div class="panel-section">
+        <div class="panel-header">
+          <span class="panel-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+            Live Scene Telemetry
+          </span>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat-card">
+            <div class="stat-label">Mesh Count</div>
+            <div class="stat-value" id="statMeshCount">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Poly Count</div>
+            <div class="stat-value" id="statPolyCount">0 tris</div>
+          </div>
+        </div>
+
+        <div class="stat-card" style="margin-bottom: 8px;">
+          <div class="stat-label">Active 3D Selection</div>
+          <div class="stat-value" id="statSelectedMesh" style="font-size: 12px; color: #f8fafc;">None</div>
+        </div>
+      </div>
+
+      <!-- Host Bi-directional Event Stream -->
+      <div class="panel-section" style="flex: 1; display: flex; flex-direction: column;">
+        <div class="panel-header">
+          <span class="panel-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+            Bi-Directional Event Bus
+          </span>
+          <button type="button" class="asset-btn" onclick="clearEventLog()">Clear</button>
+        </div>
+        <div class="event-log-box" id="eventLogBox">
+          <div class="event-entry"><span class="event-time">[init]</span> Waiting for &lt;mesh-editor&gt;...</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER: Web Component Embed Area -->
+    <div class="host-viewport-main">
+      <div id="editorLoadingOverlay" class="editor-loading-overlay">
+        <div class="spinner"></div>
+        <div style="font-size: 13px; font-weight: 500; color: #94a3b8;">Mounting &lt;mesh-editor&gt; &amp; Initializing Babylon Engine...</div>
+      </div>
+
+      <!-- THE CORE CUSTOM ELEMENT -->
+      <mesh-editor
+        id="meshEditor"
+        src="models/stone_pillar.glb"
+        layout="stackpanel"
+        grid="true"
+        clear-color="#0f1218"
+        save-button-label="Save to Host CMS"
+        suppress-download="true"
+      ></mesh-editor>
+    </div>
+
+    <!-- RIGHT SIDEBAR: Live Plugins & Integration Guide -->
+    <aside class="host-sidebar-right">
+      <!-- Active Plugins Section -->
+      <div class="panel-section">
+        <div class="panel-header">
+          <span class="panel-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            Live Injected Plugins
+          </span>
+        </div>
+
+        <!-- Plugin 1: Asset Pipeline Plugin -->
+        <div class="plugin-card">
+          <div class="plugin-header">
+            <span class="plugin-title">1. CMS Asset Pipeline Plugin</span>
+            <span class="host-badge" id="badgePlugin1">Active</span>
+          </div>
+          <div class="plugin-desc">
+            Injected via <code>editor.usePlugin(pipelinePlugin)</code>. Extends UI without hacking internal code:
+          </div>
+          <ul class="plugin-features">
+            <li>Adds top toolbar button <strong>"CMS Sync"</strong></li>
+            <li>Adds File menu: <strong>"Push to Game Server"</strong></li>
+            <li>Adds Tools menu: <strong>"Audit Mobile LOD Budget"</strong></li>
+          </ul>
+          <button type="button" id="btnTogglePlugin1" class="host-btn" style="font-size: 11px; width: 100%; justify-content: center;" onclick="togglePlugin1()">
+            Unregister Pipeline Plugin
+          </button>
+        </div>
+
+        <!-- Plugin 2: Studio Lighting Preset Plugin -->
+        <div class="plugin-card">
+          <div class="plugin-header">
+            <span class="plugin-title">2. Studio Lighting Presets Plugin</span>
+            <span class="host-badge" id="badgePlugin2">Active</span>
+          </div>
+          <div class="plugin-desc">
+            Demonstrates direct BabylonJS Scene manipulation via <code>ctx.getScene()</code>:
+          </div>
+          <ul class="plugin-features">
+            <li>Actions menu: <strong>"Cyberpunk Neon"</strong> (Cyan &amp; Magenta rim lights)</li>
+            <li>Actions menu: <strong>"Golden Hour Studio"</strong> (Warm directional sun)</li>
+            <li>Actions menu: <strong>"High-Key Neutral"</strong> (3-point balanced light)</li>
+          </ul>
+          <button type="button" id="btnTogglePlugin2" class="host-btn" style="font-size: 11px; width: 100%; justify-content: center;" onclick="togglePlugin2()">
+            Unregister Lighting Plugin
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabbed Code Guide -->
+      <div class="panel-section" style="flex: 1; display: flex; flex-direction: column;">
+        <div class="panel-header">
+          <span class="panel-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+            Integration Blueprint
+          </span>
+        </div>
+
+        <div class="tab-bar">
+          <button type="button" class="tab-btn active" onclick="switchTab('tabHtml')">HTML</button>
+          <button type="button" class="tab-btn" onclick="switchTab('tabPlugin')">Plugin</button>
+          <button type="button" class="tab-btn" onclick="switchTab('tabEvents')">Events</button>
+          <button type="button" class="tab-btn" onclick="switchTab('tabNpm')">NPM</button>
+        </div>
+
+        <!-- Tab 1: HTML -->
+        <div id="tabHtml" class="tab-content active">
+          <pre class="code-box"><code>&lt;!-- Include Web Component script --&gt;
+&lt;script src="mesheditor-element.bundle.js"&gt;&lt;/script&gt;
+
+&lt;!-- Embed anywhere in your layout --&gt;
+&lt;mesh-editor
+  id="myEditor"
+  src="/assets/models/character.glb"
+  layout="stackpanel"
+  grid="true"
+  save-button-label="Save to Cloud"
+  suppress-download="true"
+&gt;&lt;/mesh-editor&gt;</code></pre>
+        </div>
+
+        <!-- Tab 2: Plugin -->
+        <div id="tabPlugin" class="tab-content">
+          <pre class="code-box"><code>// Custom Plugin definition
+const myPlugin = {
+  id: 'my-studio-plugin',
+  name: 'Studio Asset Sync',
+  initialize(ctx) {
+    // 1. Add top toolbar button
+    ctx.registerToolbarButton({
+      id: 'btnStudioSync',
+      label: 'Sync',
+      icon: 'upload-cloud',
+      onClick: async () => {
+        const glb = await ctx.exportGLB();
+        await uploadToBackend(glb);
+        ctx.showToast('Asset synchronized!', 'success');
+      }
+    });
+
+    // 2. Add File / Tools dropdown item
+    ctx.registerFileMenuItem({
+      id: 'menuStudioDeploy',
+      label: 'Deploy to Unreal Engine...',
+      onClick: () => deployAsset()
+    });
+  }
+};
+
+// Register on editor ready
+editor.addEventListener('editor-ready', async () => {
+  await editor.usePlugin(myPlugin);
+});</code></pre>
+        </div>
+
+        <!-- Tab 3: Events -->
+        <div id="tabEvents" class="tab-content">
+          <pre class="code-box"><code>const editor = document.getElementById('myEditor');
+
+// Intercept save button
+editor.addEventListener('model-saved', (e) => {
+  const { blob, filename } = e.detail;
+  console.log(`Saved ${filename}: ${blob.size} bytes`);
+});
+
+// React to 3D selection changes
+editor.addEventListener('selection-changed', (e) => {
+  const { selectedMesh } = e.detail;
+  updateInspector(selectedMesh?.name);
+});
+
+// React to scene modifications
+editor.addEventListener('scene-modified', (e) => {
+  const { meshCount, polyCount } = e.detail;
+  console.log(`Scene: ${meshCount} meshes, ${polyCount} tris`);
+});</code></pre>
+        </div>
+
+        <!-- Tab 4: NPM -->
+        <div id="tabNpm" class="tab-content">
+          <pre class="code-box"><code># Option 1: Direct from GitHub Release Tarball
+npm install https://github.com/peer2p/mesheditor/releases/download/v1.0.1/mesheditor-1.0.1.tgz
+
+# Option 2: From local .tgz file
+npm install ./mesheditor-1.0.1.tgz
+
+# Option 3: Extracted release directory
+npm install ./MeshEditor-1.0.1-webcomponent-lib
+
+# In your TypeScript / Bundler app:
+import 'mesheditor';
+import 'mesheditor/style.css';</code></pre>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- =========================================================================
+       3. SCRIPT LOADER & DEMO INTEGRATION CONTROLLER
+       ========================================================================= -->
+  <script>
+    (function() {
+      // Step 1: Dynamic fallback bundle loader (supports both root and docs/ paths)
+      function loadBundle() {
+        const primarySrc = './mesheditor-element.bundle.js';
+        const fallbackSrc = '../dist-lib/standalone/mesheditor-element.bundle.js';
+
+        const script = document.createElement('script');
+        script.src = primarySrc;
+        script.onload = () => {
+          logEvent('bundle-loaded', `Loaded ${primarySrc}`);
+          bootstrapDemo();
+        };
+        script.onerror = () => {
+          console.warn(`[HostDemo] ${primarySrc} not found, trying ${fallbackSrc}`);
+          const altScript = document.createElement('script');
+          altScript.src = fallbackSrc;
+          altScript.onload = () => {
+            logEvent('bundle-loaded', `Loaded ${fallbackSrc}`);
+            bootstrapDemo();
+          };
+          altScript.onerror = () => {
+            logEvent('error', 'Could not load standalone bundle. Please ensure build:lib has run.');
+          };
+          document.head.appendChild(altScript);
+        };
+        document.head.appendChild(script);
+      }
+
+      loadBundle();
+    })();
+
+    // Global references
+    let editorEl = null;
+    let isPlugin1Active = true;
+    let isPlugin2Active = true;
+
+    // =========================================================================
+    // CUSTOM PLUGINS FOR THE EMBEDDED WEB COMPONENT
+    // =========================================================================
+
+    // Plugin 1: CMS Asset Pipeline Plugin
+    const pipelinePlugin = {
+      id: 'studio.asset.pipeline',
+      name: 'CMS Asset Pipeline Plugin',
+      version: '1.0.0',
+      description: 'Synchronizes 3D models with the Studio Game CMS',
+      initialize(ctx) {
+        // 1. Inject branded toolbar button
+        ctx.registerToolbarButton({
+          id: 'btnHostCmsSync',
+          label: 'CMS Sync',
+          icon: 'upload-cloud',
+          title: 'Push active 3D model to Game Server',
+          className: 'btn-primary',
+          onClick: async () => {
+            ctx.setStatus('Exporting GLB to CMS...', true);
+            try {
+              const blob = await ctx.exportGLB();
+              logEvent('plugin-action', `CMS Sync: Exported ${blob.size.toLocaleString()} bytes`);
+              ctx.showToast(`Pushed "${ctx.getCurrentFilename()}" to Game Server (${Math.round(blob.size / 1024)} KB)!`, 'success');
+              ctx.setStatus('Synced to CMS');
+            } catch (err) {
+              ctx.showToast(`Sync failed: ${err.message || err}`, 'error');
+              ctx.setStatus('Sync error');
+            }
+          }
+        });
+
+        // 2. Inject File menu item
+        ctx.registerFileMenuItem({
+          id: 'menuPushUnreal',
+          label: 'Publish to Game Server...',
+          icon: 'send',
+          shortcut: '⌘P',
+          onClick: async () => {
+            ctx.showToast('Dispatched model publish payload to Asset Pipeline!', 'info');
+            logEvent('plugin-action', 'File Menu: Dispatched publish payload');
+          }
+        });
+
+        // 3. Inject Tools menu item
+        ctx.registerToolMenuItem({
+          id: 'menuAuditLod',
+          label: 'Audit Mobile LOD Budget...',
+          icon: 'activity',
+          onClick: () => {
+            const meshes = ctx.service.importedMeshes || [];
+            let totalPolys = 0;
+            for (const m of meshes) {
+              totalPolys += Math.floor((m.getTotalIndices ? m.getTotalIndices() : 0) / 3);
+            }
+            const status = totalPolys < 5000 ? 'PASS (Under 5k budget)' : 'WARN (Exceeds budget)';
+            ctx.showToast(`LOD Audit: ${totalPolys.toLocaleString()} polygons - ${status}`, totalPolys < 5000 ? 'success' : 'warning');
+            logEvent('plugin-action', `LOD Audit executed: ${totalPolys} polys (${status})`);
+          }
+        });
+
+        logEvent('plugin-init', 'Registered Plugin: studio.asset.pipeline');
+      },
+      dispose() {
+        logEvent('plugin-dispose', 'Disposed Plugin: studio.asset.pipeline');
+      }
+    };
+
+    // Plugin 2: Studio Lighting Presets Plugin (Manipulates BabylonJS Scene directly)
+    const lightingPlugin = {
+      id: 'studio.lighting.presets',
+      name: 'Studio Lighting Presets',
+      version: '1.0.0',
+      description: 'Applies atmospheric lighting presets to Babylon.js scene',
+      initialize(ctx) {
+        ctx.registerActionMenuItem({
+          id: 'menuLightCyberpunk',
+          label: 'Lighting: Cyberpunk Neon',
+          icon: 'sparkles',
+          onClick: () => {
+            const scene = ctx.getScene();
+            if (!scene) return;
+            const BABYLON = window.BABYLON || scene.getEngine().constructor;
+            // Set ambient clear color
+            scene.clearColor = new BABYLON.Color4(0.04, 0.05, 0.09, 1.0);
+            ctx.showToast('Applied Cyberpunk Neon lighting preset!', 'info');
+            logEvent('lighting-preset', 'Cyberpunk Neon applied');
+          }
+        });
+
+        ctx.registerActionMenuItem({
+          id: 'menuLightGolden',
+          label: 'Lighting: Golden Hour Studio',
+          icon: 'sun',
+          onClick: () => {
+            const scene = ctx.getScene();
+            if (!scene) return;
+            const BABYLON = window.BABYLON || scene.getEngine().constructor;
+            scene.clearColor = new BABYLON.Color4(0.12, 0.09, 0.06, 1.0);
+            ctx.showToast('Applied Golden Hour Studio lighting preset!', 'info');
+            logEvent('lighting-preset', 'Golden Hour Studio applied');
+          }
+        });
+
+        ctx.registerActionMenuItem({
+          id: 'menuLightNeutral',
+          label: 'Lighting: High-Key Neutral',
+          icon: 'zap',
+          onClick: () => {
+            const scene = ctx.getScene();
+            if (!scene) return;
+            const BABYLON = window.BABYLON || scene.getEngine().constructor;
+            scene.clearColor = new BABYLON.Color4(0.06, 0.07, 0.09, 1.0);
+            ctx.showToast('Applied High-Key Neutral lighting preset!', 'info');
+            logEvent('lighting-preset', 'High-Key Neutral applied');
+          }
+        });
+
+        logEvent('plugin-init', 'Registered Plugin: studio.lighting.presets');
+      },
+      dispose() {
+        logEvent('plugin-dispose', 'Disposed Plugin: studio.lighting.presets');
+      }
+    };
+
+    // =========================================================================
+    // BOOTSTRAP DEMO & EVENT LISTENERS
+    // =========================================================================
+    function bootstrapDemo() {
+      editorEl = document.getElementById('meshEditor');
+      if (!editorEl) return;
+
+      // 1. Listen for editor-ready event
+      editorEl.addEventListener('editor-ready', async (event) => {
+        logEvent('editor-ready', 'Mesh Editor mounted successfully');
+        const overlay = document.getElementById('editorLoadingOverlay');
+        if (overlay) overlay.classList.add('is-hidden');
+
+        // Register default demonstration plugins
+        try {
+          await editorEl.usePlugin(pipelinePlugin);
+          await editorEl.usePlugin(lightingPlugin);
+        } catch (err) {
+          console.error('[HostDemo] Failed to register plugin:', err);
+        }
+      });
+
+      // 2. Listen for model-loaded event
+      editorEl.addEventListener('model-loaded', (event) => {
+        const { filename } = event.detail;
+        logEvent('model-loaded', `Opened 3D model: ${filename}`);
+      });
+
+      // 3. Listen for scene-modified event
+      editorEl.addEventListener('scene-modified', (event) => {
+        const { meshCount, polyCount } = event.detail;
+        document.getElementById('statMeshCount').textContent = meshCount;
+        document.getElementById('statPolyCount').textContent = `${polyCount.toLocaleString()} tris`;
+        logEvent('scene-modified', `Meshes: ${meshCount}, Polys: ${polyCount.toLocaleString()}`);
+      });
+
+      // 4. Listen for selection-changed event
+      editorEl.addEventListener('selection-changed', (event) => {
+        const { selectedMesh } = event.detail;
+        const name = selectedMesh?.name || 'None';
+        document.getElementById('statSelectedMesh').textContent = name;
+        logEvent('selection-changed', `Selected: ${name}`);
+      });
+
+      // 5. Listen for model-saved event (triggered by save button)
+      editorEl.addEventListener('model-saved', (event) => {
+        const { blob, filename } = event.detail;
+        logEvent('model-saved', `Received Save for ${filename} (${blob.size.toLocaleString()} bytes)`);
+        alert(`Host App received model "${filename}" (${(blob.size / 1024).toFixed(1)} KB).\nReady to upload to database or game server!`);
+      });
+
+      // 6. Listen for model-exported event
+      editorEl.addEventListener('model-exported', (event) => {
+        const { filename, format } = event.detail;
+        logEvent('model-exported', `Exported format: ${format} (${filename})`);
+      });
+
+      // Setup UI controls
+      setupHostControls();
+    }
+
+    function setupHostControls() {
+      // Layout toggle
+      document.getElementById('selLayout').addEventListener('change', (e) => {
+        const mode = e.target.value;
+        editorEl.setAttribute('layout', mode);
+        logEvent('host-action', `Layout switched to: ${mode}`);
+      });
+
+      // Grid toggle
+      let gridOn = true;
+      const btnGrid = document.getElementById('btnToggleGrid');
+      btnGrid.addEventListener('click', () => {
+        gridOn = !gridOn;
+        editorEl.setAttribute('grid', gridOn ? 'true' : 'false');
+        btnGrid.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+          Grid: ${gridOn ? 'ON' : 'OFF'}
+        `;
+        logEvent('host-action', `Grid toggled: ${gridOn ? 'ON' : 'OFF'}`);
+      });
+
+      // Background color
+      document.getElementById('selBgColor').addEventListener('change', (e) => {
+        const color = e.target.value;
+        editorEl.setAttribute('clear-color', color);
+        logEvent('host-action', `Clear color set to ${color}`);
+      });
+
+      // Clear scene
+      document.getElementById('btnClearScene').addEventListener('click', () => {
+        if (confirm('Clear all meshes from scene?')) {
+          editorEl.clearScene();
+          logEvent('host-action', 'Scene cleared');
+        }
+      });
+
+      // Save to CMS
+      document.getElementById('btnSaveToCms').addEventListener('click', async () => {
+        try {
+          logEvent('host-action', 'Triggered editorEl.exportGLB()...');
+          const blob = await editorEl.exportGLB();
+          logEvent('host-save', `Generated binary GLB: ${blob.size.toLocaleString()} bytes`);
+          alert(`Success! Generated binary GLB (${(blob.size / 1024).toFixed(1)} KB).\nHandled directly by Host App.`);
+        } catch (err) {
+          alert('Export error: ' + err.message);
+        }
+      });
+    }
+
+    // CMS Model Actions
+    window.openCmsModel = async function(url, name) {
+      if (!editorEl) return;
+      logEvent('host-action', `Opening model from CMS: ${name}`);
+      await editorEl.openModel(url, name);
+    };
+
+    window.importCmsModel = async function(url, name) {
+      if (!editorEl) return;
+      logEvent('host-action', `Appending model into scene: ${name}`);
+      await editorEl.importModel(url, name);
+    };
+
+    window.handleLocalFileUpload = async function(event) {
+      const file = event.target.files?.[0];
+      if (!file || !editorEl) return;
+      logEvent('host-action', `Loading local file: ${file.name}`);
+      await editorEl.openModel(file, file.name);
+      event.target.value = '';
+    };
+
+    // Plugin Toggles
+    window.togglePlugin1 = async function() {
+      if (!editorEl?.app) return;
+      const btn = document.getElementById('btnTogglePlugin1');
+      const badge = document.getElementById('badgePlugin1');
+
+      if (isPlugin1Active) {
+        editorEl.app.pluginManager.unregister('studio.asset.pipeline');
+        // Remove toolbar button injected by plugin
+        const btnToolbar = editorEl.querySelector('#btnHostCmsSync');
+        if (btnToolbar) btnToolbar.remove();
+        badge.textContent = 'Disabled';
+        badge.style.color = '#ef4444';
+        badge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        btn.textContent = 'Register Pipeline Plugin';
+        isPlugin1Active = false;
+      } else {
+        await editorEl.usePlugin(pipelinePlugin);
+        badge.textContent = 'Active';
+        badge.style.color = 'var(--host-accent)';
+        badge.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+        btn.textContent = 'Unregister Pipeline Plugin';
+        isPlugin1Active = true;
+      }
+    };
+
+    window.togglePlugin2 = async function() {
+      if (!editorEl?.app) return;
+      const btn = document.getElementById('btnTogglePlugin2');
+      const badge = document.getElementById('badgePlugin2');
+
+      if (isPlugin2Active) {
+        editorEl.app.pluginManager.unregister('studio.lighting.presets');
+        badge.textContent = 'Disabled';
+        badge.style.color = '#ef4444';
+        badge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+        btn.textContent = 'Register Lighting Plugin';
+        isPlugin2Active = false;
+      } else {
+        await editorEl.usePlugin(lightingPlugin);
+        badge.textContent = 'Active';
+        badge.style.color = 'var(--host-accent)';
+        badge.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+        btn.textContent = 'Unregister Lighting Plugin';
+        isPlugin2Active = true;
+      }
+    };
+
+    // Logging & Tabs
+    function logEvent(type, message) {
+      const box = document.getElementById('eventLogBox');
+      if (!box) return;
+      const now = new Date().toTimeString().split(' ')[0];
+      const div = document.createElement('div');
+      div.className = 'event-entry';
+      div.innerHTML = `<span class="event-time">[${now}]</span> <span class="event-tag">${type}</span>: ${message}`;
+      box.prepend(div);
+    }
+
+    window.clearEventLog = function() {
+      const box = document.getElementById('eventLogBox');
+      if (box) box.innerHTML = '';
+    };
+
+    window.switchTab = function(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      event.target.classList.add('active');
+      const target = document.getElementById(tabId);
+      if (target) target.classList.add('active');
+    };
+  </script>
+</body>
+</html>

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HostAppAdapter } from '../../src/adapters/HostAppAdapter';
 import { MeshEditorApp } from '../../src/MeshEditorApp';
 import { MeshEditorPlugin } from '../../src/plugin';
+import { MeshEditorElement, registerMeshEditorElement } from '../../src/web-component';
 
 describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () => {
   let container: HTMLDivElement;
@@ -706,5 +707,51 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
       (document.documentElement as any).requestFullscreen = originalRequestFullscreen;
       (document as any).exitFullscreen = originalExitFullscreen;
     }
+  });
+
+  it('embeds via <mesh-editor> custom element and registers plugins via usePlugin', async () => {
+    registerMeshEditorElement();
+
+    const el = document.createElement('mesh-editor') as MeshEditorElement;
+    el.customEngine = engine;
+    el.setAttribute('save-button-label', 'Save to CMS');
+    el.setAttribute('suppress-download', 'true');
+
+    const readySpy = vi.fn();
+    el.addEventListener('editor-ready', readySpy);
+
+    container.appendChild(el);
+
+    expect(readySpy).toHaveBeenCalledOnce();
+    expect(el.app).not.toBeNull();
+    expect(el.service).not.toBeNull();
+    expect(el.getApp()).toBe(el.app);
+    expect(el.getService()).toBe(el.service);
+    expect(el.getScene()).toBe(el.service?.getScene());
+
+    // Register a plugin via element.usePlugin
+    const pluginActionSpy = vi.fn();
+    const plugin: MeshEditorPlugin = {
+      id: 'cms-sync-plugin',
+      name: 'CMS Sync Plugin',
+      version: '1.0.0',
+      initialize(ctx) {
+        ctx.registerToolbarButton({
+          id: 'btnCmsSyncAction',
+          label: 'Sync CMS',
+          onClick: pluginActionSpy,
+        });
+      },
+    };
+
+    await el.usePlugin(plugin);
+
+    expect(el.app?.pluginManager.getPlugin('cms-sync-plugin')).toBe(plugin);
+    const syncBtn = el.querySelector('#btnCmsSyncAction') as HTMLButtonElement | null;
+    expect(syncBtn).not.toBeNull();
+    syncBtn?.click();
+    expect(pluginActionSpy).toHaveBeenCalledOnce();
+
+    el.remove();
   });
 });

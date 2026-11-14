@@ -1,3 +1,4 @@
+import type { Scene } from '@babylonjs/core';
 import { HostAppAdapter, HostAppAdapterOptions } from '../adapters';
 import { MeshEditorApp } from '../MeshEditorApp';
 import { MeshEditorService } from '../MeshEditorService';
@@ -39,6 +40,7 @@ export class MeshEditorElement extends HTMLElement {
 
   public app: MeshEditorApp | null = null;
   public hostAdapter: HostAppAdapter | null = null;
+  public customEngine: any = null;
   private isMounted: boolean = false;
 
   public get service(): MeshEditorService | null {
@@ -88,6 +90,7 @@ export class MeshEditorElement extends HTMLElement {
 
     this.app = new MeshEditorApp({
       container: appContainer,
+      engine: this.customEngine || undefined,
       adapter: this.hostAdapter,
       layoutMode: layoutAttr === 'stackpanel' || layoutAttr === 'floating' ? layoutAttr : undefined,
       autoLoadUrl: initialModelUrl,
@@ -226,6 +229,27 @@ export class MeshEditorElement extends HTMLElement {
    */
   public clearScene(): void {
     this.app?.service.clearModel();
+  }
+
+  /**
+   * Returns the underlying BabylonJS Scene instance for advanced custom rendering.
+   */
+  public getScene(): Scene | null {
+    return this.app?.service.getScene() || null;
+  }
+
+  /**
+   * Returns the MeshEditorApp coordinator instance.
+   */
+  public getApp(): MeshEditorApp | null {
+    return this.app;
+  }
+
+  /**
+   * Returns the MeshEditorService core engine instance.
+   */
+  public getService(): MeshEditorService | null {
+    return this.service;
   }
 
   /**

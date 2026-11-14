@@ -130,6 +130,7 @@ module.exports = (env, argv) => {
           { from: 'src/promptImages', to: 'src/promptImages', noErrorOnMissing: true },
           { from: 'docs/screenshots', to: 'screenshots', noErrorOnMissing: true },
           { from: 'src/assets', to: 'assets', noErrorOnMissing: true },
+          { from: 'dist-lib/standalone/mesheditor-element.bundle.js', to: 'mesheditor-element.bundle.js', noErrorOnMissing: true },
         ],
       }),
     ],
