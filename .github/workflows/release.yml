@@ -16,6 +16,11 @@ on:
         required: false
         default: false
         type: boolean
+      publish_gamejolt:
+        description: 'Publish HTML5 & Desktop builds to Game Jolt (via GAMEJOLT_TOKEN & GAMEJOLT_PACKAGE_ID)'
+        required: false
+        default: false
+        type: boolean
       tag_name:
         description: 'Release tag name (used when triggered manually with create_release=true, e.g. v1.0.0)'
         required: false
@@ -370,5 +375,121 @@ jobs:
             cp "${LINUX_APPIMAGE}" staging-linux/
             echo "Pushing Linux AppImage (${LINUX_APPIMAGE}) to ${ITCH_TARGET}:linux..."
             butler push staging-linux "${ITCH_TARGET}:linux" --userversion "${VERSION}"
+          fi
+
+  # ============================================================================
+  # 6. PUBLISH HTML5 & DESKTOP BUILDS TO GAME JOLT (gjpush)
+  # ============================================================================
+  publish-gamejolt:
+    name: Publish to Game Jolt
+    needs:
+      - build-web-and-lib
+      - build-desktop
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && (inputs.create_release == true || inputs.publish_gamejolt == true))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Game Jolt credentials
+        id: check_gj
+        env:
+          GJ_TOKEN_VAL: ${{ secrets.GAMEJOLT_TOKEN }}
+          GJ_PKG_VAL: ${{ secrets.GAMEJOLT_PACKAGE_ID || vars.GAMEJOLT_PACKAGE_ID }}
+        run: |
+          if [ -z "${GJ_TOKEN_VAL}" ] || [ -z "${GJ_PKG_VAL}" ]; then
+            echo "::warning::GAMEJOLT_TOKEN or GAMEJOLT_PACKAGE_ID is not configured in repository secrets/variables. Skipping Game Jolt publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Determine release version (SemVer)
+        if: steps.check_gj.outputs.skip != 'true'
+        id: meta
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ inputs.create_release }}" == "true" ]]; then
+              TAG="${{ inputs.tag_name }}"
+              VERSION="${TAG#v}"
+            else
+              VERSION=$(node -p "require('./package.json').version")
+            fi
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Publishing Mesh Editor version ${VERSION} to Game Jolt"
+
+      - name: Download HTML5 artifact
+        if: steps.check_gj.outputs.skip != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-itch-html5
+          path: artifacts-gamejolt/html5
+
+      - name: Download Desktop artifacts
+        if: steps.check_gj.outputs.skip != 'true'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-desktop-*
+          path: artifacts-gamejolt/desktop
+
+      - name: Install Game Jolt CLI (gjpush)
+        if: steps.check_gj.outputs.skip != 'true'
+        run: |
+          curl -fsSL -o gjpush-linux.zip "https://github.com/gamejolt/cli/releases/download/v0.5.0/linux.zip"
+          unzip -q gjpush-linux.zip -d gjpush-bin
+          chmod +x gjpush-bin/gjpush
+          echo "$PWD/gjpush-bin" >> "$GITHUB_PATH"
+          ./gjpush-bin/gjpush --version
+
+      - name: Push Browser & Desktop builds to Game Jolt
+        if: steps.check_gj.outputs.skip != 'true'
+        env:
+          GJPUSH_TOKEN: ${{ secrets.GAMEJOLT_TOKEN }}
+          GAME_ID: ${{ secrets.GAMEJOLT_GAME_ID || vars.GAMEJOLT_GAME_ID || '1122865' }}
+          PACKAGE_ID: ${{ secrets.GAMEJOLT_PACKAGE_ID || vars.GAMEJOLT_PACKAGE_ID }}
+          BROWSER_PACKAGE_ID: ${{ secrets.GAMEJOLT_BROWSER_PACKAGE_ID || vars.GAMEJOLT_BROWSER_PACKAGE_ID }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          TARGET_BROWSER_PKG="${BROWSER_PACKAGE_ID:-$PACKAGE_ID}"
+
+          # 1. Browser (HTML5) Build (-b flag, index.html at archive root)
+          BROWSER_ZIP="$PWD/MeshEditor-${VERSION}-browser.zip"
+          (cd artifacts-gamejolt/html5 && zip -r -q "${BROWSER_ZIP}" .)
+          echo "Pushing Browser (HTML5) build to Game Jolt (Game: ${GAME_ID}, Package: ${TARGET_BROWSER_PKG}, Release: ${VERSION})..."
+          gjpush -g "${GAME_ID}" -p "${TARGET_BROWSER_PKG}" -r "${VERSION}" -b "${BROWSER_ZIP}"
+
+          # 2. Windows Portable Build
+          WIN_PORTABLE=$(find artifacts-gamejolt/desktop -name "*-win-*-portable.exe" | head -n 1 || true)
+          if [ -n "${WIN_PORTABLE}" ]; then
+            echo "Pushing Windows Portable build (${WIN_PORTABLE}) to Game Jolt..."
+            gjpush -g "${GAME_ID}" -p "${PACKAGE_ID}" -r "${VERSION}" "${WIN_PORTABLE}"
+          fi
+
+          # 3. macOS Builds (Apple Silicon arm64 & Intel x64 .zip app bundles)
+          MAC_ARM64=$(find artifacts-gamejolt/desktop -name "*-mac-arm64.zip" | head -n 1 || true)
+          if [ -n "${MAC_ARM64}" ]; then
+            echo "Pushing macOS arm64 build (${MAC_ARM64}) to Game Jolt..."
+            gjpush -g "${GAME_ID}" -p "${PACKAGE_ID}" -r "${VERSION}" "${MAC_ARM64}"
+          fi
+
+          MAC_X64=$(find artifacts-gamejolt/desktop -name "*-mac-x64.zip" | head -n 1 || true)
+          if [ -n "${MAC_X64}" ]; then
+            echo "Pushing macOS x64 build (${MAC_X64}) to Game Jolt..."
+            gjpush -g "${GAME_ID}" -p "${PACKAGE_ID}" -r "${VERSION}" "${MAC_X64}"
+          fi
+
+          # 4. Linux AppImage Build
+          LINUX_APPIMAGE=$(find artifacts-gamejolt/desktop -name "*-linux-*.AppImage" | head -n 1 || true)
+          if [ -n "${LINUX_APPIMAGE}" ]; then
+            echo "Pushing Linux AppImage build (${LINUX_APPIMAGE}) to Game Jolt..."
+            gjpush -g "${GAME_ID}" -p "${PACKAGE_ID}" -r "${VERSION}" "${LINUX_APPIMAGE}"
           fi
 
