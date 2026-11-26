@@ -362,6 +362,332 @@ a:hover {
   background: var(--bg-hover);
 }
 
+/* Hero Quick Channels Strip */
+.hero-channels-strip {
+  display: flex;
+  flex-wrap: wrap;
+  flex-wrap: balance;
+  align-items: safe center;
+  justify-content: center;
+  gap: 10px;
+  margin-block-start: 18px;
+}
+
+.hero-channels-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+  margin-inline-end: 2px;
+}
+
+.hero-channel-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: rgba(22, 27, 34, 0.85);
+  border: 1px solid var(--border-color);
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hero-channel-pill svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.hero-channel-pill:hover {
+  transform: translateY(-1px);
+  text-shadow: none;
+  color: #ffffff;
+}
+
+.hero-channel-pill.pill-youtube svg {
+  color: #ff4e45;
+}
+.hero-channel-pill.pill-youtube:hover {
+  border-color: rgba(255, 78, 69, 0.55);
+  background: rgba(255, 78, 69, 0.14);
+  box-shadow: 0 4px 16px rgba(255, 78, 69, 0.22);
+}
+
+.hero-channel-pill.pill-itch svg {
+  color: #fa5c5c;
+}
+.hero-channel-pill.pill-itch:hover {
+  border-color: rgba(250, 92, 92, 0.55);
+  background: rgba(250, 92, 92, 0.14);
+  box-shadow: 0 4px 16px rgba(250, 92, 92, 0.22);
+}
+
+.hero-channel-pill.pill-ph svg {
+  color: #ff6154;
+}
+.hero-channel-pill.pill-ph:hover {
+  border-color: rgba(255, 97, 84, 0.55);
+  background: rgba(255, 97, 84, 0.14);
+  box-shadow: 0 4px 16px rgba(255, 97, 84, 0.22);
+}
+
+.screencast-youtube-callout {
+  margin-block-start: 16px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+.screencast-youtube-callout a {
+  font-weight: 600;
+  margin-inline-start: 4px;
+}
+
+/* =========================================================================
+   COMMUNITY & OFFICIAL CHANNELS SECTION
+   ========================================================================= */
+
+.channels-section {
+  position: relative;
+}
+
+.channels-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(390px, 1.16fr);
+  grid-template-rows: auto 1fr auto;
+  gap: 24px;
+  align-items: stretch;
+}
+
+.channel-card {
+  container: channel-card / inline-size;
+  grid-row: span 3;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-rows: subgrid;
+  row-gap: 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 26px 24px;
+  min-inline-size: 0;
+  position: relative;
+  overflow: clip;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.channel-card::before {
+  content: '';
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  block-size: 3px;
+  opacity: 0.85;
+}
+
+.channel-card-youtube::before {
+  background: linear-gradient(90deg, transparent, #ff4e45, transparent);
+}
+
+.channel-card-itch::before {
+  background: linear-gradient(90deg, transparent, #fa5c5c, transparent);
+}
+
+.channel-card-ph::before {
+  background: linear-gradient(90deg, transparent, #ff6154, transparent);
+}
+
+.channel-card:hover {
+  transform: translateY(-3px);
+}
+
+.channel-card-youtube:hover {
+  border-color: rgba(255, 78, 69, 0.45);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 24px rgba(255, 78, 69, 0.16);
+}
+
+.channel-card-itch:hover {
+  border-color: rgba(250, 92, 92, 0.45);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 24px rgba(250, 92, 92, 0.16);
+}
+
+.channel-card-ph:hover {
+  border-color: rgba(255, 97, 84, 0.45);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 24px rgba(255, 97, 84, 0.18);
+}
+
+.channel-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-inline-size: 0;
+}
+
+.channel-icon-badge {
+  inline-size: 46px;
+  block-size: 46px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.channel-icon-badge svg {
+  display: block;
+}
+
+.icon-youtube {
+  background: rgba(255, 78, 69, 0.14);
+  border: 1px solid rgba(255, 78, 69, 0.35);
+  color: #ff4e45;
+}
+
+.icon-itch {
+  background: rgba(250, 92, 92, 0.14);
+  border: 1px solid rgba(250, 92, 92, 0.35);
+  color: #fa5c5c;
+}
+
+.icon-ph {
+  background: rgba(255, 97, 84, 0.14);
+  border: 1px solid rgba(255, 97, 84, 0.35);
+  color: #ff6154;
+}
+
+.channel-card-heading {
+  min-inline-size: 0;
+}
+
+.channel-platform-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  margin-block-end: 2px;
+}
+
+.tag-youtube { color: #ff6b63; }
+.tag-itch { color: #ff7a7a; }
+.tag-ph { color: #ff796e; }
+
+.channel-card-title {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+
+.channel-card-title a {
+  color: inherit;
+}
+
+.channel-card-title a:hover {
+  color: #ffffff;
+  text-shadow: none;
+}
+
+.channel-card-desc {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.channel-card-footer {
+  display: flex;
+  align-items: flex-end;
+}
+
+.channel-cta-btn {
+  inline-size: 100%;
+  justify-content: center;
+  border-radius: 999px;
+  padding-block: 10px;
+  padding-inline: 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.channel-cta-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.btn-youtube {
+  background: rgba(255, 78, 69, 0.16);
+  border-color: rgba(255, 78, 69, 0.42);
+  color: #ff9c97;
+}
+
+.btn-youtube:hover {
+  background: #e0332b;
+  border-color: #ff6b63;
+  color: #ffffff;
+  text-shadow: none;
+  box-shadow: 0 6px 20px rgba(255, 78, 69, 0.35);
+}
+
+.btn-itch {
+  background: rgba(250, 92, 92, 0.16);
+  border-color: rgba(250, 92, 92, 0.42);
+  color: #ffa5a5;
+}
+
+.btn-itch:hover {
+  background: #fa5c5c;
+  border-color: #ff8585;
+  color: #ffffff;
+  text-shadow: none;
+  box-shadow: 0 6px 20px rgba(250, 92, 92, 0.35);
+}
+
+/* Product Hunt Embed Slot inside Channel Card */
+.channel-card-ph {
+  grid-row: span 3;
+}
+
+.ph-embed-slot {
+  grid-row: span 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 0;
+}
+
+.ph-embed-slot > div {
+  inline-size: 100%;
+  color-scheme: light;
+}
+
+.ph-embed-slot img {
+  display: block;
+}
+
+.ph-embed-slot p {
+  line-clamp: 2;
+}
+
+.ph-embed-slot a:hover {
+  color: #ffffff;
+  text-shadow: none;
+  filter: brightness(1.05);
+}
+
+@container channel-card (inline-size < 340px) {
+  .ph-embed-slot > div {
+    padding: 16px !important;
+  }
+  .ph-embed-slot a {
+    font-size: 14px !important;
+    padding: 8px 14px !important;
+  }
+}
+
 /* Hero Screenshot Showcase Window Frame */
 .hero-screenshot-wrapper {
   margin-top: 36px;
@@ -3078,9 +3404,19 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 20px;
   padding-bottom: 28px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   margin-bottom: 24px;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  flex-wrap: balance;
+  align-items: safe center;
+  justify-content: flex-end;
+  gap: 10px 22px;
 }
 
 .footer-copy {
@@ -3124,6 +3460,21 @@ a:hover {
   .roadmap-grid,
   .ai-feature-card-grid {
     grid-template-columns: 1fr;
+  }
+  .channels-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto;
+  }
+  .channel-card {
+    grid-row: auto;
+    grid-template-rows: auto 1fr auto;
+  }
+  .channel-card-ph {
+    grid-column: 1 / -1;
+    grid-template-rows: auto auto;
+  }
+  .ph-embed-slot {
+    grid-row: auto;
   }
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -3176,8 +3527,12 @@ a:hover {
     border-bottom: 1px solid var(--border-color);
   }
   .features-breakdown-grid,
-  .formats-grid {
+  .formats-grid,
+  .channels-grid {
     grid-template-columns: 1fr;
+  }
+  .footer-links {
+    justify-content: center;
   }
   .footer-grid {
     flex-direction: column;
