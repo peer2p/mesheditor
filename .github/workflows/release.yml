@@ -60,14 +60,14 @@ jobs:
       - name: Build Standalone Web App
         run: npm run build
 
-      - name: Prepare itch.io HTML5 Build
+      - name: Prepare Clean Standalone Web Build
         run: node scripts/prepare-itch.js
 
       - name: Archive Standalone Web App (.zip)
         run: |
           VERSION=$(node -p "require('./package.json').version")
           mkdir -p artifacts
-          cd dist && zip -r "../artifacts/MeshEditor-${VERSION}-standalone-web.zip" . && cd ..
+          cd dist-itch && zip -r "../artifacts/MeshEditor-${VERSION}-standalone-web.zip" . && cd ..
 
       - name: Build NPM Library & <mesh-editor> Web Component
         run: npm run build:lib
@@ -84,13 +84,6 @@ jobs:
         with:
           name: release-web-and-lib
           path: artifacts/*
-          if-no-files-found: error
-
-      - name: Upload itch.io HTML5 Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-itch-html5
-          path: dist-itch/
           if-no-files-found: error
 
   # ============================================================================
@@ -171,6 +164,7 @@ jobs:
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: release-*
           path: dist-artifacts
           merge-multiple: true
 
@@ -314,12 +308,12 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Publishing Mesh Editor version ${VERSION} to itch.io"
 
-      - name: Download itch.io HTML5 artifact
+      - name: Download Web & Library artifacts
         if: steps.check_key.outputs.skip != 'true'
         uses: actions/download-artifact@v4
         with:
-          name: release-itch-html5
-          path: artifacts-itch/html5
+          name: release-web-and-lib
+          path: artifacts-itch/web
 
       - name: Download Desktop artifacts
         if: steps.check_key.outputs.skip != 'true'
@@ -346,7 +340,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "Pushing HTML5 build to ${ITCH_TARGET}:html5..."
+          WEB_ZIP=$(find artifacts-itch/web -name "*-standalone-web.zip" | head -n 1 || true)
+          if [ -z "${WEB_ZIP}" ]; then
+            echo "::error::Standalone web archive (*-standalone-web.zip) not found!"
+            exit 1
+          fi
+          mkdir -p artifacts-itch/html5
+          unzip -q "${WEB_ZIP}" -d artifacts-itch/html5
+          echo "Pushing HTML5 build (${WEB_ZIP}) to ${ITCH_TARGET}:html5..."
           butler push artifacts-itch/html5 "${ITCH_TARGET}:html5" --userversion "${VERSION}"
 
           WIN_PORTABLE=$(find artifacts-itch/desktop -name "*-win-*-portable.exe" | head -n 1 || true)
@@ -424,12 +425,12 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Publishing Mesh Editor version ${VERSION} to Game Jolt"
 
-      - name: Download HTML5 artifact
+      - name: Download Web & Library artifacts
         if: steps.check_gj.outputs.skip != 'true'
         uses: actions/download-artifact@v4
         with:
-          name: release-itch-html5
-          path: artifacts-gamejolt/html5
+          name: release-web-and-lib
+          path: artifacts-gamejolt/web
 
       - name: Download Desktop artifacts
         if: steps.check_gj.outputs.skip != 'true'
@@ -461,9 +462,12 @@ jobs:
           TARGET_BROWSER_PKG="${BROWSER_PACKAGE_ID:-$PACKAGE_ID}"
 
           # 1. Browser (HTML5) Build (-b flag, index.html at archive root)
-          BROWSER_ZIP="$PWD/MeshEditor-${VERSION}-browser.zip"
-          (cd artifacts-gamejolt/html5 && zip -r -q "${BROWSER_ZIP}" .)
-          echo "Pushing Browser (HTML5) build to Game Jolt (Game: ${GAME_ID}, Package: ${TARGET_BROWSER_PKG}, Release: ${VERSION})..."
+          BROWSER_ZIP=$(find artifacts-gamejolt/web -name "*-standalone-web.zip" | head -n 1 || true)
+          if [ -z "${BROWSER_ZIP}" ]; then
+            echo "::error::Standalone web archive (*-standalone-web.zip) not found!"
+            exit 1
+          fi
+          echo "Pushing Browser (HTML5) build (${BROWSER_ZIP}) to Game Jolt (Game: ${GAME_ID}, Package: ${TARGET_BROWSER_PKG}, Release: ${VERSION})..."
           gjpush -g "${GAME_ID}" -p "${TARGET_BROWSER_PKG}" -r "${VERSION}" -b "${BROWSER_ZIP}"
 
           # 2. Windows Portable Build

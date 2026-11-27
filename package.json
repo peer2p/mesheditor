@@ -1,6 +1,6 @@
 {
   "name": "mesheditor",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "description": "A free, open-source 3D modeling studio powered by Babylon.js. Create, edit, sculpt, retopologize and optimize 3D assets with optional AI assistance. Available on desktop, web & touch devices (iPad/iPhone/Android), Electron app and embeddable Web Component. Supports GLB, GLTF, OBJ, STL and PLY.",
   "private": false,
   "main": "dist-lib/index.umd.js",
