@@ -1627,4 +1627,104 @@ describe('MeshEditorApp, PluginManager & HostAppAdapter Integration Tests', () =
     expect(app.service.sceneParams.voxelToolColor).toBe(DEFAULT_MESH_EDITOR_SETTINGS.voxelToolColor);
     expect(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) || '{}')).toEqual(DEFAULT_MESH_EDITOR_SETTINGS);
   });
+
+  it('configures ground grid line/fill colors and transparent grid fill in Settings, applies live to GridMaterial, and persists in localStorage', () => {
+    app = new MeshEditorApp({
+      container,
+      engine,
+    });
+
+    const btnSettings = container.querySelector('#btnSettings') as HTMLButtonElement;
+    btnSettings.click();
+
+    const lineColorInput = container.querySelector('#settingGridLineColor') as HTMLInputElement;
+    const lineColorHex = container.querySelector('#settingGridLineColorHex') as HTMLElement;
+    const fillColorInput = container.querySelector('#settingGridFillColor') as HTMLInputElement;
+    const fillColorHex = container.querySelector('#settingGridFillColorHex') as HTMLElement;
+    const fillColorItem = container.querySelector('#settingGridFillColorItem') as HTMLElement;
+    const fillBadge = container.querySelector('#settingGridFillTransparentBadge') as HTMLElement;
+    const fillTransparentToggle = container.querySelector('#settingGridFillTransparent') as HTMLInputElement;
+
+    // Verify defaults (transparent fill enabled by default, #3299fd line color, #ffffff fill color)
+    expect(lineColorInput.value.toLowerCase()).toBe('#3299fd');
+    expect(lineColorHex.textContent).toBe('#3299FD');
+    expect(fillColorInput.value.toLowerCase()).toBe('#ffffff');
+    expect(fillColorHex.textContent).toBe('#FFFFFF');
+    expect(fillTransparentToggle.checked).toBe(true);
+    expect(fillBadge.hidden).toBe(false);
+    expect(fillColorItem.classList.contains('is-transparent-fill')).toBe(true);
+    expect(app.service.gridMaterial.linesOnly).toBe(true);
+    expect(app.service.gridMaterial.opacity).toBe(1.0);
+    expect(app.service.gridMaterial.lineColor.toHexString().toLowerCase()).toBe('#3299fd');
+    // mainColor matches lineColor when linesOnly=true so minor lines stay pure without fill bleed
+    expect(app.service.gridMaterial.mainColor.toHexString().toLowerCase()).toBe('#3299fd');
+    expect(app.service.gridMesh.alphaIndex).toBe(-10);
+
+    // Resizing the grid preserves transparent fill alphaIndex
+    app.service.setGridSize(60);
+    expect(app.service.gridMesh.alphaIndex).toBe(-10);
+
+    // Disable transparent grid fill and customize grid line and fill colors
+    fillTransparentToggle.checked = false;
+    fillTransparentToggle.dispatchEvent(new Event('change', { bubbles: true }));
+
+    lineColorInput.value = '#ff8800';
+    lineColorInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    fillColorInput.value = '#1b2230';
+    fillColorInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(app.service.sceneParams.gridFillTransparent).toBe(false);
+    expect(app.service.sceneParams.gridLineColor).toBe('#ff8800');
+    expect(app.service.sceneParams.gridFillColor).toBe('#1b2230');
+    expect(lineColorHex.textContent).toBe('#FF8800');
+    expect(fillColorHex.textContent).toBe('#1B2230');
+    expect(fillBadge.hidden).toBe(true);
+    expect(fillColorItem.classList.contains('is-transparent-fill')).toBe(false);
+    expect(app.service.gridMaterial.linesOnly).toBe(false);
+    expect(app.service.gridMaterial.opacity).toBeCloseTo(0.65, 2);
+    expect(app.service.gridMaterial.lineColor.toHexString().toLowerCase()).toBe('#ff8800');
+    expect(app.service.gridMaterial.mainColor.toHexString().toLowerCase()).toBe('#1b2230');
+    expect(app.service.gridMesh.alphaIndex).toBe(Number.MAX_VALUE);
+
+    const stored = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) || '{}');
+    expect(stored.gridLineColor).toBe('#ff8800');
+    expect(stored.gridFillColor).toBe('#1b2230');
+    expect(stored.gridFillTransparent).toBe(false);
+
+    // Re-instantiate MeshEditorApp and verify persisted grid settings are restored
+    app.dispose();
+    container.innerHTML = '';
+    const secondEngine = new NullEngine();
+    app = new MeshEditorApp({
+      container,
+      engine: secondEngine,
+    });
+
+    expect(app.service.sceneParams.gridLineColor).toBe('#ff8800');
+    expect(app.service.sceneParams.gridFillColor).toBe('#1b2230');
+    expect(app.service.sceneParams.gridFillTransparent).toBe(false);
+    expect(app.service.gridMaterial.linesOnly).toBe(false);
+    expect(app.service.gridMaterial.opacity).toBeCloseTo(0.65, 2);
+    expect(app.service.gridMaterial.lineColor.toHexString().toLowerCase()).toBe('#ff8800');
+    expect(app.service.gridMaterial.mainColor.toHexString().toLowerCase()).toBe('#1b2230');
+    expect((container.querySelector('#settingGridLineColor') as HTMLInputElement).value.toLowerCase()).toBe('#ff8800');
+    expect((container.querySelector('#settingGridFillColor') as HTMLInputElement).value.toLowerCase()).toBe('#1b2230');
+    expect((container.querySelector('#settingGridFillTransparent') as HTMLInputElement).checked).toBe(false);
+    expect((container.querySelector('#settingGridFillTransparentBadge') as HTMLElement).hidden).toBe(true);
+
+    // Reset Defaults restores transparent grid fill + #3299fd line color defaults
+    const btnReset = container.querySelector('#btnResetSettings') as HTMLButtonElement;
+    btnReset.click();
+
+    expect(app.service.sceneParams.gridLineColor).toBe('#3299fd');
+    expect(app.service.sceneParams.gridFillColor).toBe('#ffffff');
+    expect(app.service.sceneParams.gridFillTransparent).toBe(true);
+    expect(app.service.gridMaterial.linesOnly).toBe(true);
+    expect(app.service.gridMaterial.opacity).toBe(1.0);
+    expect(app.service.gridMaterial.lineColor.toHexString().toLowerCase()).toBe('#3299fd');
+    expect(app.service.gridMaterial.mainColor.toHexString().toLowerCase()).toBe('#3299fd');
+    expect((container.querySelector('#settingGridFillTransparentBadge') as HTMLElement).hidden).toBe(false);
+    expect(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) || '{}')).toEqual(DEFAULT_MESH_EDITOR_SETTINGS);
+  });
 });

@@ -305,6 +305,9 @@ export class MeshEditorService {
     clearColor: '#141820',
     grid: true,
     gridSize: 20,
+    gridLineColor: '#3299fd',
+    gridFillColor: '#ffffff',
+    gridFillTransparent: true,
     ambientLight: 1.0,
     sunLight: 1.2,
     cameraSpeed: 0.4,
@@ -453,9 +456,6 @@ export class MeshEditorService {
     this.gridMaterial.minorUnitVisibility = 0.45;
     this.gridMaterial.gridRatio = 1;
     this.gridMaterial.backFaceCulling = false;
-    this.gridMaterial.mainColor = new Color3(1, 1, 1);
-    this.gridMaterial.lineColor = new Color3(0.35, 0.45, 0.55);
-    this.gridMaterial.opacity = 0.65;
 
     this.gridMesh = MeshBuilder.CreateGround(
       'editor_ground_grid',
@@ -466,6 +466,7 @@ export class MeshEditorService {
     this.gridMesh.position.y = -0.001;
     this.gridMesh.isPickable = true;
     (this.gridMesh as any).metadata = { isEditorHelper: true };
+    this.applyGridAppearance();
 
     this.highlightLayer = new HighlightLayer('editor_highlight', this.scene);
     this.highlightLayer.innerGlow = true;
@@ -1479,6 +1480,35 @@ export class MeshEditorService {
       return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
     }
     return fallback;
+  }
+
+  public getGridLineColor3(): Color3 {
+    return Color3.FromHexString(this.normalizeHexColor(this.sceneParams.gridLineColor, '#3299fd'));
+  }
+
+  public getGridFillColor3(): Color3 {
+    return Color3.FromHexString(this.normalizeHexColor(this.sceneParams.gridFillColor, '#ffffff'));
+  }
+
+  private applyGridAppearance(): void {
+    if (!this.gridMaterial) return;
+    const lineColor = this.getGridLineColor3();
+    const fillColor = this.getGridFillColor3();
+    const transparentFill = !!this.sceneParams.gridFillTransparent;
+    this.gridMaterial.lineColor = lineColor;
+    this.gridMaterial.linesOnly = transparentFill;
+    if (transparentFill) {
+      // In linesOnly mode, GridMaterial still mixes mainColor with lineColor on minor lines (0.45)
+      // and antialiased edges, so matching mainColor to lineColor keeps all grid lines pure.
+      this.gridMaterial.mainColor = lineColor.clone();
+      this.gridMaterial.opacity = 1.0;
+    } else {
+      this.gridMaterial.mainColor = fillColor;
+      this.gridMaterial.opacity = 0.65;
+    }
+    if (this.gridMesh && !this.gridMesh.isDisposed()) {
+      this.gridMesh.alphaIndex = transparentFill ? -10 : Number.MAX_VALUE;
+    }
   }
 
   public getMeshSelectionColor3(): Color3 {
@@ -10175,8 +10205,24 @@ export class MeshEditorService {
     this.gridMesh.material = this.gridMaterial;
     this.gridMesh.position.y = -0.001;
     this.gridMesh.isPickable = true;
+    this.gridMesh.alphaIndex = this.sceneParams.gridFillTransparent ? -10 : Number.MAX_VALUE;
     this.gridMesh.setEnabled(this.sceneParams.grid);
     (this.gridMesh as any).metadata = { isEditorHelper: true };
+  }
+
+  public setGridLineColor(hex: string): void {
+    this.sceneParams.gridLineColor = this.normalizeHexColor(hex, '#3299fd');
+    this.applyGridAppearance();
+  }
+
+  public setGridFillColor(hex: string): void {
+    this.sceneParams.gridFillColor = this.normalizeHexColor(hex, '#ffffff');
+    this.applyGridAppearance();
+  }
+
+  public setGridFillTransparent(transparent: boolean): void {
+    this.sceneParams.gridFillTransparent = !!transparent;
+    this.applyGridAppearance();
   }
 
   public setAmbientIntensity(val: number): void {

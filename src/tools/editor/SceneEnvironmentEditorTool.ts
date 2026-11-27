@@ -29,7 +29,7 @@ export class SceneEnvironmentEditorTool extends AbstractEditorTool {
 </ul>
 
 <h4><i class="app-icon" data-lucide="settings"></i> Viewport &amp; Snapping Settings</h4>
-<p>Ground grid visibility, grid size, camera speed, move snap, and rotate snap have moved to the <strong>Settings</strong> dialog (gear icon in the top-right toolbar), where they are saved automatically.</p>
+<p>Ground grid visibility, grid size, grid colors, transparent grid fill, camera speed, move snap, and rotate snap have moved to the <strong>Settings</strong> dialog (gear icon in the top-right toolbar), where they are saved automatically.</p>
 `.trim();
 }
 

@@ -890,6 +890,37 @@
                   </div>
                   <input type="range" id="settingGridSizeRange" class="setting-range" min="5" max="200" step="5" value="20" />
                 </div>
+
+                <div class="setting-item setting-item-color">
+                  <div class="setting-info">
+                    <label class="setting-label" for="settingGridLineColor">Grid Line Color</label>
+                    <span class="setting-desc">Color of major and minor ground grid lines</span>
+                  </div>
+                  <div class="setting-color-control">
+                    <span class="setting-color-hex" id="settingGridLineColorHex">#3299FD</span>
+                    <input type="color" id="settingGridLineColor" class="setting-color-input" value="#3299fd" />
+                  </div>
+                </div>
+
+                <div class="setting-item setting-item-color is-transparent-fill" id="settingGridFillColorItem">
+                  <div class="setting-info">
+                    <label class="setting-label" for="settingGridFillColor">Grid Fill Color</label>
+                    <span class="setting-desc">Surface fill color between ground grid lines</span>
+                  </div>
+                  <div class="setting-color-control">
+                    <span class="setting-color-badge" id="settingGridFillTransparentBadge">Transparent</span>
+                    <span class="setting-color-hex" id="settingGridFillColorHex">#FFFFFF</span>
+                    <input type="color" id="settingGridFillColor" class="setting-color-input" value="#ffffff" />
+                  </div>
+                </div>
+
+                <div class="setting-item setting-item-toggle">
+                  <div class="setting-info">
+                    <label class="setting-label" for="settingGridFillTransparent">Transparent Grid Fill</label>
+                    <span class="setting-desc">Hide the surface fill so only grid lines are rendered</span>
+                  </div>
+                  <input type="checkbox" switch id="settingGridFillTransparent" class="setting-switch" checked />
+                </div>
               </div>
 
               <div class="settings-section">

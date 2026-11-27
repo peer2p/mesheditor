@@ -25,6 +25,9 @@ export const SETTINGS_STORAGE_KEY = 'mesheditor_settings';
 export interface MeshEditorSettings {
   grid: boolean;
   gridSize: number;
+  gridLineColor: string;
+  gridFillColor: string;
+  gridFillTransparent: boolean;
   cameraSpeed: number;
   translateSnap: number;
   rotateSnap: number;
@@ -38,6 +41,9 @@ export interface MeshEditorSettings {
 export const DEFAULT_MESH_EDITOR_SETTINGS: MeshEditorSettings = {
   grid: true,
   gridSize: 20,
+  gridLineColor: '#3299fd',
+  gridFillColor: '#ffffff',
+  gridFillTransparent: true,
   cameraSpeed: 0.4,
   translateSnap: 0.1,
   rotateSnap: 5,
@@ -102,6 +108,18 @@ export class SettingsUIService {
   private getColorSettingBindings() {
     return [
       {
+        key: 'gridLineColor' as const,
+        inputId: 'settingGridLineColor',
+        hexId: 'settingGridLineColorHex',
+        apply: (val: string) => this.app.service.setGridLineColor(val),
+      },
+      {
+        key: 'gridFillColor' as const,
+        inputId: 'settingGridFillColor',
+        hexId: 'settingGridFillColorHex',
+        apply: (val: string) => this.app.service.setGridFillColor(val),
+      },
+      {
         key: 'meshSelectionColor' as const,
         inputId: 'settingMeshSelectionColor',
         hexId: 'settingMeshSelectionColorHex',
@@ -134,6 +152,18 @@ export class SettingsUIService {
     ];
   }
 
+  private syncGridFillTransparencyState(): void {
+    const isTransparent = !!this.app.service.sceneParams.gridFillTransparent;
+    const fillItem = this.app.getElement<HTMLElement>('settingGridFillColorItem');
+    const badgeEl = this.app.getElement<HTMLElement>('settingGridFillTransparentBadge');
+    if (fillItem) {
+      fillItem.classList.toggle('is-transparent-fill', isTransparent);
+    }
+    if (badgeEl) {
+      badgeEl.hidden = !isTransparent;
+    }
+  }
+
   private syncSliderVisual(rangeEl: HTMLInputElement, value: number, unit: string): void {
     rangeEl.style.setProperty('--attr-min', rangeEl.min || '0');
     rangeEl.style.setProperty('--attr-max', rangeEl.max || '100');
@@ -157,6 +187,9 @@ export class SettingsUIService {
 
       if (typeof parsed.grid === 'boolean') {
         this.app.service.setGridVisible(parsed.grid);
+      }
+      if (typeof parsed.gridFillTransparent === 'boolean') {
+        this.app.service.setGridFillTransparent(parsed.gridFillTransparent);
       }
       for (const binding of this.getNumericSettingBindings()) {
         const val = parsed[binding.key];
@@ -182,6 +215,9 @@ export class SettingsUIService {
       const payload: MeshEditorSettings = {
         grid: !!this.app.service.sceneParams.grid,
         gridSize: this.app.service.sceneParams.gridSize,
+        gridLineColor: this.app.service.sceneParams.gridLineColor,
+        gridFillColor: this.app.service.sceneParams.gridFillColor,
+        gridFillTransparent: !!this.app.service.sceneParams.gridFillTransparent,
         cameraSpeed: this.app.service.sceneParams.cameraSpeed,
         translateSnap: this.app.service.sceneParams.translateSnap,
         rotateSnap: this.app.service.sceneParams.rotateSnap,
@@ -202,6 +238,12 @@ export class SettingsUIService {
     if (gridToggle) {
       gridToggle.checked = !!this.app.service.sceneParams.grid;
     }
+
+    const gridFillTransparentToggle = this.app.getElement<HTMLInputElement>('settingGridFillTransparent');
+    if (gridFillTransparentToggle) {
+      gridFillTransparentToggle.checked = !!this.app.service.sceneParams.gridFillTransparent;
+    }
+    this.syncGridFillTransparencyState();
 
     for (const binding of this.getNumericSettingBindings()) {
       const currentVal = this.app.service.sceneParams[binding.key];
@@ -269,6 +311,7 @@ export class SettingsUIService {
 
     this.app.service.setGridVisible(DEFAULT_MESH_EDITOR_SETTINGS.grid);
     this.app.service.setGridSize(DEFAULT_MESH_EDITOR_SETTINGS.gridSize);
+    this.app.service.setGridFillTransparent(DEFAULT_MESH_EDITOR_SETTINGS.gridFillTransparent);
     this.app.service.setCameraSpeed(DEFAULT_MESH_EDITOR_SETTINGS.cameraSpeed);
     this.app.service.setTranslateSnap(DEFAULT_MESH_EDITOR_SETTINGS.translateSnap);
     this.app.service.setRotateSnap(DEFAULT_MESH_EDITOR_SETTINGS.rotateSnap);
@@ -504,6 +547,18 @@ export class SettingsUIService {
       gridToggle.addEventListener('change', () => {
         this.app.service.setGridVisible(gridToggle.checked);
         this.app.updatePanelButtonStates();
+        this.saveSettingsToStorage();
+      });
+    }
+
+    const gridFillTransparentToggle = this.app.getElement<HTMLInputElement>('settingGridFillTransparent');
+    if (gridFillTransparentToggle) {
+      if (typeof HTMLInputElement !== 'undefined' && !('switch' in HTMLInputElement.prototype)) {
+        gridFillTransparentToggle.setAttribute('role', 'switch');
+      }
+      gridFillTransparentToggle.addEventListener('change', () => {
+        this.app.service.setGridFillTransparent(gridFillTransparentToggle.checked);
+        this.syncGridFillTransparencyState();
         this.saveSettingsToStorage();
       });
     }
