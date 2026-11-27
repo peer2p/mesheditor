@@ -433,12 +433,6 @@ function createWindow(filePathsToOpen = null) {
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     backgroundColor: '#0f1218',
     show: false,
-    ...(isMac
-      ? {
-          titleBarStyle: 'hiddenInset',
-          trafficLightPosition: { x: 16, y: 14 },
-        }
-      : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
