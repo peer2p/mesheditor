@@ -6,6 +6,7 @@
 [![Tests](https://img.shields.io/badge/Vitest%20Integration%20Tests-232%20Passed-brightgreen)](tests/integration/)
 [![Electron](https://img.shields.io/badge/Electron-45.1-47848F?logo=electron)](https://www.electronjs.org/)
 [![Touch & Mobile](https://img.shields.io/badge/Touch%20%26%20Mobile-iPad%20%7C%20iPhone%20%7C%20Android-2ea043)](README.md#touch--mobile-controls)
+[![Published on webcomponents.org](https://img.shields.io/badge/webcomponents.org-published-blue.svg)](https://www.webcomponents.org/element/mesheditor)
 
 A modular 3D model studio and mesh manipulation workbench built with **TypeScript** and **Babylon.js 9.x**. Engineered from the ground up to function across **Desktop, Tablet & Mobile Touch Devices** and multiple deployment targets through a decoupled **Platform Adapter Architecture**:
 
@@ -591,6 +592,7 @@ npm install mesheditor
 ```
 
 > [!TIP]
+> - **webcomponents.org Catalog**: Explore the published custom element listing at [![Published on webcomponents.org](https://img.shields.io/badge/webcomponents.org-published-blue.svg)](https://www.webcomponents.org/element/mesheditor)
 > - **Interactive StackBlitz Showcase**: Open and run the standalone Vite + Web Component showcase with one click in your browser: [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/peer2p/mesheditor/tree/main/examples/web-component-showcase?view=preview) (Source code in [`examples/web-component-showcase/`](examples/web-component-showcase/))
 > - **Live Integration Example**: Check out the interactive [Host Application & Plugin Integration Demo](https://peer2p.github.io/mesheditor/webcomponent-example.html) (or locally in `docs/webcomponent-example.html`) showcasing live plugins, telemetry, and two-way host communication.
 

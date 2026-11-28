@@ -1,6 +1,7 @@
 # MeshEditor Web Component — StackBlitz & Vite Showcase
 
 [![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/peer2p/mesheditor/tree/main/examples/web-component-showcase?view=preview)
+[![Published on webcomponents.org](https://img.shields.io/badge/webcomponents.org-published-blue.svg)](https://www.webcomponents.org/element/mesheditor)
 
 This showcase demonstrates how to integrate the `<mesh-editor>` custom element and its dynamic plugin system into a modern Vite + TypeScript application using the official `mesheditor` npm package.
 
